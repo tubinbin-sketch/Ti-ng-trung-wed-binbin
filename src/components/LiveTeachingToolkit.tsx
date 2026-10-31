@@ -22,6 +22,9 @@ import {
   Headphones,
   CheckCircle2,
   AlertCircle,
+  ChevronDown,
+  Keyboard,
+  Wrench,
 } from 'lucide-react';
 import { VocabSlide } from '../data/chineseData';
 import {
@@ -41,7 +44,10 @@ import {
 import { playGentleChime, speakChinese } from '../utils/speech';
 import {
   ClassroomMiniGameMode,
+  DictationEvaluationResult,
+  evaluateDictationAttempt,
   generateAssignmentFromSlides,
+  generateClassroomDictationDeck,
   generateClassroomMiniGameQuestions,
 } from '../utils/hskStudyHelpers';
 import { saveStoredAssignment } from '../utils/assignmentParser';
@@ -54,6 +60,8 @@ interface LiveTeachingToolkitProps {
   onSelectSlideIndex: (idx: number) => void;
   onNotify?: (message: string) => void;
   onSwitchToStudentHomework?: () => void;
+  onOpenWorksheetModal?: () => void;
+  onToggleShortcutsHint?: () => void;
 }
 
 export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
@@ -63,7 +71,11 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
   onSelectSlideIndex,
   onNotify,
   onSwitchToStudentHomework,
+  onOpenWorksheetModal,
+  onToggleShortcutsHint,
 }) => {
+  const [isToolsDropdownOpen, setIsToolsDropdownOpen] = useState(false);
+
   // 1. Projector Mode state
   const [isProjectorOpen, setIsProjectorOpen] = useState(false);
 
@@ -106,6 +118,26 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
   // 6. HSK 3.0 Lesson Plan & Worksheet Summary Modal state
   const [isLessonPlanOpen, setIsLessonPlanOpen] = useState(false);
   const [copiedLessonPlan, setCopiedLessonPlan] = useState(false);
+
+  // 7. Classroom Dictation Studio (听写 · Tīngxiě) state
+  const [isDictationOpen, setIsDictationOpen] = useState(false);
+  const [dictationIdx, setDictationIdx] = useState(0);
+  const [dictationInput, setDictationInput] = useState('');
+  const [isDictationRevealed, setIsDictationRevealed] = useState(false);
+  const [showDictationHints, setShowDictationHints] = useState(true);
+  const [dictationEval, setDictationEval] = useState<DictationEvaluationResult | null>(null);
+  const [dictationStudentId, setDictationStudentId] = useState<string>(() => {
+    const initial = getStoredStudentRoster();
+    return initial[0]?.id || 'st-1';
+  });
+  const [dictationBonusBanner, setDictationBonusBanner] = useState<string | null>(null);
+
+  const dictationDeck = useMemo(
+    () => generateClassroomDictationDeck(slides),
+    [slides]
+  );
+  const currentDictationItem =
+    dictationDeck[dictationIdx % Math.max(1, dictationDeck.length)] || dictationDeck[0];
 
   const currentHsk3Meta = useMemo(
     () => getHsk3VocabStandard(currentSlide),
@@ -324,184 +356,299 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
   return (
     <>
       {/* =====================================================================
-          TEACHER LIVE TEACHING TOOLKIT BAR (SLIM 44PX FLOATING PILL BAR)
+          TEACHER CLASSROOM TOOLS DROPDOWN ("Công cụ đứng lớp")
           ===================================================================== */}
       <div
         data-testid="live-teaching-toolkit-bar"
-        className="relative"
+        className="relative shrink-0"
       >
-        <div className="min-h-[34px] rounded-xl bg-[#1E3227] text-[#FAFBF7] border border-[#C5B358]/60 px-2.5 py-1 shadow-xs flex items-center justify-between gap-1.5 flex-nowrap overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="font-sans text-[11px] font-bold text-[#C5B358] whitespace-nowrap shrink-0">
-              🎛️ Đứng lớp:
-            </span>
-          </div>
-
-          {/* Compact 1-Click Classroom Buttons on 1 Single Line */}
-          <div className="flex items-center gap-1 shrink-0 flex-nowrap">
-            <button
-              type="button"
-              data-testid="toolkit-projector-btn"
-              onClick={() => {
-                setIsProjectorOpen(true);
-                speakChinese(currentSlide.hanzi);
-              }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#C5B358] hover:bg-[#d5c368] text-[#1E3227] text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap"
-              title="Mở chế độ màn hình lớn chữ to (Phím tắt: F)"
-            >
-              <Monitor className="w-3 h-3 shrink-0" />
-              <span>Fullscreen</span>
-            </button>
-
-            <button
-              type="button"
-              data-testid="toolkit-lucky-picker-btn"
-              onClick={handleOpenLuckyPicker}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/10 hover:bg-white/20 text-[#FAFBF7] border border-[#C5B358]/40 text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap"
-              title="Quay số ngẫu nhiên gọi học viên phát biểu"
-            >
-              <Dices className="w-3 h-3 text-[#C5B358] shrink-0" />
-              <span>Gọi tên</span>
-            </button>
-
-            <button
-              type="button"
-              data-testid="toolkit-timer-btn"
-              onClick={() => setIsTimerPanelOpen((v) => !v)}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap border tabular-nums ${
-                isTimerPanelOpen || isTimerRunning
-                  ? 'bg-[#FAFBF7] text-[#1E3227] border-[#C5B358]'
-                  : 'bg-white/10 hover:bg-white/20 text-[#FAFBF7] border-[#C5B358]/40'
-              }`}
-              title="Đồng hồ bấm giờ thảo luận lớp học"
-            >
-              <Timer className="w-3 h-3 text-[#C5B358] shrink-0" />
-              <span>{formatClassTimer(remainingSeconds)}</span>
-            </button>
-
-            <button
-              type="button"
-              data-testid="toolkit-minigame-btn"
-              onClick={handleOpenMiniGame}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#C84B31] hover:bg-[#d8583d] text-white border border-[#C5B358]/50 text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap shadow-2xs"
-              title="Mở Mini-Game tương tác nhanh cho cả lớp"
-            >
-              <Gamepad2 className="w-3 h-3 text-[#FDE68A] shrink-0" />
-              <span>Mini-Game</span>
-            </button>
-
-            <button
-              type="button"
-              data-testid="toolkit-assign-slide-btn"
-              onClick={handleOpenAssignFromSlideModal}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#E7ECD9] hover:bg-white text-[#1E3227] border border-[#C5B358] text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap"
-              title="Giao bài tập về nhà 1-Click từ Slide hiện tại"
-            >
-              <Send className="w-3 h-3 text-[#1E3227] shrink-0" />
-              <span>Giao bài</span>
-            </button>
-
-            <button
-              type="button"
-              data-testid="toolkit-lesson-plan-btn"
-              onClick={() => setIsLessonPlanOpen(true)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/10 hover:bg-white/20 text-[#FAFBF7] border border-[#C5B358]/40 text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap"
-              title="Xem và sao chép Giáo án HSK 3.0"
-            >
-              <FileSpreadsheet className="w-3 h-3 text-[#C5B358] shrink-0" />
-              <span>Giáo án</span>
-            </button>
-          </div>
+        <div className="inline-flex items-center gap-1.5">
+          <button
+            type="button"
+            data-testid="classroom-tools-dropdown-btn"
+            onClick={() => setIsToolsDropdownOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] border border-[#C5B358]/60 text-sm font-bold shadow-xs transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap"
+            title="Mở menu Công cụ đứng lớp (Gọi tên, Bấm giờ, Giao bài, Chính tả, In A4, Phím tắt)"
+          >
+            <Wrench className="w-4 h-4 text-[#C5B358] shrink-0" />
+            <span>Công cụ đứng lớp</span>
+            {isTimerRunning && (
+              <span className="px-1.5 py-0.5 rounded bg-[#C5B358] text-[#0F382E] font-mono text-sm font-extrabold tabular-nums">
+                {formatClassTimer(remainingSeconds)}
+              </span>
+            )}
+            <ChevronDown className="w-4 h-4 text-[#C5B358] shrink-0" />
+          </button>
         </div>
 
-        {/* Compact On-Demand Timer Popover Bar (Only shown when teacher clicks ⏱️ Bấm giờ) */}
-        {isTimerPanelOpen && (
+        {/* Dropdown Menu Containing All Classroom Teaching Tools */}
+        {isToolsDropdownOpen && (
           <div
-            data-testid="toolkit-timer-panel"
-            className="mt-1.5 rounded-2xl bg-[#1E3227] text-[#FAFBF7] border border-[#C5B358]/60 px-3.5 py-2 shadow-lg flex flex-wrap items-center justify-between gap-2.5"
+            data-testid="classroom-tools-dropdown-menu"
+            className="absolute right-0 mt-2 w-[300px] sm:w-[340px] z-40 rounded-2xl backdrop-blur-xl bg-[#182B22]/98 text-[#FAF7F0] border border-[#C5B358]/60 shadow-2xl p-3 space-y-2"
           >
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-bold text-[#C5B358]">
-                ⏱️ Chọn nhanh thời gian:
+            <div className="flex items-center justify-between pb-2 border-b border-white/15">
+              <span className="text-sm font-bold text-[#C5B358] flex items-center gap-1.5">
+                <Wrench className="w-4 h-4" />
+                <span>Công cụ giảng dạy trực tiếp</span>
               </span>
-              {[
-                { label: '30s', secs: 30 },
-                { label: '1p', secs: 60 },
-                { label: '3p', secs: 180 },
-              ].map((preset) => (
-                <button
-                  key={preset.secs}
-                  type="button"
-                  data-testid={`timer-preset-${preset.secs}`}
-                  onClick={() => handleSelectTimerPreset(preset.secs)}
-                  className={`px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    timerPresetSeconds === preset.secs
-                      ? 'bg-[#C5B358] text-[#1E3227]'
-                      : 'bg-white/10 text-white hover:bg-white/20'
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              ))}
+              <button
+                type="button"
+                onClick={() => setIsToolsDropdownOpen(false)}
+                aria-label="Đóng menu công cụ đứng lớp"
+                className="p-1 rounded-lg text-white/70 hover:text-white hover:bg-white/10 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div
-                data-testid="class-timer-readout"
-                className={`px-2.5 py-0.5 rounded-lg font-mono text-sm font-black tabular-nums border ${
-                  timerFinishedAlert
-                    ? 'bg-[#C84B31] text-white border-white'
-                    : 'bg-[#FAFBF7] text-[#1E3227] border-[#C5B358]'
-                }`}
-              >
-                {formatClassTimer(remainingSeconds)}
-              </div>
-
+            <div className="grid grid-cols-1 gap-1.5">
               <button
                 type="button"
-                data-testid="timer-toggle-run-btn"
+                data-testid="toolkit-projector-btn"
                 onClick={() => {
-                  setTimerFinishedAlert(false);
-                  if (remainingSeconds === 0) {
-                    setRemainingSeconds(timerPresetSeconds);
-                  }
-                  setIsTimerRunning((r) => !r);
+                  setIsToolsDropdownOpen(false);
+                  setIsProjectorOpen(true);
+                  speakChinese(currentSlide.hanzi);
                 }}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#C5B358] text-[#1E3227] text-xs font-bold cursor-pointer"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#C5B358] hover:bg-[#d5c368] text-[#1E3227] text-sm font-bold transition-all cursor-pointer"
               >
-                {isTimerRunning ? (
-                  <>
-                    <Pause className="w-3 h-3" />
-                    <span>Tạm dừng</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-3 h-3" />
-                    <span>Bắt đầu</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                data-testid="timer-reset-btn"
-                onClick={() => {
-                  setIsTimerRunning(false);
-                  setTimerFinishedAlert(false);
-                  setRemainingSeconds(timerPresetSeconds);
-                }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-semibold cursor-pointer"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Đặt lại</span>
-              </button>
-
-              {timerFinishedAlert && (
-                <span className="text-xs font-bold text-[#FDE047]">
-                  🔔 Hết giờ!
+                <span className="inline-flex items-center gap-2">
+                  <Monitor className="w-4 h-4 shrink-0" />
+                  <span>Trình chiếu Fullscreen</span>
                 </span>
+                <span className="text-sm font-semibold opacity-80">Phím F</span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="toolkit-lucky-picker-btn"
+                onClick={() => {
+                  setIsToolsDropdownOpen(false);
+                  handleOpenLuckyPicker();
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#FAF7F0] border border-white/15 text-sm font-bold transition-all cursor-pointer"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Dices className="w-4 h-4 text-[#C5B358] shrink-0" />
+                  <span>Gọi tên ngẫu nhiên</span>
+                </span>
+                <span className="text-sm text-[#C5B358]">{roster.length} HV</span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="toolkit-timer-btn"
+                onClick={() => {
+                  setIsTimerPanelOpen((v) => !v);
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#FAF7F0] border border-white/15 text-sm font-bold transition-all cursor-pointer tabular-nums"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Timer className="w-4 h-4 text-[#C5B358] shrink-0" />
+                  <span>Bấm giờ thảo luận</span>
+                </span>
+                <span className="px-2 py-0.5 rounded bg-black/30 text-[#C5B358] font-mono text-sm">
+                  {formatClassTimer(remainingSeconds)}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="toolkit-minigame-btn"
+                onClick={() => {
+                  setIsToolsDropdownOpen(false);
+                  handleOpenMiniGame();
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#B8292F] hover:bg-[#C93238] text-white border border-[#C5B358]/40 text-sm font-bold transition-all cursor-pointer"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Gamepad2 className="w-4 h-4 text-[#FDE68A] shrink-0" />
+                  <span>Mini-Game cả lớp</span>
+                </span>
+                <span className="text-sm text-[#FDE68A]">6 câu</span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="open-dictation-studio-btn"
+                onClick={() => {
+                  setIsToolsDropdownOpen(false);
+                  setDictationIdx(activeSlideIndex);
+                  setDictationInput('');
+                  setIsDictationRevealed(false);
+                  setDictationEval(null);
+                  setDictationBonusBanner(null);
+                  setIsDictationOpen(true);
+                  speakChinese(currentSlide.hanzi, 0.9);
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#FAF7F0] border border-white/15 text-sm font-bold transition-all cursor-pointer"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Headphones className="w-4 h-4 text-[#C5B358] shrink-0" />
+                  <span>Chính tả Nghe - Viết (听写)</span>
+                </span>
+                <span className="text-sm text-[#C5B358]">HSK 3.0</span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="toolkit-assign-slide-btn"
+                onClick={() => {
+                  setIsToolsDropdownOpen(false);
+                  handleOpenAssignFromSlideModal();
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#FAF7F0] border border-white/15 text-sm font-bold transition-all cursor-pointer"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Send className="w-4 h-4 text-[#C5B358] shrink-0" />
+                  <span>Giao bài tập từ Slide</span>
+                </span>
+                <span className="text-sm text-[#C5B358]">1-Click</span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="toolkit-lesson-plan-btn"
+                onClick={() => {
+                  setIsToolsDropdownOpen(false);
+                  setIsLessonPlanOpen(true);
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#FAF7F0] border border-white/15 text-sm font-bold transition-all cursor-pointer"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-[#C5B358] shrink-0" />
+                  <span>Giáo án chuẩn HSK 3.0</span>
+                </span>
+                <span className="text-sm text-[#C5B358]">{slides.length} từ</span>
+              </button>
+
+              {onOpenWorksheetModal && (
+                <button
+                  type="button"
+                  data-testid="open-a4-worksheet-btn"
+                  onClick={() => {
+                    setIsToolsDropdownOpen(false);
+                    onOpenWorksheetModal();
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#FAF7F0] border border-white/15 text-sm font-bold transition-all cursor-pointer"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Printer className="w-4 h-4 text-[#C5B358] shrink-0" />
+                    <span>In phiếu tập viết A4</span>
+                  </span>
+                  <span className="text-sm text-[#C5B358]">PDF/In</span>
+                </button>
+              )}
+
+              {onToggleShortcutsHint && (
+                <button
+                  type="button"
+                  data-testid="toolbar-shortcuts-badge-btn"
+                  onClick={() => {
+                    setIsToolsDropdownOpen(false);
+                    onToggleShortcutsHint();
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-[#FAF7F0] border border-white/15 text-sm font-bold transition-all cursor-pointer"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Keyboard className="w-4 h-4 text-[#C5B358] shrink-0" />
+                    <span>Phím tắt đứng lớp</span>
+                  </span>
+                  <span className="text-sm text-[#C5B358]">Space / W / F</span>
+                </button>
               )}
             </div>
+
+            {/* Compact On-Demand Timer Controls inside Dropdown */}
+            {isTimerPanelOpen && (
+              <div
+                data-testid="toolkit-timer-panel"
+                className="mt-2 pt-2.5 border-t border-white/15 space-y-2"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <span className="text-sm font-bold text-[#C5B358] flex items-center gap-1">
+                    <Timer className="w-4 h-4" />
+                    <span>Bấm giờ:</span>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {[
+                      { label: '30s', secs: 30 },
+                      { label: '1p', secs: 60 },
+                      { label: '3p', secs: 180 },
+                    ].map((preset) => (
+                      <button
+                        key={preset.secs}
+                        type="button"
+                        data-testid={`timer-preset-${preset.secs}`}
+                        onClick={() => handleSelectTimerPreset(preset.secs)}
+                        className={`px-2.5 py-1 rounded-lg text-sm font-bold transition-all cursor-pointer ${
+                          timerPresetSeconds === preset.secs
+                            ? 'bg-[#C5B358] text-[#1E3227]'
+                            : 'bg-white/10 text-white hover:bg-white/20'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <div
+                    data-testid="class-timer-readout"
+                    className={`px-3 py-1 rounded-lg font-mono text-sm font-black tabular-nums border ${
+                      timerFinishedAlert
+                        ? 'bg-[#C84B31] text-white border-white'
+                        : 'bg-[#FAFBF7] text-[#1E3227] border-[#C5B358]'
+                    }`}
+                  >
+                    {formatClassTimer(remainingSeconds)}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      data-testid="timer-toggle-run-btn"
+                      onClick={() => {
+                        setTimerFinishedAlert(false);
+                        if (remainingSeconds === 0) {
+                          setRemainingSeconds(timerPresetSeconds);
+                        }
+                        setIsTimerRunning((r) => !r);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#C5B358] text-[#1E3227] text-sm font-bold cursor-pointer"
+                    >
+                      {isTimerRunning ? (
+                        <>
+                          <Pause className="w-3.5 h-3.5" />
+                          <span>Dừng</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3.5 h-3.5" />
+                          <span>Chạy</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      data-testid="timer-reset-btn"
+                      onClick={() => {
+                        setIsTimerRunning(false);
+                        setTimerFinishedAlert(false);
+                        setRemainingSeconds(timerPresetSeconds);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-semibold cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Đặt lại</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1303,6 +1450,301 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
           </div>
         </div>
       )}
+
+      {/* =====================================================================
+          MODAL 6: 🎧 PHÒNG ĐỌC CHÍNH TẢ NGHE – VIẾT TRÊN LỚP (听写 · CLASSROOM DICTATION STUDIO)
+          ===================================================================== */}
+      {isDictationOpen && currentDictationItem && (
+        <div
+          className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Phòng Đọc Chính Tả Nghe - Viết Trên Lớp (听写)"
+          data-testid="dictation-studio-modal"
+          onClick={() => setIsDictationOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-3xl rounded-3xl bg-[#FAF7F0] border-2 border-[#C5B358] shadow-2xl overflow-hidden text-[#0F382E]"
+          >
+            {/* Header */}
+            <div className="px-5 py-3.5 bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <Headphones className="w-5 h-5 text-[#C5B358]" />
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#C5B358]">
+                    🎧 PHÒNG ĐỌC CHÍNH TẢ TRÊN LỚP · 课堂听写 (TĪNGXIĚ)
+                  </div>
+                  <h3 className="text-sm sm:text-base font-bold text-white">
+                    Từ số {currentDictationItem.index}/{dictationDeck.length} · Cấp độ{' '}
+                    <span className="text-[#C5B358]">{currentDictationItem.hskLevel}</span> ·{' '}
+                    {currentDictationItem.partOfSpeech}
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="dictation-toggle-hint-btn"
+                  onClick={() => setShowDictationHints((v) => !v)}
+                  className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold cursor-pointer"
+                >
+                  {showDictationHints ? '💡 Ẩn gợi ý nét' : '💡 Hiện gợi ý nét'}
+                </button>
+                <button
+                  type="button"
+                  data-testid="close-dictation-modal-btn"
+                  onClick={() => setIsDictationOpen(false)}
+                  className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 sm:p-6 space-y-4">
+              {/* Top Audio Cadence & Mystery Word Display */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
+                {/* Left 5 cols: Masked / Revealed Character Stage */}
+                <div className="md:col-span-5 rounded-2xl bg-gradient-to-br from-[#0F5243] to-[#123A30] text-white p-5 border border-[#C5B358]/60 flex flex-col justify-between text-center space-y-3">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#C5B358]">
+                    {isDictationRevealed ? 'ĐÁP ÁN CHỮ HÁN CHUẨN' : 'NGHE ÂM & VIẾT CHỮ HÁN'}
+                  </div>
+
+                  <div
+                    data-testid="dictation-hanzi-stage"
+                    className="font-['Noto_Sans_SC'] text-5xl sm:text-6xl font-black tracking-widest py-2 text-[#FAF7F0]"
+                  >
+                    {isDictationRevealed
+                      ? currentDictationItem.hanzi
+                      : currentDictationItem.maskedHanzi}
+                  </div>
+
+                  <div className="text-sm font-bold text-[#C5B358]">
+                    {isDictationRevealed
+                      ? `${currentDictationItem.pinyin} · Hán Việt: ${currentDictationItem.hanViet.toUpperCase()}`
+                      : 'Phiên âm Pinyin đang ẩn để luyện nghe'}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      data-testid="dictation-play-cadence-btn"
+                      onClick={() => {
+                        speakChinese(currentDictationItem.hanzi, 0.92);
+                        window.setTimeout(() => {
+                          speakChinese(currentDictationItem.hanzi, 0.58);
+                        }, 1100);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#C5B358] hover:bg-[#d5c368] text-[#1E3227] text-xs font-black cursor-pointer shadow-sm"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>🔊 Đọc chuẩn 2 nhịp</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      data-testid="dictation-play-context-btn"
+                      onClick={() => speakChinese(currentDictationItem.exampleHanzi, 0.85)}
+                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold cursor-pointer"
+                    >
+                      <span>Đọc câu ngữ cảnh</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Right 7 cols: Hints + Board Verification Input */}
+                <div className="md:col-span-7 space-y-3 flex flex-col justify-between">
+                  {showDictationHints && (
+                    <div
+                      data-testid="dictation-pedagogical-hints"
+                      className="p-3.5 rounded-2xl bg-white/90 border border-[#C5B358]/45 space-y-1.5 text-xs"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-bold text-[#0F5243]">
+                          🎯 Nghĩa tiếng Việt: “{currentDictationItem.meaning}”
+                        </span>
+                        <span className="px-2 py-0.5 rounded-lg bg-[#0F5243]/10 text-[#0F5243] font-bold">
+                          {currentDictationItem.strokeHint}
+                        </span>
+                      </div>
+                      <div className="text-[#3A544B] font-medium">
+                        {currentDictationItem.radicalHint}
+                      </div>
+                      <div className="text-[11px] text-[#3A544B] pt-1 border-t border-black/5">
+                        Ngữ cảnh: “{currentDictationItem.exampleVi}”
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Interactive Check Box for Student at the Board */}
+                  <div className="p-3.5 rounded-2xl bg-white border border-[#0F5243]/20 space-y-2.5">
+                    <label
+                      htmlFor="dictation-board-input"
+                      className="block text-xs font-bold text-[#0F382E]"
+                    >
+                      ✍️ Học sinh gõ chữ Hán lên bảng (hoặc giáo viên kiểm tra nhanh):
+                    </label>
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                      <input
+                        id="dictation-board-input"
+                        type="text"
+                        data-testid="dictation-input"
+                        value={dictationInput}
+                        onChange={(e) => setDictationInput(e.target.value)}
+                        placeholder="Nhập chữ Hán (hoặc Pinyin)..."
+                        className="min-w-0 flex-1 px-3 py-2 rounded-xl bg-[#FAF7F0] border border-[#0F5243]/25 focus:border-[#0F5243] text-sm font-['Noto_Sans_SC'] font-bold text-[#0F382E] outline-none"
+                      />
+                      <button
+                        type="button"
+                        data-testid="dictation-check-btn"
+                        onClick={() => {
+                          const res = evaluateDictationAttempt(
+                            dictationInput,
+                            currentDictationItem
+                          );
+                          setDictationEval(res);
+                          if (res.isExactHanzi) {
+                            setIsDictationRevealed(true);
+                            playGentleChime(880, 0.25);
+                          } else {
+                            playGentleChime(440, 0.2);
+                          }
+                        }}
+                        className="shrink-0 px-3 py-2 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-white text-xs font-bold cursor-pointer whitespace-nowrap"
+                      >
+                        ✓ Chấm chính tả
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="dictation-reveal-btn"
+                        onClick={() => {
+                          setIsDictationRevealed((v) => !v);
+                          if (!isDictationRevealed) {
+                            speakChinese(currentDictationItem.hanzi, 0.9);
+                          }
+                        }}
+                        className="shrink-0 px-3 py-2 rounded-xl bg-[#E7ECD9] hover:bg-[#dce3c8] text-[#1E3227] border border-[#9B8A3E]/50 text-xs font-bold cursor-pointer whitespace-nowrap"
+                      >
+                        {isDictationRevealed ? '🙈 Ẩn đáp án' : '👁️ Lật đáp án'}
+                      </button>
+                    </div>
+
+                    {dictationEval && (
+                      <div
+                        data-testid="dictation-eval-feedback"
+                        className={`p-2.5 rounded-xl text-xs font-semibold border ${
+                          dictationEval.isExactHanzi
+                            ? 'bg-emerald-50 border-emerald-400 text-emerald-950'
+                            : 'bg-amber-50 border-amber-300 text-amber-950'
+                        }`}
+                      >
+                        {dictationEval.pedagogicalFeedback}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick Student Bonus Star Bar */}
+                  <div className="p-3 rounded-2xl bg-[#F4EFE6] border border-[#C5B358]/50 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-bold text-[#0F382E]">
+                        Thưởng điểm viết đúng:
+                      </span>
+                      <select
+                        aria-label="Chọn học viên nhận điểm chính tả"
+                        value={dictationStudentId}
+                        onChange={(e) => setDictationStudentId(e.target.value)}
+                        className="px-2.5 py-1 rounded-xl bg-white border border-[#0F5243]/20 text-xs font-bold text-[#0F382E]"
+                      >
+                        {roster.map((st) => (
+                          <option key={st.id} value={st.id}>
+                            {st.studentCode} · {st.name} ({st.totalPoints}đ)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      data-testid="dictation-award-star-btn"
+                      onClick={() => {
+                        const target =
+                          roster.find((s) => s.id === dictationStudentId) || roster[0];
+                        handleAwardBonusPoint(
+                          target,
+                          `Viết đúng chính tả (听写) từ “${currentDictationItem.hanzi}”`
+                        );
+                        setDictationBonusBanner(
+                          `🌟 Đã cộng +1 điểm thưởng chính tả cho ${target.name} (${target.studentCode})!`
+                        );
+                      }}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0F5243] hover:bg-[#166E5B] text-white text-xs font-bold cursor-pointer"
+                    >
+                      <Star className="w-3.5 h-3.5 text-[#C5B358] fill-[#C5B358]" />
+                      <span>+1 ⭐ Điểm thuộc bài</span>
+                    </button>
+                  </div>
+
+                  {dictationBonusBanner && (
+                    <div
+                      data-testid="dictation-bonus-banner"
+                      className="p-2 rounded-xl bg-[#E7ECD9] border border-[#0F5243]/25 text-xs font-bold text-[#0F382E]"
+                    >
+                      {dictationBonusBanner}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer Navigation */}
+              <div className="flex items-center justify-between gap-2 pt-3 border-t border-black/10">
+                <button
+                  type="button"
+                  data-testid="dictation-prev-btn"
+                  onClick={() => {
+                    const prevIdx =
+                      (dictationIdx - 1 + dictationDeck.length) % dictationDeck.length;
+                    setDictationIdx(prevIdx);
+                    setDictationInput('');
+                    setIsDictationRevealed(false);
+                    setDictationEval(null);
+                    setDictationBonusBanner(null);
+                    speakChinese(dictationDeck[prevIdx].hanzi, 0.9);
+                  }}
+                  className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl bg-white border border-[#0F5243]/20 text-xs font-bold text-[#0F382E] cursor-pointer whitespace-nowrap"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Từ trước</span>
+                </button>
+
+                <span className="hidden sm:inline text-xs font-semibold text-[#3A544B] truncate">
+                  Mẹo: “Đọc chuẩn 2 nhịp” phát âm tốc độ thường (0.9x) kèm chậm (0.6x)
+                </span>
+
+                <button
+                  type="button"
+                  data-testid="dictation-next-btn"
+                  onClick={() => {
+                    const nextIdx = (dictationIdx + 1) % dictationDeck.length;
+                    setDictationIdx(nextIdx);
+                    setDictationInput('');
+                    setIsDictationRevealed(false);
+                    setDictationEval(null);
+                    setDictationBonusBanner(null);
+                    speakChinese(dictationDeck[nextIdx].hanzi, 0.9);
+                  }}
+                  className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-white text-xs font-bold cursor-pointer whitespace-nowrap"
+                >
+                  <span>Từ tiếp theo</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
+

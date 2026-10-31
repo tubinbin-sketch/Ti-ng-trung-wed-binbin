@@ -19,6 +19,19 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
+  ClipboardList,
+  Save,
+  Keyboard,
+  Rewind,
+  Puzzle,
+  Compass,
+  MessageSquare,
+  FileText,
+  Award,
+  Info,
+  Star,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { Toast } from './Toast';
 import { StrokeData, VocabSlide } from '../data/chineseData';
@@ -28,7 +41,10 @@ import {
   saveCustomVocabImage,
 } from '../utils/vocabVisualEngine';
 import { BinBinPandaAI, BinBinPandaMascotSVG, PandaMood } from './BinBinPandaAI';
+import { AddVocabModal } from './AddVocabModal';
+import { WorksheetPreviewModal } from './WorksheetPreviewModal';
 import {
+  getIsSpeaking,
   getPreferredSpeechRate,
   getPreferredStrokeSpeedMs,
   setPreferredSpeechRate,
@@ -36,6 +52,7 @@ import {
   speakChinese,
   playGentleChime,
   subscribeSlideSettings,
+  subscribeSpeakingState,
 } from '../utils/speech';
 import {
   createCustomVocabSlide,
@@ -44,6 +61,8 @@ import {
   evaluateStrokeWithFeedback,
   fetchAIVocabSuggestions,
   fetchHanziWriterCharacter,
+  getAuthenticCollocationsForWord,
+  getSynonymDistinctionForWord,
   parseBatchSlideInput,
   searchInstantVocabSuggestions,
   SMART_HANZI_DICTIONARY,
@@ -58,11 +77,14 @@ import {
   getHsk3VocabStandard,
 } from '../utils/hsk3Engine';
 import { LiveTeachingToolkit } from './LiveTeachingToolkit';
+import { FilterDisplayPopover } from './FilterDisplayPopover';
+import { MeasureWordDrillModal } from './MeasureWordDrillModal';
 import {
   analyzeToneSandhi,
   applySrsRatingToRecords,
   generateContextualDialogue,
   getMistakeNotebookList,
+  isSrsDueToday,
   loadStoredSrsRecords,
   saveStoredSrsRecords,
   SrsRating,
@@ -77,6 +99,8 @@ interface SlideDeckStudioProps {
   onToggleLearned: (slideId: string) => void;
   onAddSlides: (newSlides: VocabSlide[]) => void;
   onUpdateSlide?: (updatedSlide: VocabSlide) => void;
+  onReplaceAllSlides?: (nextSlides: VocabSlide[]) => void;
+  onResetDefaultSlides?: () => void;
   roleMode?: 'teacher' | 'student';
   studentStudyMode?: 'writing' | 'flashcard';
   onChangeStudentStudyMode?: (mode: 'writing' | 'flashcard') => void;
@@ -102,6 +126,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
   onToggleLearned,
   onAddSlides,
   onUpdateSlide,
+  onReplaceAllSlides,
+  onResetDefaultSlides,
   roleMode = 'teacher',
   studentStudyMode = 'writing',
   onChangeStudentStudyMode,
@@ -116,7 +142,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
   const [showVietnamese, setShowVietnamese] = useState(true);
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
-  const [col1ActiveTab, setCol1ActiveTab] = useState<'radical' | 'grammar' | 'example'>('radical');
+  const [col1ActiveTab, setCol1ActiveTab] = useState<'radical' | 'grammar' | 'example' | 'collocations'>('radical');
   const [showToneSandhiInfo, setShowToneSandhiInfo] = useState(false);
   const [isCol1AccordionOpen, setIsCol1AccordionOpen] = useState(false);
   const [col3ActiveTab, setCol3ActiveTab] = useState<'example' | 'dialogue'>('example');
@@ -155,6 +181,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
   const [speechRate, setSpeechRate] = useState<number>(() => getPreferredSpeechRate());
   const [pandaMood, setPandaMood] = useState<PandaMood>('idle');
   const inlineSvgRef = useRef<SVGSVGElement | null>(null);
+  const chipRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
   // Add Custom Vocab Modal State (+ Tự thêm từ vựng mới)
   const [isAddVocabModalOpen, setIsAddVocabModalOpen] = useState(false);
@@ -185,6 +212,17 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
   const [isBatchImportModalOpen, setIsBatchImportModalOpen] = useState(false);
   const [batchRawInput, setBatchRawInput] = useState('明天, 考试, 照顾, 旅行');
 
+  // Lesson Export/Import Menu State & Keyboard Shortcut Popover & Measure Word Drill Modal
+  const [isLessonFileMenuOpen, setIsLessonFileMenuOpen] = useState(false);
+  const [showShortcutsHint, setShowShortcutsHint] = useState(false);
+  const [isMeasureWordModalOpen, setIsMeasureWordModalOpen] = useState(false);
+  const [isTtsSpeaking, setIsTtsSpeaking] = useState<boolean>(() => getIsSpeaking());
+  const lessonFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    return subscribeSpeakingState((speaking) => setIsTtsSpeaking(speaking));
+  }, []);
+
   // AI Speech-to-Text zh-CN pronunciation practice state
   const [isPracticingSpeech, setIsPracticingSpeech] = useState(false);
   const [speechResult, setSpeechResult] = useState<{
@@ -192,13 +230,14 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     score: number;
     feedback: string;
     isSuccess: boolean;
+    charMatches?: { char: string; isMatched: boolean; isPunctuation?: boolean }[];
   } | null>(null);
   const speechRecognitionRef = useRef<any>(null);
 
-
-  // HSK 3.0 (3 Stages - 9 Levels) Filter State
+  // HSK 3.0 (3 Stages - 9 Levels) Filter State & SRS Due Today Filter
   const [hsk3StageFilter, setHsk3StageFilter] = useState<Hsk3StageId>('all');
   const [hsk3LevelFilter, setHsk3LevelFilter] = useState<Hsk3LevelFilter>('all');
+  const [isDueTodayFilterActive, setIsDueTodayFilterActive] = useState(false);
 
   const currentSlide = useMemo(
     () => slides[activeSlideIndex] || slides[0],
@@ -208,10 +247,21 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     () => getHsk3VocabStandard(currentSlide),
     [currentSlide]
   );
-  const filteredSlides = useMemo(
-    () => filterSlidesByHsk3(slides, hsk3StageFilter, hsk3LevelFilter),
-    [slides, hsk3StageFilter, hsk3LevelFilter]
-  );
+  const filteredSlides = useMemo(() => {
+    let result = filterSlidesByHsk3(slides, hsk3StageFilter, hsk3LevelFilter);
+    if (isDueTodayFilterActive) {
+      result = result.filter((s) => isSrsDueToday(srsRecords[s.id]));
+    }
+    return result;
+  }, [slides, hsk3StageFilter, hsk3LevelFilter, isDueTodayFilterActive, srsRecords]);
+
+  // Auto-scroll active chip into view whenever activeSlideIndex changes
+  useEffect(() => {
+    const targetEl = chipRefs.current.get(activeSlideIndex);
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [activeSlideIndex]);
   const learnedCount = useMemo(
     () => slides.filter((s) => s.learned).length,
     [slides]
@@ -296,13 +346,33 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     saveStoredSrsRecords(nextRecords);
     playGentleChime(rating === 'good' ? 783.99 : rating === 'hard' ? 587.33 : 440, 0.18);
 
+    // 2-Way Sync: Sync student's Sổ từ khó (错题本) words to Teacher's Gradebook in localStorage
+    try {
+      const updatedMistakes = getMistakeNotebookList(nextRecords).map((m) => m.hanzi);
+      const rawRoster = localStorage.getItem('hanu_classroom_students_roster_v2');
+      if (rawRoster) {
+        const parsedRoster = JSON.parse(rawRoster);
+        if (Array.isArray(parsedRoster) && parsedRoster.length > 0) {
+          const nextRoster = parsedRoster.map((st, idx) =>
+            idx === 0 ? { ...st, reviewWords: updatedMistakes } : st
+          );
+          localStorage.setItem('hanu_classroom_students_roster_v2', JSON.stringify(nextRoster));
+          window.dispatchEvent(new CustomEvent('hanu_students_updated', { detail: nextRoster.length }));
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+
     if (rating === 'good' && !currentSlide.learned) {
       onToggleLearned(currentSlide.id);
     }
     const labelMap: Record<SrsRating, string> = {
-      again: `😰 Đã đưa "${currentSlide.hanzi}" vào Sổ tay từ hay quên (错题本) để ôn lại ngay!`,
-      hard: `🤔 Đã đánh dấu "${currentSlide.hanzi}" (Hơi nhớ) vào Sổ tay từ hay quên (错题本).`,
-      good: `✅ Đã thuộc lòng "${currentSlide.hanzi}"! Tiếp tục phát huy nhé.`,
+      again: `😰 Đã đưa "${currentSlide.hanzi}" vào Sổ tay từ hay quên (错题本) & đồng bộ tới Giáo viên!`,
+      forgot: `😰 Đã đưa "${currentSlide.hanzi}" vào Sổ tay từ hay quên (错题本) & đồng bộ tới Giáo viên!`,
+      hard: `🤔 Đã đánh dấu "${currentSlide.hanzi}" (Cần củng cố) vào Sổ tay từ hay quên (错题本).`,
+      good: `✅ Đã thuộc nhớ "${currentSlide.hanzi}"! Tiếp tục phát huy nhé.`,
+      mastered: `🌟 Đã thuộc làu "${currentSlide.hanzi}"! Tự tin làm chủ từ vựng.`,
     };
     setToastMessage(labelMap[rating]);
     setIsCardFlipped(false);
@@ -438,6 +508,25 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     };
   }, [currentSlide.id, currentSlide.hanzi, currentSlide.pinyin, currentSlide.characters]);
 
+  // Dictation Mode (听写 - Ẩn chữ mẫu) & 1-Stroke Hint Flash state
+  const [hideGuideStrokes, setHideGuideStrokes] = useState(false);
+  const [hintStrokeFlashIdx, setHintStrokeFlashIdx] = useState<number | null>(null);
+  const hintFlashTimerRef = useRef<number | null>(null);
+
+  const handleFlashOneStrokeHint = () => {
+    if (hintFlashTimerRef.current) {
+      window.clearTimeout(hintFlashTimerRef.current);
+    }
+    setIsAnimatingStrokes(false);
+    setInlineStrokeMode('practice');
+    const targetIdx = Math.min(userStrokes.length, Math.max(0, totalStrokes - 1));
+    setHintStrokeFlashIdx(targetIdx);
+    speakChinese(currentChar.char, speechRate);
+    hintFlashTimerRef.current = window.setTimeout(() => {
+      setHintStrokeFlashIdx(null);
+    }, 1500);
+  };
+
   // Reset character index when switching slides
   useEffect(() => {
     setActiveCharIdx(0);
@@ -446,6 +535,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     setCurrentStroke([]);
     setPracticeAccuracy(null);
     setPracticeEvalDetail(null);
+    setHintStrokeFlashIdx(null);
     setIsAnimatingStrokes(true);
   }, [currentSlide.id]);
 
@@ -455,6 +545,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     setCurrentStroke([]);
     setPracticeAccuracy(null);
     setPracticeEvalDetail(null);
+    setHintStrokeFlashIdx(null);
     setInlineStrokeMode('animate');
     setIsAnimatingStrokes(true);
   }, [activeCharIdx]);
@@ -616,20 +707,49 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
       const matchRatio = cleanTarget.length > 0 ? matchedChars / cleanTarget.length : 1;
       const calculatedScore = Math.min(98, Math.max(86, Math.round(matchRatio * 20 + 78)));
 
+      const charMatches = targetSentence.split('').map((ch) => {
+        if (!/[\u4e00-\u9fa5]/.test(ch)) {
+          return { char: ch, isMatched: true, isPunctuation: true };
+        }
+        return { char: ch, isMatched: cleanSpoken.includes(ch), isPunctuation: false };
+      });
+
       const feedback =
         cleanSpoken.includes(targetWord) || targetSentence.includes(targetWord)
           ? `Thanh điệu chữ "${targetWord}" rất tốt! Nhịp điệu câu tự nhiên.`
           : `Phát âm rõ ràng, hãy chú ý cao độ thanh điệu của từ trọng tâm "${targetWord}".`;
 
-      setSpeechResult({
+      const resultPayload = {
         transcript: spokenText || targetSentence,
         score: calculatedScore,
         feedback,
         isSuccess: calculatedScore >= 80,
-      });
+        charMatches,
+      };
+
+      setSpeechResult(resultPayload);
       playGentleChime(783.99, 0.25);
       setPandaMood('cheering');
       setTimeout(() => setPandaMood('idle'), 2500);
+
+      try {
+        const spKey = 'hanu_student_reading_eval_history_v2';
+        const existing = localStorage.getItem(spKey);
+        const list = existing ? JSON.parse(existing) : [];
+        list.unshift({
+          id: `sp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          hanzi: currentSlide.hanzi,
+          targetSentence,
+          transcript: spokenText || targetSentence,
+          score: calculatedScore,
+          feedback,
+          timestamp: Date.now(),
+        });
+        localStorage.setItem(spKey, JSON.stringify(list.slice(0, 50)));
+        window.dispatchEvent(new CustomEvent('hanu_reading_history_updated'));
+      } catch {
+        // ignore
+      }
     }
 
     function fallbackSpeechGrading() {
@@ -637,15 +757,40 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
       recognized = true;
       setIsPracticingSpeech(false);
       const simulatedScore = Math.floor(Math.random() * 6) + 92;
+      const charMatches = targetSentence.split('').map((ch) => ({
+        char: ch,
+        isMatched: true,
+        isPunctuation: !/[\u4e00-\u9fa5]/.test(ch),
+      }));
       setSpeechResult({
         transcript: targetSentence,
         score: simulatedScore,
         feedback: `Thanh điệu chữ "${targetWord}" rất tốt! Nhịp điệu câu tự nhiên và chuẩn xác.`,
         isSuccess: true,
+        charMatches,
       });
       playGentleChime(783.99, 0.25);
       setPandaMood('cheering');
       setTimeout(() => setPandaMood('idle'), 2500);
+
+      try {
+        const spKey = 'hanu_student_reading_eval_history_v2';
+        const existing = localStorage.getItem(spKey);
+        const list = existing ? JSON.parse(existing) : [];
+        list.unshift({
+          id: `sp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          hanzi: currentSlide.hanzi,
+          targetSentence,
+          transcript: targetSentence,
+          score: simulatedScore,
+          feedback: `Thanh điệu chữ "${targetWord}" rất tốt! Nhịp điệu câu tự nhiên và chuẩn xác.`,
+          timestamp: Date.now(),
+        });
+        localStorage.setItem(spKey, JSON.stringify(list.slice(0, 50)));
+        window.dispatchEvent(new CustomEvent('hanu_reading_history_updated'));
+      } catch {
+        // ignore
+      }
     }
   };
 
@@ -677,18 +822,39 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
   // Classroom Keyboard Shortcuts: [←]/[→] Prev/Next word, [Space] Pronounce, [W] Animate Stroke, [F] Toggle Fullscreen
   useEffect(() => {
     const handleClassroomShortcuts = (e: KeyboardEvent) => {
-      if (isAddVocabModalOpen || isWorksheetModalOpen) return;
+      if (
+        isAddVocabModalOpen ||
+        isWorksheetModalOpen ||
+        isQuickEditModalOpen ||
+        isBatchImportModalOpen ||
+        isMeasureWordModalOpen
+      ) {
+        return;
+      }
       const target = e.target as HTMLElement | null;
-      if (target) {
-        const tag = target.tagName;
+      const activeEl = document.activeElement as HTMLElement | null;
+      const isInteractiveElement = (el: HTMLElement | null): boolean => {
+        if (!el) return false;
+        const tag = el.tagName;
         if (
           tag === 'INPUT' ||
           tag === 'TEXTAREA' ||
           tag === 'SELECT' ||
-          target.isContentEditable
+          el.isContentEditable
         ) {
-          return;
+          return true;
         }
+        if (
+          el.closest?.(
+            'input, textarea, select, [contenteditable="true"], [data-testid="binbin-floating-widget"], [data-testid="binbin-inline-card"], [role="dialog"]'
+          )
+        ) {
+          return true;
+        }
+        return false;
+      };
+      if (isInteractiveElement(target) || isInteractiveElement(activeEl)) {
+        return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
@@ -727,7 +893,77 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     handleSelectSlide,
     isAddVocabModalOpen,
     isWorksheetModalOpen,
+    isQuickEditModalOpen,
+    isBatchImportModalOpen,
   ]);
+
+  const handleExportLessonJson = () => {
+    try {
+      const payload = {
+        platform: 'HANU × 阮文受 · Giáo án HSK 3.0',
+        exportedAt: new Date().toISOString(),
+        slideCount: slides.length,
+        slides,
+      };
+      const jsonStr = JSON.stringify(payload, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Bai_Giang_HSK3_HANU_${slides.length}_Tu.json`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+      setIsLessonFileMenuOpen(false);
+      setToastMessage(`📤 Đã xuất file bài giảng (.json) gồm ${slides.length} thẻ từ vựng thành công!`);
+      playGentleChime(783.99, 0.22);
+    } catch {
+      setToastMessage('Không thể xuất file bài giảng. Vui lòng thử lại.');
+    }
+  };
+
+  const handleImportLessonJsonFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const raw = String(ev.target?.result || '');
+        const parsed = JSON.parse(raw);
+        const importedSlides: VocabSlide[] = Array.isArray(parsed)
+          ? parsed
+          : Array.isArray(parsed?.slides)
+          ? parsed.slides
+          : [];
+        if (importedSlides.length > 0 && importedSlides[0]?.hanzi) {
+          if (onReplaceAllSlides) {
+            onReplaceAllSlides(importedSlides);
+          } else {
+            onAddSlides(importedSlides);
+          }
+          setIsLessonFileMenuOpen(false);
+          setToastMessage(
+            `📥 Đã nạp thành công file bài giảng "${file.name}" (${importedSlides.length} thẻ từ vựng)!`
+          );
+          playGentleChime(783.99, 0.25);
+        } else {
+          setToastMessage('File .json không đúng định dạng bài giảng HSK 3.0.');
+        }
+      } catch {
+        setToastMessage('Không thể đọc file .json. Vui lòng kiểm tra định dạng file.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleResetDefaultLesson = () => {
+    onResetDefaultSlides?.();
+    setIsLessonFileMenuOpen(false);
+    setToastMessage('🔄 Đã khôi phục bộ bài giảng HSK 3.0 mặc định ban đầu!');
+    playGentleChime(659.25, 0.2);
+  };
 
   const generateOrSelectHanzi = (rawInput: string) => {
     const trimmed = rawInput.trim();
@@ -943,6 +1179,29 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
         setPandaMood('cheering');
         playGentleChime(659.25, 0.16);
       }
+
+      try {
+        const hwKey = 'hanu_student_handwriting_history_v2';
+        const existing = localStorage.getItem(hwKey);
+        const list = existing ? JSON.parse(existing) : [];
+        list.unshift({
+          id: `hw-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          char: currentChar.char,
+          hanziWord: currentSlide.hanzi,
+          strokeNum,
+          totalCount,
+          accuracy: evalDetail.accuracy,
+          stars: evalDetail.stars || (evalDetail.accuracy >= 90 ? 3 : evalDetail.accuracy >= 70 ? 2 : 1),
+          feedback: evalDetail.feedback,
+          isReversedDirection: Boolean(evalDetail.isReversedDirection),
+          strokeCountMatched: evalDetail.strokeCountMatched,
+          timestamp: Date.now(),
+        });
+        localStorage.setItem(hwKey, JSON.stringify(list.slice(0, 50)));
+        window.dispatchEvent(new CustomEvent('hanu_handwriting_history_updated'));
+      } catch {
+        // ignore
+      }
     }
     setCurrentStroke([]);
   };
@@ -1155,31 +1414,22 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
       : null;
 
       return (
-        <div className="space-y-2">
-          {/* 1. Slim Floating Pill Bar for Classroom Toolkit */}
-          {roleMode === 'teacher' && (
-            <LiveTeachingToolkit
-              slides={slides}
-              currentSlide={currentSlide}
-              activeSlideIndex={activeSlideIndex}
-              onSelectSlideIndex={handleSelectSlide}
-              onNotify={(msg) => setToastMessage(msg)}
-              onSwitchToStudentHomework={onSwitchToStudentHomework}
-            />
-          )}
-
-          {/* 2. Ultra-Compact Row 1: Search & 3 Quick Action Buttons on 1 Horizontal Line (Single Icon per Button) */}
-          {roleMode === 'teacher' && (
-            <div
-              data-testid="teacher-ai-vocab-search-section"
-              className="rounded-2xl backdrop-blur-xl bg-white/75 border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 px-3 py-1.5 transition-all duration-300"
-            >
-              <form
-                onSubmit={handleUnifiedSearchSubmit}
-                className="flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar"
-              >
-                <div className="relative flex-1 min-w-[160px]">
-                  <Search className="w-3.5 h-3.5 text-[#3A544B] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <div className="space-y-2.5">
+          {/* =================================================================
+              TIER 2: UNIFIED SEARCH, FILTER POPOVER & CLASSROOM TOOLS BAR
+              ================================================================= */}
+          <div
+            data-testid="teacher-ai-vocab-search-section"
+            className="rounded-2xl backdrop-blur-xl bg-white/85 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 px-3 py-2 transition-all duration-300"
+          >
+            <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-2">
+              {/* Left: Search Input (in Teacher Mode) OR Student Mode Quick Label */}
+              {roleMode === 'teacher' ? (
+                <form
+                  onSubmit={handleUnifiedSearchSubmit}
+                  className="relative flex-1 min-w-[200px]"
+                >
+                  <Search className="w-4 h-4 text-[#3A544B] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
                     value={vocabSearchQuery}
@@ -1190,148 +1440,33 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       }
                     }}
                     placeholder="Tìm hoặc thêm nhanh từ vựng (VD: 温暖, 龙, ấm áp)..."
-                    className="w-full pl-8 pr-2.5 py-1 rounded-xl bg-white/85 border border-[#0F5243]/15 focus:border-[#0F5243] focus:outline-none text-xs text-[#0F382E]"
+                    className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-white border border-[#0F5243]/20 focus:border-[#0F5243] focus:outline-none text-sm font-medium text-[#0F382E]"
                   />
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    data-testid="toggle-ai-suggestions-drawer-btn"
-                    onClick={() => setIsAiDrawerOpen((o) => !o)}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap border ${
-                      isAiDrawerOpen
-                        ? 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] border-[#C5B358]/50 shadow-xs'
-                        : 'bg-white/85 hover:bg-white text-[#0F382E] border-[#9B8A3E]/45'
-                    }`}
-                  >
-                    <Sparkles className="w-3 h-3 text-[#C5B358] shrink-0" />
-                    <span>{isAiDrawerOpen ? 'Kho Từ Vựng Gợi Ý ▲' : 'Kho Từ Vựng Gợi Ý ▾'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    data-testid="open-add-vocab-modal-btn"
-                    onClick={handleOpenAddVocabModal}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] border border-[#C5B358]/50 text-xs font-bold shadow-[0_2px_10px_rgba(15,82,67,0.22)] transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-[#C5B358] shrink-0" />
-                    <span>Thêm từ</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    data-testid="open-batch-import-modal-btn"
-                    onClick={() => setIsBatchImportModalOpen(true)}
-                    title="Nhập danh sách từ vựng hàng loạt (Batch Import)"
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/85 hover:bg-white text-[#0F382E] border border-[#9B8A3E]/45 text-xs font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
-                  >
-                    <span>📋 Nhập hàng loạt</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsWorksheetModalOpen(true)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/85 hover:bg-white text-[#0F382E] border border-[#9B8A3E]/45 text-xs font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
-                  >
-                    <Printer className="w-3.5 h-3.5 text-[#9B8A3E] shrink-0" />
-                    <span>In A4</span>
-                  </button>
-                </div>
-              </form>
-
-              {/* Expandable Vocabulary Suggestions Drawer */}
-              {isAiDrawerOpen && (
-                <div
-                  data-testid="ai-suggestions-drawer-content"
-                  className="mt-2 pt-2 border-t border-[rgba(30,50,39,0.12)] space-y-2"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-1.5">
-                    <div
-                      data-testid="ai-topic-filter-bar"
-                      className="flex flex-wrap items-center gap-1.5"
-                    >
-                      {SEARCH_TOPIC_FILTERS.map((tab) => (
-                        <button
-                          key={tab.id}
-                          type="button"
-                          data-testid={`topic-filter-${tab.id}`}
-                          onClick={() => setVocabSearchTopic(tab.id)}
-                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${
-                            vocabSearchTopic === tab.id
-                              ? 'bg-[#1E3227] text-[#FAFBF7]'
-                              : 'bg-white/80 text-[#3F5447] border border-[#9B8A3E]/35 hover:border-[#9B8A3E] hover:text-[#1E3227]'
-                          }`}
-                        >
-                          {tab.label}
-                        </button>
-                      ))}
-                      {isSearchingAI && (
-                        <span className="text-[11px] text-[#9B8A3E] font-semibold ml-1">
-                          Đang lọc...
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[10px] font-bold text-[#0F5243] px-2 py-0.5 rounded-full bg-[#E6EFEA] border border-[#0F5243]/15">
-                      Gia Sư Hán Ngữ Trực Tuyến · Chuẩn HSK 3.0
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {vocabSuggestions.map((item, idx) => (
-                      <button
-                        key={`${item.hanzi}-${idx}`}
-                        type="button"
-                        onClick={() => {
-                          handleSelectSuggestedVocab(item);
-                          setToastMessage(`Đã chọn slide cho "${item.hanzi}"`);
-                        }}
-                        className="flex items-center justify-between p-2 rounded-xl bg-white/75 border border-[rgba(30,50,39,0.12)] hover:border-[#9B8A3E] text-left transition-all cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-lg bg-[#FAFBF7] border border-[#9B8A3E]/25 flex items-center justify-center font-['Noto_Sans_SC'] font-bold text-sm text-[#1E3227] shrink-0">
-                            {item.hanzi}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-[11px] font-bold text-[#9B8A3E] truncate">
-                              {item.pinyin} · {item.hanViet}
-                            </div>
-                            <div className="text-[11px] font-semibold text-[#1E3227] truncate">
-                              {item.meaning}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="w-6 h-6 rounded-full bg-[#1E3227]/8 flex items-center justify-center text-[#1E3227] shrink-0">
-                          <Plus className="w-3.5 h-3.5" />
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                </form>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0F5243]/10 text-[#0F5243] text-sm font-bold">
+                    <BookOpen className="w-4 h-4 text-[#9B8A3E]" />
+                    <span>Đã thuộc {learnedCount}/{slides.length} từ</span>
+                  </span>
                 </div>
               )}
-            </div>
-          )}
 
-          {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
-
-          {/* 3. Ultra-Compact Row 2: Single Horizontal Bar for HSK Filter + Page Switcher + Display Toggles */}
-          <div
-            data-testid="hsk3-filter-panel"
-            className="relative rounded-2xl backdrop-blur-xl bg-white/75 border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 px-3 py-1.5 transition-all duration-300"
-          >
-            <div className="flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar">
-              {/* Left: HSK 3.0 Dropdown + Stage Pills + Page Switcher [< 11/18 >] */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                <select
-                  aria-label="Chọn cấp độ HSK 1-9"
-                  data-testid="hsk3-level-dropdown"
-                  value={hsk3LevelFilter}
-                  onChange={(e) => {
-                    const lvl = e.target.value as Hsk3LevelFilter;
+              {/* Right: Consolidated Filter & Display Popover + Measure Word Drill + Teacher Tools */}
+              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                <FilterDisplayPopover
+                  totalSlidesCount={slides.length}
+                  hsk3LevelFilter={hsk3LevelFilter}
+                  hsk3StageFilter={hsk3StageFilter}
+                  showPinyin={showPinyin}
+                  showMeaning={showMeaning}
+                  strokeSpeedMs={strokeSpeedMs}
+                  speechRate={speechRate}
+                  isDueTodayFilterActive={isDueTodayFilterActive}
+                  onToggleDueToday={() => setIsDueTodayFilterActive((v) => !v)}
+                  onSelectLevel={(lvl) => {
                     setHsk3LevelFilter(lvl);
-                    if (lvl !== 'all') {
-                      setHsk3StageFilter('all');
-                    }
+                    if (lvl !== 'all') setHsk3StageFilter('all');
                     const matching = filterSlidesByHsk3(
                       slides,
                       lvl === 'all' ? hsk3StageFilter : 'all',
@@ -1342,265 +1477,350 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       if (firstIdx !== -1) handleSelectSlide(firstIdx);
                     }
                   }}
-                  className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] border border-[#C5B358]/60 text-xs font-bold cursor-pointer focus:outline-none shadow-2xs"
-                >
-                  <option value="all" className="text-[#0F382E] bg-white">Cấp HSK 1-9 ({slides.length})</option>
-                  <option value="HSK 1" className="text-[#0F382E] bg-white">HSK 1 (Sơ cấp)</option>
-                  <option value="HSK 2" className="text-[#0F382E] bg-white">HSK 2 (Sơ cấp)</option>
-                  <option value="HSK 3" className="text-[#0F382E] bg-white">HSK 3 (Sơ cấp)</option>
-                  <option value="HSK 4" className="text-[#0F382E] bg-white">HSK 4 (Trung cấp)</option>
-                  <option value="HSK 5" className="text-[#0F382E] bg-white">HSK 5 (Trung cấp)</option>
-                  <option value="HSK 6" className="text-[#0F382E] bg-white">HSK 6 (Trung cấp)</option>
-                  <option value="HSK 7-9" className="text-[#0F382E] bg-white">HSK 7–9 (Cao cấp)</option>
-                </select>
-
-                {/* Non-redundant Stage Pills (Sơ cấp 1-3 | Trung cấp 4-6 | Cao cấp 7-9) visible on wide screens */}
-                <div className="hidden xl:flex items-center gap-1">
-                  {HSK3_STAGES.filter((stage) => stage.id !== 'all').map((stage) => {
-                    const isSelected = hsk3StageFilter === stage.id && hsk3LevelFilter === 'all';
-                    const shortLabel =
-                      stage.id === 'elementary'
-                        ? 'Sơ cấp 1-3'
-                        : stage.id === 'intermediate'
-                        ? 'Trung cấp 4-6'
-                        : 'Cao cấp 7-9';
-                    return (
-                      <button
-                        key={stage.id}
-                        type="button"
-                        data-testid={`hsk3-stage-filter-${stage.id}`}
-                        onClick={() => {
-                          const nextStage = isSelected ? 'all' : stage.id;
-                          setHsk3StageFilter(nextStage);
-                          setHsk3LevelFilter('all');
-                          const matching = filterSlidesByHsk3(slides, nextStage, 'all');
-                          if (matching.length > 0 && !matching.some((m) => m.id === currentSlide.id)) {
-                            const firstIdx = slides.findIndex((s) => s.id === matching[0].id);
-                            if (firstIdx !== -1) handleSelectSlide(firstIdx);
-                          }
-                        }}
-                        className={`px-2 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap border ${
-                          isSelected
-                            ? 'bg-[#1E3227] border-[#9B8A3E] text-[#FAFBF7]'
-                            : 'bg-white border-[rgba(30,50,39,0.15)] text-[#3F5447] hover:border-[#9B8A3E] hover:text-[#1E3227]'
-                        }`}
-                      >
-                        {shortLabel}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Right: [< 11/18 >] + [⚙️ 0.8x] + [✓ Pinyin] + [✓ Nghĩa TV] */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                <div className="inline-flex items-center rounded-xl bg-white border border-[rgba(30,50,39,0.15)] p-0.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={handlePrev}
-                    aria-label="Slide trước"
-                    title="Từ trước (Phím tắt: ←)"
-                    className="p-1 rounded-lg text-[#1E3227] hover:bg-[#E7ECD9] transition-colors cursor-pointer"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="px-1.5 text-[11px] font-bold text-[#1E3227] tabular-nums whitespace-nowrap">
-                    {activeSlideIndex + 1}/{slides.length}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    aria-label="Slide tiếp theo"
-                    title="Từ tiếp theo (Phím tắt: →)"
-                    className="p-1 rounded-lg text-[#1E3227] hover:bg-[#E7ECD9] transition-colors cursor-pointer"
-                  >
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  data-testid="toggle-slide-settings-btn"
-                  onClick={() => setShowSettingsPanel((v) => !v)}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl border text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${
-                    showSettingsPanel
-                      ? 'bg-[#1E3227] border-[#9B8A3E] text-[#FAFBF7]'
-                      : 'bg-white border-[rgba(30,50,39,0.18)] text-[#1E3227] hover:border-[#9B8A3E]'
-                  }`}
-                  title="Chỉnh tốc độ nét viết & giọng đọc chuẩn"
-                >
-                  <span>⚙️ {speechRate.toFixed(2).replace(/0$/, '')}x</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowPinyin((v) => !v)}
-                  className={`px-2.5 py-1 rounded-xl border text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${
-                    showPinyin
-                      ? 'bg-[#E7ECD9] border-[#1E3227]/25 text-[#1E3227]'
-                      : 'bg-white border-[rgba(30,50,39,0.12)] text-[#5F7266]'
-                  }`}
-                >
-                  {showPinyin ? '✓ Pinyin' : 'Pinyin'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
+                  onSelectStage={(nextStage) => {
+                    setHsk3StageFilter(nextStage);
+                    setHsk3LevelFilter('all');
+                    const matching = filterSlidesByHsk3(slides, nextStage, 'all');
+                    if (matching.length > 0 && !matching.some((m) => m.id === currentSlide.id)) {
+                      const firstIdx = slides.findIndex((s) => s.id === matching[0].id);
+                      if (firstIdx !== -1) handleSelectSlide(firstIdx);
+                    }
+                  }}
+                  onTogglePinyin={() => setShowPinyin((v) => !v)}
+                  onToggleMeaning={() => {
                     const nextVal = !showMeaning;
                     setShowMeaning(nextVal);
                     setShowVietnamese(nextVal);
                   }}
-                  className={`px-2.5 py-1 rounded-xl border text-xs font-bold transition-colors cursor-pointer whitespace-nowrap ${
-                    showMeaning
-                      ? 'bg-[#E7ECD9] border-[#1E3227]/25 text-[#1E3227]'
-                      : 'bg-white border-[rgba(30,50,39,0.12)] text-[#5F7266]'
-                  }`}
+                  onUpdateStrokeSpeed={handleUpdateStrokeSpeed}
+                  onUpdateSpeechRate={(rate) => {
+                    handleUpdateSpeechRate(rate);
+                    speakChinese(currentSlide.hanzi, rate);
+                  }}
+                />
+
+                <button
+                  type="button"
+                  data-testid="open-measure-word-drill-btn"
+                  onClick={() => setIsMeasureWordModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/50 text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                  title="Luyện chuyên đề Lượng từ & Kết hợp Danh từ HSK 3.0 (量词搭配)"
                 >
-                  {showMeaning ? '✓ Nghĩa TV' : 'Nghĩa TV'}
+                  <Puzzle className="w-4 h-4 text-[#9B8A3E] shrink-0" />
+                  <span>Lượng từ HSK</span>
                 </button>
+
+                <button
+                  type="button"
+                  data-testid="toolbar-open-worksheet-modal-btn"
+                  onClick={() => setIsWorksheetModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/50 text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                  title="In phiếu luyện viết chữ Hán A4 (PDF) chuẩn Ô Mễ Tự Cách"
+                >
+                  <Printer className="w-4 h-4 text-[#9B8A3E] shrink-0" />
+                  <span>In phiếu A4</span>
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="open-add-vocab-modal-btn"
+                  onClick={handleOpenAddVocabModal}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] border border-[#C5B358]/50 text-sm font-bold shadow-[0_2px_10px_rgba(15,82,67,0.22)] transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                  title="Thêm từ vựng mới vào bộ thẻ học tập"
+                >
+                  <Plus className="w-4 h-4 text-[#C5B358] shrink-0" />
+                  <span>Thêm từ</span>
+                </button>
+
+                <button
+                  type="button"
+                  data-testid="open-batch-import-modal-btn"
+                  onClick={() => setIsBatchImportModalOpen(true)}
+                  title="Nhập danh sách từ vựng / bài khóa hàng loạt (Batch Import)"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/45 text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                >
+                  <ClipboardList className="w-4 h-4 text-[#9B8A3E] shrink-0" />
+                  <span className="hidden xl:inline">Nhập bài khóa</span>
+                </button>
+
+                <div className="relative">
+                  <input
+                    ref={lessonFileInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={handleImportLessonJsonFile}
+                    className="hidden"
+                    data-testid="import-lesson-json-input"
+                  />
+                  <button
+                    type="button"
+                    data-testid="lesson-save-load-menu-btn"
+                    onClick={() => setIsLessonFileMenuOpen((v) => !v)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/45 text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                    title="Xuất hoặc Nhập dữ liệu học tập & bài giảng (.json)"
+                  >
+                    <Save className="w-4 h-4 text-[#9B8A3E] shrink-0" />
+                    <span className="hidden xl:inline">Lưu / Nạp</span>
+                  </button>
+                </div>
+
+                {roleMode === 'teacher' && (
+                  <>
+                    <button
+                      type="button"
+                      data-testid="toggle-ai-suggestions-drawer-btn"
+                      onClick={() => setIsAiDrawerOpen((o) => !o)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-sm font-bold transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap border ${
+                        isAiDrawerOpen
+                          ? 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] border-[#C5B358]/50 shadow-xs'
+                          : 'bg-white hover:bg-[#FAF7F0] text-[#0F382E] border-[#9B8A3E]/45'
+                      }`}
+                    >
+                      <Sparkles className="w-4 h-4 text-[#C5B358] shrink-0" />
+                      <span>Kho từ gợi ý</span>
+                    </button>
+
+                    <LiveTeachingToolkit
+                      slides={slides}
+                      currentSlide={currentSlide}
+                      activeSlideIndex={activeSlideIndex}
+                      onSelectSlideIndex={handleSelectSlide}
+                      onNotify={(msg) => setToastMessage(msg)}
+                      onSwitchToStudentHomework={onSwitchToStudentHomework}
+                      onOpenWorksheetModal={() => setIsWorksheetModalOpen(true)}
+                      onToggleShortcutsHint={() => setShowShortcutsHint((v) => !v)}
+                    />
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Compact Popover for Stroke Speed & Voice Speed (Only visible when ⚙️ Tốc độ is clicked) */}
-            {showSettingsPanel && (
+            {/* Expandable Save / Load Lesson Action Bar */}
+            {isLessonFileMenuOpen && (
               <div
-                data-testid="slide-settings-panel"
-                className="mt-2 pt-2 border-t border-[rgba(30,50,39,0.12)] flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 text-xs text-[#1E3227]"
+                data-testid="lesson-save-load-dropdown"
+                className="mt-2.5 pt-2.5 border-t border-[rgba(30,50,39,0.12)] flex flex-wrap items-center justify-between gap-2 animate-fade-in"
+              >
+                <span className="text-sm font-bold text-[#0F382E] inline-flex items-center gap-1.5">
+                  <Save className="w-4 h-4 text-[#9B8A3E]" />
+                  <span>Quản lý dữ liệu bài giảng ({slides.length} thẻ từ vựng · Tự động lưu bền vững):</span>
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    data-testid="export-lesson-json-btn"
+                    onClick={handleExportLessonJson}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-sm font-bold shadow-2xs cursor-pointer"
+                  >
+                    Xuất file bài giảng (.json)
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="import-lesson-json-btn"
+                    onClick={() => lessonFileInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#0F5243]/25 text-sm font-bold cursor-pointer"
+                  >
+                    Nạp file bài giảng
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="reset-default-lesson-btn"
+                    onClick={handleResetDefaultLesson}
+                    className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 text-sm font-bold cursor-pointer"
+                  >
+                    Khôi phục bài mặc định
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Expandable Keyboard Shortcuts Quick Guide */}
+            {showShortcutsHint && (
+              <div
+                data-testid="toolbar-shortcuts-popover"
+                className="mt-2.5 pt-2.5 border-t border-[rgba(30,50,39,0.12)] flex flex-wrap items-center justify-between gap-2 text-sm text-[#0F382E]"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-[#1E3227]">Tốc độ nét viết:</span>
-                  <div className="inline-flex items-center rounded-xl bg-[#E7ECD9] p-0.5 border border-[rgba(30,50,39,0.15)]">
-                    {[
-                      { label: 'Chậm', ms: 1000 },
-                      { label: 'Vừa', ms: 660 },
-                      { label: 'Nhanh', ms: 380 },
-                    ].map((spd) => (
+                  <span className="font-bold text-[#0F5243] inline-flex items-center gap-1">
+                    <Keyboard className="w-4 h-4 text-[#9B8A3E]" />
+                    <span>Phím tắt đứng lớp:</span>
+                  </span>
+                  <span><strong>[←] / [→]</strong>: Chuyển thẻ từ</span>
+                  <span>·</span>
+                  <span><strong>[Space]</strong>: Phát âm chuẩn zh-CN</span>
+                  <span>·</span>
+                  <span><strong>[W]</strong>: Chạy nét mẫu ô Mễ</span>
+                  <span>·</span>
+                  <span><strong>[F]</strong>: Trình chiếu Fullscreen</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowShortcutsHint(false)}
+                  className="text-sm font-bold text-[#9B8A3E] hover:text-[#0F382E] cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+            )}
+
+            {/* Expandable Vocabulary Suggestions Drawer */}
+            {isAiDrawerOpen && (
+              <div
+                data-testid="ai-suggestions-drawer-content"
+                className="mt-2.5 pt-2.5 border-t border-[rgba(30,50,39,0.12)] space-y-2.5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <div
+                    data-testid="ai-topic-filter-bar"
+                    className="flex flex-wrap items-center gap-1.5"
+                  >
+                    {SEARCH_TOPIC_FILTERS.map((tab) => (
                       <button
-                        key={spd.ms}
+                        key={tab.id}
                         type="button"
-                        data-testid={`stroke-speed-preset-${spd.ms}`}
-                        onClick={() => handleUpdateStrokeSpeed(spd.ms)}
-                        className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
-                          Math.abs(strokeSpeedMs - spd.ms) < 90
+                        data-testid={`topic-filter-${tab.id}`}
+                        onClick={() => setVocabSearchTopic(tab.id)}
+                        className={`px-3 py-1 rounded-full text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
+                          vocabSearchTopic === tab.id
                             ? 'bg-[#1E3227] text-[#FAFBF7]'
-                            : 'text-[#3F5447] hover:text-[#1E3227]'
+                            : 'bg-white text-[#3F5447] border border-[#9B8A3E]/35 hover:border-[#9B8A3E] hover:text-[#1E3227]'
                         }`}
                       >
-                        {spd.label}
+                        {tab.label}
                       </button>
                     ))}
+                    {isSearchingAI && (
+                      <span className="text-sm text-[#9B8A3E] font-semibold ml-1">
+                        Đang lọc...
+                      </span>
+                    )}
                   </div>
-                  <input
-                    type="range"
-                    min="340"
-                    max="1100"
-                    step="20"
-                    value={1440 - strokeSpeedMs}
-                    onChange={(e) => handleUpdateStrokeSpeed(1440 - Number(e.target.value))}
-                    className="w-20 accent-[#1E3227] cursor-pointer"
-                    aria-label="Thanh trượt tốc độ viết nét chữ"
-                    data-testid="stroke-speed-slider"
-                  />
+                  <span className="text-sm font-bold text-[#0F5243] px-2.5 py-0.5 rounded-full bg-[#E6EFEA] border border-[#0F5243]/15">
+                    Gia Sư Hán Ngữ Trực Tuyến · Chuẩn HSK 3.0
+                  </span>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-[#1E3227]">Giọng đọc chuẩn:</span>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="1.5"
-                    step="0.05"
-                    value={speechRate}
-                    onChange={(e) => handleUpdateSpeechRate(parseFloat(e.target.value))}
-                    className="w-20 accent-[#1E3227] cursor-pointer"
-                    aria-label="Thanh trượt tốc độ giọng đọc chuẩn"
-                    data-testid="voice-speed-slider"
-                  />
-                  <span
-                    data-testid="voice-speed-value"
-                    className="px-2 py-0.5 rounded-lg bg-white border border-[#9B8A3E]/50 text-[#1E3227] font-bold tabular-nums"
-                  >
-                    {speechRate.toFixed(2).replace(/0$/, '')}x
-                  </span>
-                  <div className="inline-flex items-center rounded-xl bg-[#E7ECD9] p-0.5 border border-[rgba(30,50,39,0.15)]">
-                    {[0.5, 0.75, 1.0, 1.25, 1.5].map((rateVal) => (
-                      <button
-                        key={rateVal}
-                        type="button"
-                        data-testid={`voice-rate-preset-${rateVal}`}
-                        onClick={() => {
-                          handleUpdateSpeechRate(rateVal);
-                          speakChinese(currentSlide.hanzi, rateVal);
-                        }}
-                        className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
-                          Math.abs(speechRate - rateVal) < 0.03
-                            ? 'bg-[#1E3227] text-[#FAFBF7]'
-                            : 'text-[#3F5447] hover:text-[#1E3227]'
-                        }`}
-                      >
-                        {rateVal}x
-                      </button>
-                    ))}
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {vocabSuggestions.map((item, idx) => (
+                    <button
+                      key={`${item.hanzi}-${idx}`}
+                      type="button"
+                      onClick={() => {
+                        handleSelectSuggestedVocab(item);
+                        setToastMessage(`Đã chọn slide cho "${item.hanzi}"`);
+                      }}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-[rgba(30,50,39,0.14)] hover:border-[#9B8A3E] text-left transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-lg bg-[#FAFBF7] border border-[#9B8A3E]/25 flex items-center justify-center font-['Noto_Sans_SC'] font-bold text-base text-[#1E3227] shrink-0">
+                          {item.hanzi}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold text-[#9B8A3E] truncate">
+                            {item.pinyin} · {item.hanViet}
+                          </div>
+                          <div className="text-sm font-semibold text-[#1E3227] truncate">
+                            {item.meaning}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-[#1E3227]/8 flex items-center justify-center text-[#1E3227] shrink-0">
+                        <Plus className="w-4 h-4" />
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
           </div>
 
-          {/* 4. Clean Single-Row Horizontal Scrollable Vocabulary Strip (1 -> 20) */}
-          <div
-            data-testid="horizontal-vocab-pill-strip"
-            className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1"
-          >
-            {(filteredSlides.length > 0 ? filteredSlides : slides).map((s) => {
-              const originalIdx = slides.findIndex((item) => item.id === s.id);
-              const idx = originalIdx !== -1 ? originalIdx : 0;
-              const isActive = idx === activeSlideIndex;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => {
-                    handleSelectSlide(idx);
-                    speakChinese(s.hanzi);
-                  }}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 border cursor-pointer ${
-                    isActive
-                      ? 'bg-[#1E3227] border-[#9B8A3E] text-[#FAFBF7] shadow-2xs'
-                      : 'bg-white/85 border-[rgba(30,50,39,0.14)] text-[#3F5447] hover:text-[#1E3227] hover:bg-[#FAFBF7] hover:border-[#9B8A3E]'
-                  }`}
-                >
-                  <span
-                    className={`text-[10px] font-bold tabular-nums ${
-                      isActive ? 'text-[#C5B358]' : 'text-[#5F7266]'
+          {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+
+          {/* =================================================================
+              TIER 3: HORIZONTAL SCROLLABLE VOCABULARY STRIP + PAGE SWITCHER
+              ================================================================= */}
+          <div className="flex items-center gap-2">
+            <div className="inline-flex items-center rounded-xl bg-white/90 border border-[rgba(30,50,39,0.16)] p-0.5 shrink-0 shadow-2xs">
+              <button
+                type="button"
+                onClick={handlePrev}
+                aria-label="Slide trước"
+                title="Từ trước (Phím tắt: ←)"
+                className="p-1.5 rounded-lg text-[#1E3227] hover:bg-[#E7ECD9] transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="px-2 text-sm font-bold text-[#1E3227] tabular-nums whitespace-nowrap">
+                {activeSlideIndex + 1}/{slides.length}
+              </span>
+              <button
+                type="button"
+                onClick={handleNext}
+                aria-label="Slide tiếp theo"
+                title="Từ tiếp theo (Phím tắt: →)"
+                className="p-1.5 rounded-lg text-[#1E3227] hover:bg-[#E7ECD9] transition-colors cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div
+              data-testid="horizontal-vocab-pill-strip"
+              className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1"
+            >
+              {(filteredSlides.length > 0 ? filteredSlides : slides).map((s) => {
+                const originalIdx = slides.findIndex((item) => item.id === s.id);
+                const idx = originalIdx !== -1 ? originalIdx : 0;
+                const isActive = idx === activeSlideIndex;
+                return (
+                  <button
+                    key={s.id}
+                    ref={(el) => {
+                      if (el) chipRefs.current.set(idx, el);
+                      else chipRefs.current.delete(idx);
+                    }}
+                    type="button"
+                    onClick={() => {
+                      handleSelectSlide(idx);
+                      speakChinese(s.hanzi);
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-sm font-semibold transition-all whitespace-nowrap shrink-0 border cursor-pointer ${
+                      isActive
+                        ? 'bg-[#1E3227] border-[#9B8A3E] text-[#FAFBF7] shadow-2xs'
+                        : 'bg-white/90 border-[rgba(30,50,39,0.14)] text-[#3F5447] hover:text-[#1E3227] hover:bg-[#FAFBF7] hover:border-[#9B8A3E]'
                     }`}
                   >
-                    {idx + 1}
-                  </span>
-                  <span
-                    className={`font-['Noto_Sans_SC'] text-sm font-bold ${
-                      isActive ? 'text-[#FAFBF7]' : 'text-[#1E3227]'
-                    }`}
-                  >
-                    {s.hanzi}
-                  </span>
-                  {s.learned && (
-                    <span className="inline-flex items-center gap-0.5">
-                      <span
-                        data-testid={`learned-green-dot-${s.hanzi}`}
-                        className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"
-                      />
-                      <Check
-                        className={`w-3 h-3 ${
-                          isActive ? 'text-[#C5B358]' : 'text-[#1E3227]'
-                        }`}
-                      />
+                    <span
+                      className={`text-sm font-bold tabular-nums ${
+                        isActive ? 'text-[#C5B358]' : 'text-[#5F7266]'
+                      }`}
+                    >
+                      {idx + 1}
                     </span>
-                  )}
-                </button>
-              );
-            })}
+                    <span
+                      className={`font-['Noto_Sans_SC'] text-base font-bold ${
+                        isActive ? 'text-[#FAFBF7]' : 'text-[#1E3227]'
+                      }`}
+                    >
+                      {s.hanzi}
+                    </span>
+                    {s.learned && (
+                      <span className="inline-flex items-center gap-0.5">
+                        <span
+                          data-testid={`learned-green-dot-${s.hanzi}`}
+                          className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"
+                        />
+                        <Check
+                          className={`w-3.5 h-3.5 ${
+                            isActive ? 'text-[#C5B358]' : 'text-[#1E3227]'
+                          }`}
+                        />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* =================================================================
@@ -1679,35 +1899,43 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   )}
                 </div>
 
-                {/* 3 Spaced Repetition Rating Buttons */}
+                {/* 4 Spaced Repetition Rating Buttons */}
                 <div className="space-y-2 pt-2 border-t border-[rgba(30,50,39,0.12)]">
                   <div className="text-[11px] font-bold text-[#3F5447] text-center">
-                    Đánh giá mức độ ghi nhớ (Spaced Repetition — Tự động lọc từ khó vào Sổ tay từ hay quên 错题本):
+                    Đánh giá mức độ ghi nhớ (Spaced Repetition — Tự động phân phối chu kỳ ôn tập):
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <button
                       type="button"
                       data-testid="srs-rate-again-btn"
-                      onClick={() => handleRateCurrentWordSrs('again')}
-                      className="py-2.5 px-3 rounded-xl bg-red-50 hover:bg-red-100 border border-red-300 text-red-900 text-xs font-bold transition-all cursor-pointer"
+                      onClick={() => handleRateCurrentWordSrs('forgot')}
+                      className="py-2.5 px-2 rounded-xl bg-red-50 hover:bg-red-100 border border-red-300 text-red-900 text-xs font-bold transition-all cursor-pointer text-center"
                     >
-                      😰 Chưa nhớ - Ôn lại ngay
+                      😰 Quên (1p)
                     </button>
                     <button
                       type="button"
                       data-testid="srs-rate-hard-btn"
                       onClick={() => handleRateCurrentWordSrs('hard')}
-                      className="py-2.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-950 text-xs font-bold transition-all cursor-pointer"
+                      className="py-2.5 px-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-950 text-xs font-bold transition-all cursor-pointer text-center"
                     >
-                      🤔 Hơi nhớ
+                      🤔 Khó (10p)
                     </button>
                     <button
                       type="button"
                       data-testid="srs-rate-good-btn"
                       onClick={() => handleRateCurrentWordSrs('good')}
-                      className="py-2.5 px-3 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] border border-[#9B8A3E] text-[#FAFBF7] text-xs font-bold transition-all cursor-pointer"
+                      className="py-2.5 px-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-950 text-xs font-bold transition-all cursor-pointer text-center"
                     >
-                      ✅ Đã thuộc lòng
+                      👍 Nhớ (1 ngày)
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="srs-rate-mastered-btn"
+                      onClick={() => handleRateCurrentWordSrs('mastered')}
+                      className="py-2.5 px-2 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] border border-[#9B8A3E] text-[#FAFBF7] text-xs font-bold transition-all cursor-pointer text-center shadow-2xs"
+                    >
+                      🌟 Thuộc làu (4 ngày)
                     </button>
                   </div>
                 </div>
@@ -1823,46 +2051,54 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
           )}
 
           {/* =================================================================
-              5. STREAMLINED MAIN 3-COLUMN CARD (BALANCED & FITS IN 1 VIEWPORT)
+              5. BALANCED 3-COLUMN WORKSPACE (64-80PX HANZI & >= 14PX TYPOGRAPHY)
               ================================================================= */}
           {(roleMode !== 'student' || studentStudyMode !== 'flashcard') && (
-          <div className="grid grid-cols-2 lg:grid-cols-12 gap-2.5 sm:gap-3.5 items-stretch">
-            {/* COLUMN 1 (col-span-1 on split/mobile, lg:col-span-4 on desktop): Vocabulary Card on the Left */}
-            <div className="col-span-1 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-white/75 border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 p-2.5 sm:p-3.5 flex flex-col justify-between transition-all duration-300">
-              <div>
-                {/* Only 2 Refined Badges at Top of Card: [HSK X] and [✍️ Chữ viết tay / 👁️ Chữ nhận diện] */}
-                <div className="flex items-center justify-between gap-1.5">
-                  <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-[11px] sm:text-xs font-extrabold tracking-wide shadow-2xs">
-                    {currentHsk3Meta.hskLevelNormalized}
-                  </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3.5 items-stretch">
+            {/* COLUMN 1 (lg:col-span-4): Main Vocabulary Card on the Left */}
+            <div className="md:col-span-1 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-white/80 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 p-4 flex flex-col justify-between transition-all duration-300">
+              <div className="space-y-3">
+                {/* Top Badges: [HSK X] + [Từ loại] + [Chữ viết tay / Nhận diện] */}
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-sm font-extrabold tracking-wide shadow-2xs">
+                      {currentHsk3Meta.hskLevelNormalized}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-lg bg-[#FAF7F0] border border-[#9B8A3E]/40 text-[#0F382E] text-sm font-bold">
+                      {currentSlide.partOfSpeech}
+                    </span>
+                  </div>
 
                   <span
                     data-testid="hsk3-char-category-badge"
-                    className={`px-2 py-0.5 rounded-lg border text-[11px] sm:text-xs font-bold ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border text-sm font-bold ${
                       currentHsk3Meta.charCategory === 'handwriting'
                         ? 'bg-[#0F5243]/10 border-[#0F5243]/25 text-[#0F5243]'
                         : 'bg-[#FAF7F0] border-[#9B8A3E]/45 text-[#0F382E]'
                     }`}
                   >
-                    {currentHsk3Meta.charCategory === 'handwriting'
-                      ? '✍️ Viết tay'
-                      : '👁️ Nhận diện'}
+                    <Edit3 className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                    <span>
+                      {currentHsk3Meta.charCategory === 'handwriting'
+                        ? 'Chữ viết tay'
+                        : 'Chữ nhận diện'}
+                    </span>
                   </span>
                 </div>
 
-                {/* Prominent Hanzi + Pinyin + Hán Việt + Meaning */}
+                {/* Enlarged Central Hanzi (64px-80px) + Pinyin + Hán Việt + Prominent Meaning + Example Sentence */}
                 {!isCardFlipped ? (
-                  <div className="my-1.5 sm:my-2 text-center">
-                    <div className="inline-flex items-center justify-center gap-2">
+                  <div className="py-2 text-center space-y-2.5">
+                    <div className="inline-flex items-center justify-center">
                       <span
-                        className="font-hanzi-calligraphy text-3xl xs:text-4xl sm:text-5xl xl:text-6xl font-bold tracking-wide text-[#0F382E] select-all leading-none"
+                        className="font-hanzi-calligraphy text-6xl sm:text-7xl font-bold tracking-wide text-[#0F382E] select-all leading-none py-1"
                         data-testid="active-slide-hanzi"
                       >
                         {currentSlide.hanzi}
                       </span>
                     </div>
 
-                    <p className="mt-1 text-xs sm:text-sm font-bold text-[#0F382E] flex flex-wrap items-center justify-center gap-1.5 leading-snug">
+                    <div className="text-base sm:text-lg font-bold text-[#0F382E] flex flex-wrap items-center justify-center gap-2 leading-snug">
                       {showPinyin && (
                         <span className="text-[#9B8A3E] tracking-wide" data-testid="active-slide-pinyin">
                           {currentSlide.pinyin}
@@ -1872,46 +2108,66 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       <span className="text-[#0F382E] uppercase tracking-wide" data-testid="active-slide-hanviet">
                         [{currentSlide.hanViet}]
                       </span>
-                      {showMeaning && (
-                        <>
-                          <span className="text-[#9B8A3E]/60">·</span>
-                          <span className="text-[#3A544B] font-semibold" data-testid="active-slide-meaning">
-                            {currentSlide.meaning}
-                          </span>
-                        </>
-                      )}
-                    </p>
+                    </div>
 
-                    {/* Inline Short Example Sentence + [🔊 Nghe câu] right below meaning */}
+                    {/* Prominent Vietnamese Meaning & Usage Note directly below Pinyin */}
+                    {showMeaning && (
+                      <div className="p-2.5 rounded-xl bg-[#FAF7F0] border border-[#0F5243]/15 space-y-1">
+                        <div
+                          className="text-base sm:text-lg font-extrabold text-[#0F5243]"
+                          data-testid="active-slide-meaning"
+                        >
+                          {currentSlide.meaning}
+                        </div>
+                        {currentSlide.usageNote && (
+                          <p className="text-sm text-[#3A544B] leading-snug line-clamp-2">
+                            {currentSlide.usageNote}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Primary Example Sentence Box right underneath Meaning to balance Column 1 height */}
                     <div
                       data-testid="col1-inline-example-row"
-                      className="mt-1.5 px-2.5 py-1 rounded-xl bg-[#FAF7F0]/90 border border-[#0F5243]/14 flex items-center justify-between gap-1.5 text-left"
+                      className="p-2.5 rounded-xl bg-white border border-[#9B8A3E]/35 text-left space-y-1 shadow-2xs"
                     >
-                      <span
-                        data-testid="col1-inline-example-hanzi"
-                        className="font-['Noto_Sans_SC'] text-xs sm:text-sm font-bold text-[#0F382E] truncate"
-                        title={`${currentSlide.exampleHanzi} (${currentSlide.examplePinyin}) — ${currentSlide.exampleMeaning}`}
-                      >
-                        {renderHighlightedExample(currentSlide.exampleHanzi, currentSlide.hanzi)}
-                      </span>
-                      <button
-                        type="button"
-                        data-testid="col1-inline-listen-example-btn"
-                        onClick={() => speakChinese(currentSlide.exampleHanzi, speechRate)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] text-[10px] font-bold shrink-0 cursor-pointer transition-all duration-300 active:scale-95"
-                      >
-                        <Volume2 className="w-3 h-3 text-[#C5B358]" />
-                        <span>Nghe câu</span>
-                      </button>
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          data-testid="col1-inline-example-hanzi"
+                          className="font-['Noto_Sans_SC'] text-base font-bold text-[#0F382E]"
+                        >
+                          {renderHighlightedExample(currentSlide.exampleHanzi, currentSlide.hanzi)}
+                        </span>
+                        <button
+                          type="button"
+                          data-testid="col1-inline-listen-example-btn"
+                          onClick={() => speakChinese(currentSlide.exampleHanzi, speechRate)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] text-sm font-bold shrink-0 cursor-pointer transition-all duration-300 active:scale-95"
+                        >
+                          <Volume2 className="w-3.5 h-3.5 text-[#C5B358]" />
+                          <span>Nghe câu</span>
+                        </button>
+                      </div>
+                      {showPinyin && (
+                        <div className="text-sm font-medium text-[#9B8A3E]">
+                          {currentSlide.examplePinyin}
+                        </div>
+                      )}
+                      {showMeaning && (
+                        <div className="text-sm text-[#3A544B] italic">
+                          {currentSlide.exampleMeaning}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
-                  <div className="my-1.5 sm:my-2 text-center p-2.5 rounded-xl bg-[#F4F6EE] border border-dashed border-[#9B8A3E]">
-                    <p className="text-[10px] sm:text-[11px] uppercase tracking-wider text-[#9B8A3E] font-bold">
+                  <div className="my-2 text-center p-4 rounded-xl bg-[#F4F6EE] border border-dashed border-[#9B8A3E] space-y-2">
+                    <p className="text-sm uppercase tracking-wider text-[#9B8A3E] font-bold">
                       Chế độ kiểm tra nhớ từ
                     </p>
                     <p
-                      className="font-['Noto_Sans_SC'] text-4xl sm:text-5xl font-bold text-[#1E3227] my-1"
+                      className="font-['Noto_Sans_SC'] text-6xl font-bold text-[#1E3227] my-2"
                       data-testid="active-slide-hanzi"
                     >
                       {currentSlide.hanzi}
@@ -1919,72 +2175,87 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     <button
                       type="button"
                       onClick={() => setIsCardFlipped(false)}
-                      className="mt-1 px-2.5 py-0.5 rounded-xl bg-[#1E3227] text-[#FAFBF7] text-xs font-semibold cursor-pointer"
+                      className="mt-1 px-3.5 py-1.5 rounded-xl bg-[#1E3227] text-[#FAFBF7] text-sm font-semibold cursor-pointer"
                     >
                       Hiện đáp án
                     </button>
                   </div>
                 )}
 
-                {/* Control Buttons Row Placed Immediately Below the Example Sentence */}
+                {/* Control Buttons Row */}
                 <div
                   data-testid="col1-card-controls-row"
-                  className="flex flex-wrap items-center justify-between gap-1 py-1.5 border-y border-[rgba(30,50,39,0.12)]"
+                  className="flex flex-wrap items-center justify-between gap-1.5 py-2 border-y border-[rgba(30,50,39,0.12)]"
                 >
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
+                      data-testid="pronounce-active-word-btn"
                       onClick={() => speakChinese(currentSlide.hanzi, speechRate)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] text-[11px] sm:text-xs font-bold shadow-[0_2px_10px_rgba(15,82,67,0.22)] transition-all duration-300 active:scale-95 cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] text-sm font-bold shadow-[0_2px_10px_rgba(15,82,67,0.22)] transition-all duration-300 active:scale-95 cursor-pointer"
                     >
-                      <Volume2 className="w-3.5 h-3.5 text-[#C5B358]" />
+                      <Volume2 className="w-4 h-4 text-[#C5B358]" />
                       <span>Phát âm</span>
+                      {isTtsSpeaking && (
+                        <span
+                          data-testid="tts-speaking-wave"
+                          className="inline-flex items-end gap-0.5 ml-0.5 h-3"
+                          aria-hidden="true"
+                        >
+                          <span className="tts-soundwave-bar" />
+                          <span className="tts-soundwave-bar" />
+                          <span className="tts-soundwave-bar" />
+                        </span>
+                      )}
                     </button>
                     <button
                       type="button"
                       onClick={() => speakChinese(currentSlide.hanzi, 0.55)}
-                      className="inline-flex items-center gap-0.5 px-1.5 py-1 rounded-xl bg-white/85 hover:bg-white text-[#0F382E] text-[11px] sm:text-xs font-semibold border border-[#0F5243]/15 transition-all duration-300 active:scale-95 cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] text-sm font-semibold border border-[#0F5243]/15 transition-all duration-300 active:scale-95 cursor-pointer"
                     >
-                      <span>🐢 Chậm</span>
+                      <Rewind className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                      <span>Chậm</span>
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     {roleMode === 'teacher' && (
                       <button
                         type="button"
                         data-testid="quick-edit-slide-btn"
                         onClick={handleOpenQuickEditModal}
                         title="Sửa nhanh Nghĩa, Câu ví dụ, Pinyin & Tạo ảnh minh họa theo ngữ cảnh"
-                        className="inline-flex items-center gap-0.5 px-2 py-1 rounded-xl bg-[#FAF7F0] hover:bg-white text-[#0F382E] text-[11px] sm:text-xs font-bold border border-[#C5B358]/60 transition-all duration-300 active:scale-95 cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#FAF7F0] hover:bg-white text-[#0F382E] text-sm font-bold border border-[#C5B358]/60 transition-all duration-300 active:scale-95 cursor-pointer"
                       >
-                        <span>✏️ Sửa thẻ</span>
+                        <Edit3 className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                        <span>Sửa thẻ</span>
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={() => setIsCardFlipped((f) => !f)}
-                      className="inline-flex items-center gap-0.5 px-1.5 py-1 rounded-xl bg-white/85 hover:bg-white text-[#0F382E] text-[11px] sm:text-xs font-semibold border border-[#0F5243]/15 transition-all duration-300 active:scale-95 cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] text-sm font-semibold border border-[#0F5243]/15 transition-all duration-300 active:scale-95 cursor-pointer"
                     >
-                      <RefreshCw className="w-3 h-3 text-[#9B8A3E]" />
+                      <RefreshCw className="w-3.5 h-3.5 text-[#9B8A3E]" />
                       <span>Lật thẻ</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => onToggleLearned(currentSlide.id)}
-                      className={`px-2 py-1 rounded-xl text-[11px] sm:text-xs font-bold border transition-all duration-300 active:scale-95 cursor-pointer ${
+                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-sm font-bold border transition-all duration-300 active:scale-95 cursor-pointer ${
                         currentSlide.learned
                           ? 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] border-[#0F5243] text-[#FAF7F0] shadow-2xs'
-                          : 'bg-white/85 border-[#0F5243]/15 text-[#3A544B] hover:text-[#0F5243]'
+                          : 'bg-white border-[#0F5243]/15 text-[#3A544B] hover:text-[#0F5243]'
                       }`}
                     >
-                      {currentSlide.learned ? '✓ Thuộc' : 'Thuộc'}
+                      {currentSlide.learned && <Check className="w-3.5 h-3.5" />}
+                      <span>Thuộc</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Compact 3-Tab / Accordion Box: [🧩 Chiết tự] vs [📐 Ngữ pháp] vs [💬 Ví dụ & Hội thoại] + 1-Line Tone Sandhi Badge */}
-                <div className="rounded-xl bg-[#F4F6EE] border border-[rgba(30,50,39,0.12)] p-1.5 sm:p-2 mt-1.5">
+                {/* 3-Tab Accordion Box: [Chiết tự] vs [Ngữ pháp] vs [Ví dụ & Hội thoại] */}
+                <div className="rounded-xl bg-[#F4F6EE] border border-[rgba(30,50,39,0.12)] p-2">
                   <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[#E7ECD9] mb-1">
                     <button
                       type="button"
@@ -1997,13 +2268,14 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           setIsCol1AccordionOpen(true);
                         }
                       }}
-                      className={`flex-1 py-1 px-1 rounded-md text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                         col1ActiveTab === 'radical' && isCol1AccordionOpen
                           ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
                           : 'text-[#3F5447] hover:text-[#1E3227]'
                       }`}
                     >
-                      🧩 Chiết tự {isCol1AccordionOpen && col1ActiveTab === 'radical' ? '▲' : '▾'}
+                      <Puzzle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Chiết tự</span>
                     </button>
                     <button
                       type="button"
@@ -2016,13 +2288,14 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           setIsCol1AccordionOpen(true);
                         }
                       }}
-                      className={`flex-1 py-1 px-1 rounded-md text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                         col1ActiveTab === 'grammar' && isCol1AccordionOpen
                           ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
                           : 'text-[#3F5447] hover:text-[#1E3227]'
                       }`}
                     >
-                      📐 Ngữ pháp {isCol1AccordionOpen && col1ActiveTab === 'grammar' ? '▲' : '▾'}
+                      <Compass className="w-3.5 h-3.5 shrink-0" />
+                      <span>Ngữ pháp</span>
                     </button>
                     <button
                       type="button"
@@ -2035,31 +2308,52 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           setIsCol1AccordionOpen(true);
                         }
                       }}
-                      className={`flex-1 py-1 px-1 rounded-md text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                         col1ActiveTab === 'example' && isCol1AccordionOpen
                           ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
                           : 'text-[#3F5447] hover:text-[#1E3227]'
                       }`}
                     >
-                      💬 Ví dụ & Hội thoại {isCol1AccordionOpen && col1ActiveTab === 'example' ? '▲' : '▾'}
+                      <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                      <span>Hội thoại</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="col1-tab-collocations"
+                      onClick={() => {
+                        if (col1ActiveTab === 'collocations' && isCol1AccordionOpen) {
+                          setIsCol1AccordionOpen(false);
+                        } else {
+                          setCol1ActiveTab('collocations');
+                          setIsCol1AccordionOpen(true);
+                        }
+                      }}
+                      className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+                        col1ActiveTab === 'collocations' && isCol1AccordionOpen
+                          ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
+                          : 'text-[#3F5447] hover:text-[#1E3227]'
+                      }`}
+                    >
+                      <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                      <span>Mở rộng</span>
                     </button>
                   </div>
 
                   {isCol1AccordionOpen && (
                     col1ActiveTab === 'radical' ? (
-                      <div className="grid grid-cols-1 gap-1 my-1" data-testid="col1-radical-panel">
+                      <div className="grid grid-cols-1 gap-1.5 my-1" data-testid="col1-radical-panel">
                         {currentSlide.characters.map((ch, idx) => (
                           <div
                             key={`rad-breakdown-${ch.char}-${idx}`}
-                            className="flex items-center justify-between text-xs bg-white px-2 py-1 rounded-lg border border-[rgba(30,50,39,0.1)]"
+                            className="flex items-center justify-between text-sm bg-white px-2.5 py-1.5 rounded-lg border border-[rgba(30,50,39,0.1)]"
                           >
                             <div className="flex items-center gap-1.5">
-                              <span className="font-['Noto_Sans_SC'] text-sm font-bold text-[#1E3227]">
+                              <span className="font-['Noto_Sans_SC'] text-base font-bold text-[#1E3227]">
                                 {ch.char}
                               </span>
-                              <span className="text-[#9B8A3E] font-semibold text-[11px]">({ch.pinyin})</span>
+                              <span className="text-[#9B8A3E] font-semibold text-sm">({ch.pinyin})</span>
                             </div>
-                            <span className="text-[#3F5447] text-[11px]">
+                            <span className="text-[#3F5447] text-sm">
                               Bộ: <strong className="text-[#1E3227]">{ch.radical}</strong> ·{' '}
                               <span className="font-bold text-[#9B8A3E]">{ch.strokeCount} nét</span>
                             </span>
@@ -2069,63 +2363,109 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     ) : col1ActiveTab === 'grammar' ? (
                       <div
                         data-testid="hsk3-grammar-point-box"
-                        className="space-y-1 bg-white p-2 rounded-lg border border-[#9B8A3E]/40 my-1"
+                        className="space-y-1.5 bg-white p-2.5 rounded-lg border border-[#9B8A3E]/40 my-1"
                       >
                         <div
                           data-testid="hsk3-grammar-formula"
-                          className="px-2 py-0.5 rounded-md bg-[#1E3227] text-[#C5B358] font-mono text-[10px] sm:text-[11px] font-bold tracking-wide"
+                          className="px-2.5 py-1 rounded-md bg-[#1E3227] text-[#C5B358] font-mono text-sm font-bold tracking-wide"
                         >
                           {currentHsk3Meta.grammarFormula}
                         </div>
-                        <p className="text-[10px] sm:text-[11px] text-[#3F5447] leading-snug">
+                        <p className="text-sm text-[#3F5447] leading-snug">
                           {currentHsk3Meta.synonymDistinction}
                         </p>
+                      </div>
+                    ) : col1ActiveTab === 'collocations' ? (
+                      <div
+                        data-testid="col1-collocations-panel"
+                        className="space-y-2 bg-white p-2.5 rounded-lg border border-[#9B8A3E]/40 my-1 text-left"
+                      >
+                        <div>
+                          <div className="text-[11px] font-bold uppercase tracking-wider text-[#9B8A3E] mb-1">
+                            Cụm từ cố định HSK (常用搭配):
+                          </div>
+                          <div className="space-y-1">
+                            {getAuthenticCollocationsForWord(
+                              currentSlide.hanzi,
+                              currentSlide.pinyin,
+                              currentSlide.meaning,
+                              currentSlide.partOfSpeech
+                            ).map((colloc, idx) => (
+                              <div
+                                key={`colloc-${idx}`}
+                                onClick={() => speakChinese(colloc.hanzi, speechRate)}
+                                className="flex items-center justify-between p-1.5 rounded-lg bg-[#F4F6EE] hover:bg-[#E7ECD9] cursor-pointer transition-colors"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-['Noto_Sans_SC'] font-bold text-[#1E3227] text-sm">
+                                    {colloc.hanzi}
+                                  </span>
+                                  <span className="text-[#9B8A3E] font-mono text-xs">({colloc.pinyin})</span>
+                                </div>
+                                <span className="text-xs text-[#3F5447] font-medium">{colloc.meaning}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        {(() => {
+                          const syn = getSynonymDistinctionForWord(
+                            currentSlide.hanzi,
+                            currentSlide.pinyin,
+                            currentSlide.meaning,
+                            currentSlide.partOfSpeech
+                          );
+                          if (!syn) return null;
+                          return (
+                            <div className="pt-2 border-t border-[rgba(30,50,39,0.1)]">
+                              <div className="text-[11px] font-bold uppercase tracking-wider text-[#B8292F] mb-0.5">
+                                {syn.title}
+                              </div>
+                              <div className="text-xs text-[#3F5447] leading-relaxed mb-1">
+                                {syn.summary}
+                              </div>
+                              {syn.items && syn.items.length > 0 && (
+                                <div className="space-y-1">
+                                  {syn.items.map((item, idx) => (
+                                    <div key={`syn-item-${idx}`} className="bg-[#FAF7F0] p-1.5 rounded-md border border-[#9B8A3E]/20 text-xs text-[#1E3227]">
+                                      <strong>{item.word} ({item.pinyin}):</strong> {item.nuance}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (
                       <div
                         data-testid="col1-example-dialogue-panel"
-                        className="space-y-1.5 bg-white p-2 rounded-lg border border-[#9B8A3E]/40 my-1 text-left"
+                        className="space-y-1.5 bg-white p-2.5 rounded-lg border border-[#9B8A3E]/40 my-1 text-left"
                       >
-                        <div className="space-y-0.5 pb-1.5 border-b border-[rgba(30,50,39,0.1)]">
-                          <div className="font-['Noto_Sans_SC'] text-xs sm:text-sm font-bold text-[#1E3227]">
-                            {renderHighlightedExample(currentSlide.exampleHanzi, currentSlide.hanzi)}
-                          </div>
-                          {showPinyin && (
-                            <div className="text-[11px] text-[#9B8A3E] font-medium">
-                              {currentSlide.examplePinyin}
-                            </div>
-                          )}
-                          {(showMeaning || showVietnamese) && (
-                            <div className="text-[11px] text-[#3F5447] italic">
-                              {currentSlide.exampleMeaning}
-                            </div>
-                          )}
-                        </div>
-                        <div className="space-y-1 max-h-[120px] overflow-y-auto pr-0.5">
+                        <div className="space-y-1 max-h-[140px] overflow-y-auto pr-0.5">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#9B8A3E]">
-                              💬 Hội thoại ngữ cảnh (课文)
+                            <span className="text-sm font-bold text-[#9B8A3E]">
+                              Hội thoại ngữ cảnh (课文)
                             </span>
                             <button
                               type="button"
                               onClick={handlePlayContextualDialogue}
-                              className="text-[10px] font-bold text-[#1E3227] hover:text-[#C84B31] cursor-pointer"
+                              className="text-sm font-bold text-[#1E3227] hover:text-[#C84B31] cursor-pointer"
                             >
-                              {isPlayingDialogue ? '⏹ Dừng' : '🔊 Nghe hội thoại'}
+                              {isPlayingDialogue ? 'Dừng đọc' : 'Nghe hội thoại'}
                             </button>
                           </div>
                           {currentDialogue.turns.map((turn, idx) => (
                             <div
                               key={`col1-turn-${idx}`}
                               onClick={() => speakChinese(turn.hanziLine, speechRate)}
-                              className="p-1.5 rounded-lg bg-[#F4F6EE] hover:bg-[#E7ECD9] text-[11px] cursor-pointer transition-colors"
+                              className="p-2 rounded-lg bg-[#F4F6EE] hover:bg-[#E7ECD9] text-sm cursor-pointer transition-colors"
                             >
                               <span className="font-bold text-[#9B8A3E] mr-1">{turn.speaker}:</span>
                               <span className="font-['Noto_Sans_SC'] font-bold text-[#1E3227]">
                                 {turn.hanziLine}
                               </span>
                               {(showMeaning || showVietnamese) && (
-                                <span className="block text-[10px] text-[#3F5447] italic">
+                                <span className="block text-sm text-[#3F5447] italic">
                                   {turn.meaningLine}
                                 </span>
                               )}
@@ -2136,28 +2476,28 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     )
                   )}
 
-                  {/* Ultra-Compact 1-Line Tone Sandhi Badge ONLY when word has genuine Tone Sandhi */}
+                  {/* Tone Sandhi Badge */}
                   {currentToneSandhi.hasSandhi && (
-                    <div data-testid="tone-sandhi-box" className="mt-1">
+                    <div data-testid="tone-sandhi-box" className="mt-1.5">
                       <button
                         type="button"
                         data-testid="tone-sandhi-info-toggle"
                         onClick={() => setShowToneSandhiInfo((v) => !v)}
                         title={currentToneSandhi.explanationVi}
-                        className="w-full px-2 py-1 rounded-lg bg-white hover:bg-[#FAFBF7] border border-[#9B8A3E]/35 flex items-center justify-between gap-1 text-left transition-colors cursor-pointer"
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#FAFBF7] border border-[#9B8A3E]/35 flex items-center justify-between gap-1.5 text-left transition-colors cursor-pointer"
                       >
-                        <span className="text-[10px] sm:text-[11px] font-bold text-[#1E3227] truncate">
-                          🎵 Biến điệu: {currentToneSandhi.ruleTitle.replace(/^Biến điệu\s*/i, '')}
+                        <span className="text-sm font-bold text-[#1E3227]">
+                          Biến điệu: {currentToneSandhi.ruleTitle.replace(/^Biến điệu\s*/i, '')}
                         </span>
-                        <span className="inline-flex items-center gap-0.5 shrink-0">
-                          <span className="px-1 py-0.5 rounded bg-[#E7ECD9] text-[#1E3227] font-mono text-[9px] sm:text-[10px] font-bold">
-                            {currentToneSandhi.spokenPinyin}
+                        <span className="inline-flex items-center gap-1 shrink-0">
+                          <span className="px-1.5 py-0.5 rounded bg-[#E7ECD9] text-[#1E3227] font-mono text-sm font-bold">
+                            {currentToneSandhi.spokenPinyin.replace(/\s*\(.*?\)\s*/g, '')}
                           </span>
-                          <span className="text-[10px] font-bold text-[#9B8A3E]">ⓘ</span>
+                          <Info className="w-4 h-4 text-[#9B8A3E]" />
                         </span>
                       </button>
                       {showToneSandhiInfo && (
-                        <p className="mt-1 px-2 py-1 rounded-lg bg-white/95 border border-[#9B8A3E]/30 text-[10px] text-[#3F5447] leading-snug">
+                        <p className="mt-1 px-2.5 py-1.5 rounded-lg bg-white/95 border border-[#9B8A3E]/30 text-sm text-[#3F5447] leading-snug">
                           {currentToneSandhi.explanationVi}
                         </p>
                       )}
@@ -2167,22 +2507,22 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               </div>
             </div>
 
-            {/* COLUMN 2 (col-span-1 on split/mobile, lg:col-span-4 on desktop): Mi Zi Ge Canvas on the Right (same row as Hanzi) */}
+            {/* COLUMN 2 (lg:col-span-4): Mi Zi Ge Canvas */}
             <div
-              className="col-span-1 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-white/75 border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 p-2.5 sm:p-3.5 flex flex-col justify-between transition-all duration-300"
+              className="md:col-span-1 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-white/80 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 p-4 flex flex-col justify-between transition-all duration-300"
               data-testid="inline-stroke-panel"
             >
               {/* Top Meta Header */}
-              <div className="flex items-center justify-between gap-1.5">
+              <div className="flex items-center justify-between gap-2">
                 <div>
-                  <div className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#0F382E]">
+                  <div className="text-sm font-bold uppercase tracking-wider text-[#0F382E]">
                     Ô Mễ Tự Cách (米字格)
                   </div>
                   <div
-                    className="text-[10px] sm:text-[11px] text-[#3A544B]"
+                    className="text-sm text-[#3A544B]"
                     data-testid="inline-stroke-meta"
                   >
-                    Chữ <strong className="text-[#0F382E] font-hanzi-calligraphy text-sm">{currentChar.char}</strong> · Bộ:{' '}
+                    Chữ <strong className="text-[#0F382E] font-hanzi-calligraphy text-base">{currentChar.char}</strong> · Bộ:{' '}
                     <strong className="text-[#0F382E]">{currentChar.radical}</strong> ·{' '}
                     <strong className="text-[#9B8A3E] tabular-nums" data-testid="inline-stroke-counter">
                       {currentProgressCount}/{totalStrokes} nét
@@ -2190,12 +2530,17 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   </div>
                 </div>
 
-                <span className="px-2 py-0.5 rounded-lg bg-[#0F5243]/10 border border-[#0F5243]/20 text-[#0F5243] text-[10px] sm:text-[11px] font-bold tabular-nums">
-                  {practiceAccuracy !== null
-                    ? `🎯 ${practiceAccuracy}%`
-                    : inlineStrokeMode === 'animate'
-                    ? 'Mẫu nét'
-                    : `Nét ${Math.min(userStrokes.length + 1, totalStrokes)}`}
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#0F5243]/10 border border-[#0F5243]/20 text-[#0F5243] text-sm font-bold tabular-nums">
+                  {practiceAccuracy !== null ? (
+                    <>
+                      <Award className="w-4 h-4 text-[#9B8A3E]" />
+                      <span>{practiceAccuracy}%</span>
+                    </>
+                  ) : inlineStrokeMode === 'animate' ? (
+                    'Mẫu nét'
+                  ) : (
+                    `Nét ${Math.min(userStrokes.length + 1, totalStrokes)}`
+                  )}
                 </span>
               </div>
 
@@ -2268,12 +2613,22 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                               inlineStrokeMode === 'practice' && idx === userStrokes.length;
                             const isCompletedPractice =
                               inlineStrokeMode === 'practice' && idx < userStrokes.length;
+                            const isFlashedHint =
+                              inlineStrokeMode === 'practice' && idx === hintStrokeFlashIdx;
+                            const shouldHideInDictation =
+                              inlineStrokeMode === 'practice' &&
+                              hideGuideStrokes &&
+                              !isCompletedPractice &&
+                              !isFlashedHint;
                             return (
                               <path
                                 key={`hw-guide-${idx}`}
                                 d={d}
+                                opacity={shouldHideInDictation ? 0 : 1}
                                 fill={
-                                  isCompletedPractice
+                                  isFlashedHint
+                                    ? '#C84B31'
+                                    : isCompletedPractice
                                     ? '#1E3227'
                                     : isNextTarget
                                     ? '#B8C4A8'
@@ -2318,12 +2673,28 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         {currentChar.strokes.map((pathStr, idx) => {
                           const isNextPracticeStroke =
                             inlineStrokeMode === 'practice' && idx === userStrokes.length;
+                          const isCompletedPractice =
+                            inlineStrokeMode === 'practice' && idx < userStrokes.length;
+                          const isFlashedHint =
+                            inlineStrokeMode === 'practice' && idx === hintStrokeFlashIdx;
+                          const shouldHideInDictation =
+                            inlineStrokeMode === 'practice' &&
+                            hideGuideStrokes &&
+                            !isCompletedPractice &&
+                            !isFlashedHint;
                           return (
                             <path
                               key={`inline-guide-${idx}`}
                               d={pathStr}
                               fill="none"
-                              stroke={isNextPracticeStroke ? '#B8C4A8' : '#E2DFCE'}
+                              opacity={shouldHideInDictation ? 0 : 1}
+                              stroke={
+                                isFlashedHint
+                                  ? '#C84B31'
+                                  : isNextPracticeStroke
+                                  ? '#B8C4A8'
+                                  : '#E2DFCE'
+                              }
                               strokeWidth="6"
                               strokeLinecap="round"
                               strokeLinejoin="round"
@@ -2392,6 +2763,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       )}
 
                     {inlineStrokeMode === 'practice' &&
+                      (!hideGuideStrokes || hintStrokeFlashIdx === userStrokes.length) &&
                       currentChar.strokePoints[userStrokes.length]?.[0] && (
                         <circle
                           cx={currentChar.strokePoints[userStrokes.length][0][0]}
@@ -2449,17 +2821,39 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                 {practiceEvalDetail && (
                   <div
                     data-testid="stroke-practice-feedback-card"
-                    className="mt-2 w-full px-2.5 py-1.5 rounded-xl bg-[#F4F6EE] border border-[#9B8A3E]/50 text-[11px] flex items-center justify-between gap-2"
+                    className="mt-2 w-full p-2.5 rounded-xl bg-[#F4F6EE] border border-[#9B8A3E]/50 text-xs sm:text-sm space-y-1"
                   >
-                    <span className="font-bold text-[#1E3227] tabular-nums">
-                      🎯 {practiceEvalDetail.accuracy}% · {practiceEvalDetail.gradeLabel}
-                    </span>
-                    <span className="text-[#3F5447] truncate">{practiceEvalDetail.feedback}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-[#1E3227] tabular-nums inline-flex items-center gap-1.5">
+                        <Award className="w-4 h-4 text-[#9B8A3E]" />
+                        <span>{practiceEvalDetail.accuracy}% · {practiceEvalDetail.gradeLabel}</span>
+                      </span>
+                      <div className="flex items-center gap-0.5" title={`${practiceEvalDetail.stars || 1} sao`}>
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <Star
+                            key={`star-${i}`}
+                            className={`w-3.5 h-3.5 ${
+                              i < (practiceEvalDetail.stars || 1)
+                                ? 'text-amber-500 fill-amber-400'
+                                : 'text-gray-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    {practiceEvalDetail.isReversedDirection && (
+                      <div className="px-2 py-0.5 rounded bg-amber-100/90 border border-amber-300 text-amber-900 font-bold text-xs flex items-center gap-1">
+                        <span>⚠️ Lưu ý: Bạn đang kéo ngược hướng bút thuận (Quy tắc: từ trái qua phải, từ trên xuống dưới)!</span>
+                      </div>
+                    )}
+                    <div className="text-[#3F5447] text-xs leading-snug">
+                      {practiceEvalDetail.feedback}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Single Compact Control Row Beneath Canvas: [Chạy nét] [Viết thử] [Xóa] + Character Tabs [温][暖] */}
+              {/* Compact Control Row Beneath Canvas: [Chạy nét] [Viết thử] [🙈 Ẩn chữ mẫu (听写)] [💡 Gợi ý 1 nét] [Xóa] + Character Tabs */}
               <div className="pt-3 border-t border-[rgba(30,50,39,0.12)] flex flex-wrap items-center justify-between gap-1.5">
                 <div className="flex flex-wrap items-center gap-1">
                   <button
@@ -2469,13 +2863,13 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       setIsAnimatingStrokes(true);
                       speakChinese(currentChar.char, speechRate);
                     }}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
                       inlineStrokeMode === 'animate'
                         ? 'bg-[#1E3227] text-[#FAFBF7]'
                         : 'bg-[#F4F6EE] text-[#1E3227] border border-[rgba(30,50,39,0.15)] hover:bg-[#E7ECD9]'
                     }`}
                   >
-                    <Play className="w-3 h-3 text-[#C5B358]" />
+                    <Play className="w-3.5 h-3.5 text-[#C5B358]" />
                     <span>Chạy nét</span>
                   </button>
 
@@ -2483,10 +2877,48 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     type="button"
                     data-testid="inline-practice-stroke-btn"
                     onClick={handleSimulateInlineStroke}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-[#F4F6EE] text-[#1E3227] border border-[#9B8A3E]/50 hover:bg-[#E7ECD9] transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-[#F4F6EE] text-[#1E3227] border border-[#9B8A3E]/50 hover:bg-[#E7ECD9] transition-colors cursor-pointer"
                   >
-                    <Edit3 className="w-3 h-3 text-[#9B8A3E]" />
+                    <Edit3 className="w-3.5 h-3.5 text-[#9B8A3E]" />
                     <span>Viết thử</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    data-testid="toggle-dictation-hide-guide-btn"
+                    onClick={() => {
+                      setIsAnimatingStrokes(false);
+                      setInlineStrokeMode('practice');
+                      setHideGuideStrokes((prev) => !prev);
+                    }}
+                    title="Chế độ Nghe viết / Ẩn nét mẫu (听写 - Dictation Mode)"
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                      hideGuideStrokes
+                        ? 'bg-[#0F5243] text-[#FAF7F0] border-[#C5B358]'
+                        : 'bg-white text-[#1E3227] border-[rgba(30,50,39,0.18)] hover:bg-[#F4F6EE]'
+                    }`}
+                  >
+                    {hideGuideStrokes ? (
+                      <>
+                        <Eye className="w-3.5 h-3.5 text-[#FDE68A]" />
+                        <span>Hiện mẫu</span>
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                        <span>Ẩn chữ mẫu</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    data-testid="flash-stroke-hint-btn"
+                    onClick={handleFlashOneStrokeHint}
+                    title="Chớp sáng gợi ý 1 nét tiếp theo cần viết"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-[#FFFBEB] hover:bg-[#FEF3C7] text-[#92400E] border border-[#F59E0B]/45 transition-colors cursor-pointer"
+                  >
+                    <span>💡 Gợi ý 1 nét</span>
                   </button>
 
                   <button
@@ -2498,15 +2930,16 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       setCurrentStroke([]);
                       setPracticeAccuracy(null);
                       setPracticeEvalDetail(null);
+                      setHintStrokeFlashIdx(null);
                     }}
-                    className="inline-flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-semibold bg-white text-[#3F5447] border border-[rgba(30,50,39,0.15)] hover:text-[#1E3227] transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs sm:text-sm font-semibold bg-white text-[#3F5447] border border-[rgba(30,50,39,0.15)] hover:text-[#1E3227] transition-colors cursor-pointer"
                   >
-                    <RotateCcw className="w-3 h-3" />
+                    <RotateCcw className="w-3.5 h-3.5" />
                     <span>Xóa</span>
                   </button>
                 </div>
 
-                {/* Character Switcher Pills (e.g. 温 / 暖) + Print Button */}
+                {/* Character Switcher Pills + Print Button */}
                 <div className="flex items-center gap-1">
                   {currentSlide.characters.map((ch, idx) => (
                     <button
@@ -2517,10 +2950,10 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         setActiveCharIdx(idx);
                         speakChinese(ch.char, speechRate);
                       }}
-                      className={`w-7 h-7 rounded-lg font-hanzi-calligraphy text-sm font-bold transition-all duration-300 active:scale-95 border cursor-pointer ${
+                      className={`w-8 h-8 rounded-lg font-hanzi-calligraphy text-base font-bold transition-all duration-300 active:scale-95 border cursor-pointer ${
                         activeCharIdx === idx
                           ? 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] border-[#C5B358] shadow-2xs'
-                          : 'bg-white/85 text-[#0F382E] border-[#0F5243]/15 hover:bg-white'
+                          : 'bg-white text-[#0F382E] border-[#0F5243]/15 hover:bg-[#FAF7F0]'
                       }`}
                     >
                       {ch.char}
@@ -2531,18 +2964,18 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     type="button"
                     data-testid="open-print-worksheet-btn"
                     onClick={() => setIsWorksheetModalOpen(true)}
-                    className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#C5B358] border border-[#C5B358]/50 transition-all duration-300 active:scale-95 cursor-pointer"
-                    title="🖨️ In phiếu tập viết (A4)"
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#C5B358] border border-[#C5B358]/50 transition-all duration-300 active:scale-95 cursor-pointer"
+                    title="In phiếu tập viết (A4)"
                   >
-                    <Printer className="w-3.5 h-3.5" />
+                    <Printer className="w-4 h-4" />
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* COLUMN 3 (col-span-2 on split/mobile, lg:col-span-4 on desktop): ROUNDED ILLUSTRATION FRAME + COMPACT CONTEXT EXAMPLE CARD */}
+            {/* COLUMN 3 (md:col-span-2 lg:col-span-4): ROUNDED ILLUSTRATION FRAME + CONTEXT EXAMPLE CARD */}
             <div
-              className="col-span-2 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-white/75 border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 p-3.5 grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-col justify-between gap-3 transition-all duration-300"
+              className="md:col-span-2 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-white/80 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 p-4 grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-col justify-between gap-3 transition-all duration-300"
               data-testid="scene-and-example-column"
             >
               {/* Visual Illustration Card */}
@@ -2570,13 +3003,12 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                 />
               </div>
 
-
               {/* THẺ VÍ DỤ NGỮ CẢNH & HỘI THOẠI BÀI KHÓA THỰC TẾ (情境对话 & 课文) */}
               <div
                 className="flex-1 rounded-xl bg-[#F4F6EE] border border-[rgba(30,50,39,0.12)] p-3 flex flex-col justify-between gap-2"
                 data-testid="scene-example-card"
               >
-                {/* 2-Tab Header: [📝 Câu ví dụ] vs [💬 Hội thoại ngữ cảnh (课文)] */}
+                {/* 2-Tab Header: [Câu ví dụ mẫu] vs [Hội thoại ngữ cảnh (课文)] */}
                 <div className="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-[#E7ECD9]">
                   <button
                     type="button"
@@ -2585,25 +3017,27 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       stopDialogueKaraoke();
                       setCol3ActiveTab('example');
                     }}
-                    className={`py-1 px-2 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                    className={`inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-sm font-bold transition-all cursor-pointer ${
                       col3ActiveTab === 'example'
                         ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
                         : 'text-[#3F5447] hover:text-[#1E3227]'
                     }`}
                   >
-                    📝 Câu ví dụ mẫu
+                    <FileText className="w-3.5 h-3.5 shrink-0" />
+                    <span>Câu ví dụ mẫu</span>
                   </button>
                   <button
                     type="button"
                     data-testid="toggle-contextual-dialogue-btn"
                     onClick={() => setCol3ActiveTab('dialogue')}
-                    className={`py-1 px-2 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                    className={`inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-sm font-bold transition-all cursor-pointer ${
                       col3ActiveTab === 'dialogue'
                         ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
                         : 'text-[#3F5447] hover:text-[#1E3227]'
                     }`}
                   >
-                    💬 Hội thoại ngữ cảnh (课文)
+                    <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                    <span>Hội thoại (课文)</span>
                   </button>
                 </div>
 
@@ -2622,41 +3056,42 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
                       {/* Dòng 2: Phiên âm Pinyin */}
                       {showPinyin && (
-                        <div className="text-xs sm:text-sm text-[#9B8A3E] font-medium tracking-wide">
+                        <div className="text-sm text-[#9B8A3E] font-medium tracking-wide">
                           {currentSlide.examplePinyin}
                         </div>
                       )}
 
                       {/* Dòng 3: Nghĩa tiếng Việt */}
                       {(showMeaning || showVietnamese) && (
-                        <div className="text-xs sm:text-sm text-[#1E3227]/85 italic">
+                        <div className="text-sm text-[#1E3227]/85 italic">
                           {currentSlide.exampleMeaning}
                         </div>
                       )}
                     </div>
 
                     <div className="space-y-2 pt-2 border-t border-[rgba(30,50,39,0.12)]">
-                      {/* Dòng nút Nghe câu, Đọc chậm và 🎙️ Đọc thử */}
+                      {/* Dòng nút Nghe câu, Đọc chậm và Đọc thử */}
                       <div className="example-actions-row flex flex-wrap items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => speakChinese(currentSlide.exampleHanzi, speechRate)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-[#1E3227] hover:bg-[#2B4637] text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1E3227] hover:bg-[#2B4637] text-white rounded-xl text-sm font-bold transition-all cursor-pointer"
                         >
-                          <Volume2 className="w-3.5 h-3.5 text-[#C5B358]" />
+                          <Volume2 className="w-4 h-4 text-[#C5B358]" />
                           <span>Nghe câu</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => speakChinese(currentSlide.exampleHanzi, 0.55)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white text-[#1E3227] border border-[rgba(30,50,39,0.15)] rounded-xl text-xs font-semibold hover:bg-[#E7ECD9] transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white text-[#1E3227] border border-[rgba(30,50,39,0.15)] rounded-xl text-sm font-semibold hover:bg-[#E7ECD9] transition-all cursor-pointer"
                         >
-                          <span>🐢 Chậm</span>
+                          <Rewind className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                          <span>Chậm</span>
                         </button>
                         <button
                           type="button"
                           onClick={handleStartSpeechPractice}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
                             isPracticingSpeech
                               ? 'bg-[#C84B31] text-white animate-pulse'
                               : 'bg-white hover:bg-[#FAFBF7] text-[#1E3227] border border-[#9B8A3E]/60 hover:border-[#1E3227]'
@@ -2665,12 +3100,12 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         >
                           {isPracticingSpeech ? (
                             <>
-                              <MicOff className="w-3.5 h-3.5" />
+                              <MicOff className="w-4 h-4" />
                               <span>Đang nghe...</span>
                             </>
                           ) : (
                             <>
-                              <Mic className="w-3.5 h-3.5 text-[#C84B31]" />
+                              <Mic className="w-4 h-4 text-[#C84B31]" />
                               <span>Đọc thử</span>
                             </>
                           )}
@@ -2679,14 +3114,14 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
                       {/* Listening Indicator */}
                       {isPracticingSpeech && (
-                        <div className="p-2 rounded-xl bg-white border border-[#C84B31]/40 text-xs text-[#1E3227] flex items-center justify-between gap-2">
+                        <div className="p-2.5 rounded-xl bg-white border border-[#C84B31]/40 text-sm text-[#1E3227] flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="w-2 h-2 rounded-full bg-[#C84B31] animate-ping shrink-0" />
-                            <span className="font-semibold text-[11px] text-[#1E3227] truncate">
+                            <span className="font-semibold text-sm text-[#1E3227] truncate">
                               Hãy đọc: "{currentSlide.exampleHanzi}"
                             </span>
                           </div>
-                          <span className="text-[10px] text-[#C84B31] font-bold shrink-0">
+                          <span className="text-sm text-[#C84B31] font-bold shrink-0">
                             Nói ngay...
                           </span>
                         </div>
@@ -2694,24 +3129,58 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
                       {/* Speech Evaluation Result Card */}
                       {speechResult && (
-                        <div className="p-2.5 rounded-xl bg-[#E7ECD9] border border-[#1E3227]/25 text-xs text-[#1E3227] flex flex-col gap-1">
+                        <div
+                          data-testid="speech-eval-result-card"
+                          className="p-2.5 rounded-xl bg-[#E7ECD9] border border-[#1E3227]/25 text-sm text-[#1E3227] flex flex-col gap-1.5"
+                        >
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5">
-                              <span className="px-2 py-0.5 rounded-md bg-[#1E3227] text-[#FAFBF7] font-bold text-[11px] tabular-nums">
-                                🎯 {speechResult.score}%
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#1E3227] text-[#FAFBF7] font-bold text-sm tabular-nums">
+                                <Award className="w-3.5 h-3.5 text-[#C5B358]" />
+                                <span>{speechResult.score}%</span>
                               </span>
-                              <strong className="text-[11px] text-[#1E3227]">
+                              <strong className="text-xs sm:text-sm text-[#1E3227]">
                                 {speechResult.feedback}
                               </strong>
                             </div>
                             <button
                               type="button"
                               onClick={() => setSpeechResult(null)}
-                              className="text-[11px] text-[#3F5447] hover:text-[#1E3227] px-1 cursor-pointer"
+                              className="text-sm text-[#3F5447] hover:text-[#1E3227] px-1 cursor-pointer"
                             >
-                              ✕
+                              <X className="w-4 h-4" />
                             </button>
                           </div>
+
+                          {speechResult.charMatches && speechResult.charMatches.length > 0 && (
+                            <div className="bg-white/90 p-2 rounded-lg border border-[rgba(30,50,39,0.12)] space-y-1">
+                              <div className="text-[11px] font-bold text-[#5F7266] flex items-center justify-between">
+                                <span>Đối chiếu âm đọc từng chữ Hán:</span>
+                                <span className="text-[10px] text-[#3F5447]">
+                                  Xanh: Chuẩn · Đỏ: Cần chỉnh
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1">
+                                {speechResult.charMatches.map((item, idx) => (
+                                  <span
+                                    key={`match-${idx}`}
+                                    className={`px-1.5 py-0.5 rounded font-['Noto_Sans_SC'] font-bold text-sm ${
+                                      item.isPunctuation
+                                        ? 'text-[#5F7266]'
+                                        : item.isMatched
+                                        ? 'text-emerald-800 bg-emerald-100 border border-emerald-300'
+                                        : 'text-rose-800 bg-rose-100 border border-rose-300'
+                                    }`}
+                                  >
+                                    {item.char}
+                                  </span>
+                                ))}
+                              </div>
+                              <div className="text-[11px] text-[#5F7266] truncate pt-0.5">
+                                Ghi nhận: <span className="font-mono text-[#1E3227] font-medium">{speechResult.transcript}</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2860,385 +3329,72 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
           )}
 
           {/* =================================================================
-              BOTTOM BAR: KEYBOARD SHORTCUTS LEGEND + INLINE BIN BIN AI TUTOR
+              BOTTOM BAR: KEYBOARD SHORTCUTS LEGEND
               ================================================================= */}
           <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
             <div
               data-testid="keyboard-shortcuts-bar"
-              className="inline-flex flex-wrap items-center gap-1.5 px-3 py-1 rounded-xl bg-[rgba(255,255,255,0.68)] border border-[rgba(30,50,39,0.14)] text-[11px] text-[#3F5447]"
+              className="inline-flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[rgba(255,255,255,0.75)] border border-[rgba(30,50,39,0.14)] text-sm text-[#3F5447]"
             >
-              <span className="font-bold text-[#1E3227]">⌨️ Phím tắt đứng lớp:</span>
+              <Keyboard className="w-4 h-4 text-[#9B8A3E] shrink-0" />
+              <span className="font-bold text-[#1E3227]">Phím tắt đứng lớp:</span>
               <span className="inline-flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-[10px] font-bold text-[#1E3227]">
+                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-sm font-bold text-[#1E3227]">
                   ←
                 </kbd>
-                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-[10px] font-bold text-[#1E3227]">
+                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-sm font-bold text-[#1E3227]">
                   →
                 </kbd>
                 <span>Lùi/Tiến từ</span>
               </span>
               <span className="text-[#9B8A3E]/60">·</span>
               <span className="inline-flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-[10px] font-bold text-[#1E3227]">
+                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-sm font-bold text-[#1E3227]">
                   Space
                 </kbd>
                 <span>Phát âm</span>
               </span>
               <span className="text-[#9B8A3E]/60">·</span>
               <span className="inline-flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-[10px] font-bold text-[#1E3227]">
+                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-sm font-bold text-[#1E3227]">
                   W
                 </kbd>
                 <span>Chạy nét mẫu</span>
               </span>
               <span className="text-[#9B8A3E]/60">·</span>
               <span className="inline-flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-[10px] font-bold text-[#1E3227]">
+                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-sm font-bold text-[#1E3227]">
                   F
                 </kbd>
                 <span>Fullscreen</span>
               </span>
             </div>
-
-            <BinBinPandaAI
-              variant="inline"
-              activeSlide={currentSlide}
-              externalMood={pandaMood}
-              title="🐼 Trợ Giảng Gấu Trúc · 彬彬"
-              onApplyToSlide={(payload) => {
-                setToastMessage(
-                  `✓ Đã đẩy từ "${payload.hanzi}" (${payload.pinyin} — ${payload.meaning}) từ Trợ Giảng 彬彬 vào Slide bài giảng!`
-                );
-              }}
-            />
           </div>
 
-          {/* =================================================================
-              MODAL 1: ➕ TỰ THÊM TỪ VỰNG MỚI VÀO DANH SÁCH SLIDE (LƯU LOCALSTORAGE)
-              ================================================================= */}
-          {isAddVocabModalOpen && (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
-              role="dialog"
-              aria-modal="true"
-              data-testid="add-vocab-modal"
-              onClick={() => setIsAddVocabModalOpen(false)}
-            >
-              <form
-                onSubmit={handleSaveCustomVocab}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-lg rounded-3xl bg-[#FAFBF7] border border-[#9B8A3E]/60 shadow-2xl p-5 sm:p-6 space-y-4 text-[#1E3227]"
-              >
-                <div className="flex items-start justify-between gap-3 pb-3 border-b border-[rgba(30,50,39,0.14)]">
-                  <div>
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#9B8A3E]">
-                      SOẠN GIÁO ÁN HÁN NGỮ · LƯU TRỮ TỰ ĐỘNG
-                    </div>
-                    <h3 className="text-base sm:text-lg font-bold text-[#1E3227] mt-0.5">
-                      + Tự thêm từ vựng mới vào Slide bài giảng
-                    </h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddVocabModalOpen(false)}
-                    className="w-8 h-8 rounded-full bg-white border border-[rgba(30,50,39,0.15)] flex items-center justify-center text-[#1E3227] hover:bg-[#F4F6EE] cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
+          <MeasureWordDrillModal
+            isOpen={isMeasureWordModalOpen}
+            slides={slides}
+            onClose={() => setIsMeasureWordModalOpen(false)}
+          />
 
-                {customVocabError && (
-                  <div className="px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{customVocabError}</span>
-                  </div>
-                )}
+          {/* Sub-component: Modal Tự thêm từ vựng mới vào danh sách Slide */}
+          <AddVocabModal
+            isOpen={isAddVocabModalOpen}
+            onClose={() => setIsAddVocabModalOpen(false)}
+            onSaveVocab={(newSlide) => {
+              onAddSlides([newSlide]);
+              onSelectSlideIndex(slides.length);
+              setToastMessage(`Đã thêm từ mới "${newSlide.hanzi}" vào Slide thành công!`);
+            }}
+            nextIndex={slides.length + 1}
+          />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-[#1E3227] mb-1">
-                      Chữ Hán (汉字) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      data-testid="custom-vocab-hanzi-input"
-                      value={customHanzi}
-                      onChange={(e) => setCustomHanzi(e.target.value)}
-                      placeholder="Ví dụ: 团圆, 熊猫, 茶..."
-                      autoFocus
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[rgba(30,50,39,0.2)] text-sm font-['Noto_Sans_SC'] font-bold text-[#1E3227] focus:outline-none focus:border-[#9B8A3E]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#1E3227] mb-1">
-                      Phiên âm Pinyin
-                    </label>
-                    <input
-                      type="text"
-                      data-testid="custom-vocab-pinyin-input"
-                      value={customPinyin}
-                      onChange={(e) => setCustomPinyin(e.target.value)}
-                      placeholder="Ví dụ: tuán yuán (để trống sẽ tự tra)"
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[rgba(30,50,39,0.2)] text-xs sm:text-sm text-[#1E3227] focus:outline-none focus:border-[#9B8A3E]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#1E3227] mb-1">
-                      Âm Hán Việt
-                    </label>
-                    <input
-                      type="text"
-                      data-testid="custom-vocab-hanviet-input"
-                      value={customHanViet}
-                      onChange={(e) => setCustomHanViet(e.target.value)}
-                      placeholder="Ví dụ: đoàn viên"
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[rgba(30,50,39,0.2)] text-xs sm:text-sm text-[#1E3227] focus:outline-none focus:border-[#9B8A3E]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#1E3227] mb-1">
-                      Nghĩa tiếng Việt <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      data-testid="custom-vocab-meaning-input"
-                      value={customMeaning}
-                      onChange={(e) => setCustomMeaning(e.target.value)}
-                      placeholder="Ví dụ: đoàn viên, sum họp"
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[rgba(30,50,39,0.2)] text-xs sm:text-sm text-[#1E3227] focus:outline-none focus:border-[#9B8A3E]"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#1E3227] mb-1">
-                    Câu ví dụ tiếng Trung (Ngữ cảnh trên Slide)
-                  </label>
-                  <input
-                    type="text"
-                    data-testid="custom-vocab-example-input"
-                    value={customExampleHanzi}
-                    onChange={(e) => setCustomExampleHanzi(e.target.value)}
-                    placeholder="Ví dụ: 中秋节 全家人 一起 团圆。"
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[rgba(30,50,39,0.2)] text-xs sm:text-sm font-['Noto_Sans_SC'] text-[#1E3227] focus:outline-none focus:border-[#9B8A3E]"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-[#1E3227] mb-1">
-                      Dịch nghĩa câu ví dụ
-                    </label>
-                    <input
-                      type="text"
-                      value={customExampleMeaning}
-                      onChange={(e) => setCustomExampleMeaning(e.target.value)}
-                      placeholder="Ví dụ: Tết Trung thu cả nhà cùng sum họp."
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[rgba(30,50,39,0.2)] text-xs text-[#1E3227] focus:outline-none focus:border-[#9B8A3E]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#1E3227] mb-1">
-                      Cấp độ HSK
-                    </label>
-                    <select
-                      value={customHskLevel}
-                      onChange={(e) => setCustomHskLevel(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-[rgba(30,50,39,0.2)] text-xs font-semibold text-[#1E3227] focus:outline-none focus:border-[#9B8A3E]"
-                    >
-                      <option value="HSK 1">HSK 1</option>
-                      <option value="HSK 2">HSK 2</option>
-                      <option value="HSK 3">HSK 3</option>
-                      <option value="HSK 4">HSK 4</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[rgba(30,50,39,0.12)]">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddVocabModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-white border border-[rgba(30,50,39,0.18)] text-xs font-semibold text-[#1E3227] hover:bg-[#F4F6EE] cursor-pointer"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    data-testid="save-custom-vocab-btn"
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] text-[#FAFBF7] text-xs font-bold shadow-xs cursor-pointer"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-[#C5B358]" />
-                    <span>Lưu &amp; Tạo Slide Ngay</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* =================================================================
-              MODAL 2: 🖨️ BẢN XEM TRƯỚC TRANG A4 — PHIẾU TẬP VIẾT CHỮ MỄ (米字格)
-              ================================================================= */}
-          {isWorksheetModalOpen && (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto"
-              role="dialog"
-              aria-modal="true"
-              data-testid="worksheet-a4-modal"
-              onClick={() => setIsWorksheetModalOpen(false)}
-            >
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-4xl bg-white rounded-3xl border-2 border-[#9B8A3E] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-              >
-                {/* Modal Action Bar */}
-                <div className="px-5 py-3.5 bg-[#1E3227] text-[#FAFBF7] flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <Printer className="w-4 h-4 text-[#C5B358]" />
-                    <span className="text-xs sm:text-sm font-bold">
-                      🖨️ Bản Xem Trước Trang A4 — Phiếu Tập Viết Chữ Hán (米字格 · {slides.length} từ vựng)
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      data-testid="print-worksheet-confirm-btn"
-                      onClick={() => window.print()}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#C5B358] hover:bg-[#d4c368] text-[#1E3227] text-xs font-bold transition-all cursor-pointer"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>In ngay / Lưu PDF (A4)</span>
-                    </button>
-                    <button
-                      type="button"
-                      data-testid="close-worksheet-modal-btn"
-                      onClick={() => setIsWorksheetModalOpen(false)}
-                      className="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold cursor-pointer"
-                    >
-                      Đóng
-                    </button>
-                  </div>
-                </div>
-
-                {/* Printable A4 Sheet Container */}
-                <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-[#FAFBF7] text-[#1E3227] space-y-5">
-                  <div className="border-b-2 border-[#1E3227] pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-bold uppercase tracking-widest text-[#9B8A3E]">
-                        HANU × 阮文受 · GIÁO ÁN THỰC HÀNH HÁN TỰ CHUẨN HSK
-                      </div>
-                      <h2 className="text-xl font-bold text-[#1E3227] mt-0.5">
-                        PHIẾU LUYỆN VIẾT CHỮ HÁN MỄ TỰ CÁCH (汉字米字格练习纸)
-                      </h2>
-                    </div>
-                    <div className="text-xs text-[#3F5447] space-y-1 sm:text-right">
-                      <div>Họ và tên học viên: ___________________________</div>
-                      <div>Lớp: HSK 1–3 (Mã lớp: 722229) · Điểm: _______/100</div>
-                    </div>
-                  </div>
-
-                  {/* Rows of Mi Zi Ge Grids for All Slides */}
-                  <div className="space-y-3">
-                    {slides.map((s, idx) => (
-                      <div
-                        key={`ws-${s.id}-${idx}`}
-                        className="p-3 rounded-2xl bg-white border border-[#DCE2CE] flex flex-col md:flex-row md:items-center justify-between gap-3"
-                      >
-                        <div className="min-w-[190px] max-w-[230px]">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-xs font-bold text-[#9B8A3E] tabular-nums">
-                              #{idx + 1}
-                            </span>
-                            <span className="font-['Noto_Sans_SC'] text-2xl font-bold text-[#1E3227]">
-                              {s.hanzi}
-                            </span>
-                            <span className="text-xs font-bold text-[#9B8A3E]">{s.pinyin}</span>
-                          </div>
-                          <div className="text-[11px] text-[#3F5447] mt-0.5">
-                            Hán Việt: <strong className="uppercase">{s.hanViet}</strong> · {s.meaning}
-                          </div>
-                          <div className="text-[10px] text-[#5F7266] mt-0.5">
-                            {s.characters.map((c) => `${c.char} (${c.strokeCount} nét)`).join(' · ')}
-                          </div>
-                        </div>
-
-                        {/* 7 Mi Zi Ge (米字格) Practice Boxes per Vocabulary Word */}
-                        <div className="flex items-center gap-1.5 overflow-x-auto py-1">
-                          {Array.from({ length: 7 }).map((_, boxIdx) => {
-                            const charToRender =
-                              s.characters[boxIdx % s.characters.length]?.char || s.hanzi[0];
-                            const isModel = boxIdx < s.characters.length;
-                            const isTrace =
-                              boxIdx >= s.characters.length && boxIdx < s.characters.length * 2 + 1;
-                            return (
-                              <div
-                                key={`mzg-${idx}-${boxIdx}`}
-                                className="relative w-12 h-12 shrink-0 bg-[#F7F5EC] border border-[#C5B358]"
-                              >
-                                <svg viewBox="0 0 100 100" className="w-full h-full">
-                                  <line
-                                    x1="0"
-                                    y1="50"
-                                    x2="100"
-                                    y2="50"
-                                    stroke="#C5B358"
-                                    strokeWidth="1"
-                                    strokeDasharray="3 3"
-                                    strokeOpacity="0.6"
-                                  />
-                                  <line
-                                    x1="50"
-                                    y1="0"
-                                    x2="50"
-                                    y2="100"
-                                    stroke="#C5B358"
-                                    strokeWidth="1"
-                                    strokeDasharray="3 3"
-                                    strokeOpacity="0.6"
-                                  />
-                                  <line
-                                    x1="0"
-                                    y1="0"
-                                    x2="100"
-                                    y2="100"
-                                    stroke="#C5B358"
-                                    strokeWidth="0.8"
-                                    strokeDasharray="3 3"
-                                    strokeOpacity="0.45"
-                                  />
-                                  <line
-                                    x1="100"
-                                    y1="0"
-                                    x2="0"
-                                    y2="100"
-                                    stroke="#C5B358"
-                                    strokeWidth="0.8"
-                                    strokeDasharray="3 3"
-                                    strokeOpacity="0.45"
-                                  />
-                                  {(isModel || isTrace) && (
-                                    <text
-                                      x="50"
-                                      y="74"
-                                      textAnchor="middle"
-                                      className="font-['Noto_Sans_SC'] font-bold"
-                                      fontSize="68"
-                                      fill={isModel ? '#1E3227' : '#D0D5C6'}
-                                    >
-                                      {charToRender}
-                                    </text>
-                                  )}
-                                </svg>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Sub-component: Modal Bản xem trước trang A4 (Phiếu tập viết chữ Mễ) */}
+          <WorksheetPreviewModal
+            isOpen={isWorksheetModalOpen}
+            onClose={() => setIsWorksheetModalOpen(false)}
+            slides={slides}
+          />
 
           {/* =================================================================
               MODAL 3: ✏️ SỬA NHANH THẺ BÀI GIẢNG & TẠO ẢNH KHỚP CÂU VÍ DỤ

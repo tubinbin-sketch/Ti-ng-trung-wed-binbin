@@ -26,6 +26,7 @@ import {
   setPreferredSpeechRate,
   getPreferredStrokeSpeedMs,
   setPreferredStrokeSpeedMs,
+  selectBestChineseVoice,
 } from './speech';
 
 test('evaluateSentenceOrder validates exact Chinese token sequence', () => {
@@ -208,7 +209,7 @@ test('createStudentRecord, filterClassroomStudents, and generateStudentsCsvConte
   assert.equal(s1.studentCode, 'HV-013');
   assert.equal(s1.hskLevel, 'HSK 3');
   assert.equal(s1.totalPoints, 96);
-  assert.equal(s1.status, 'Đã chấm AI');
+  assert.equal(s1.status, 'Đã chấm tự động');
 
   const s2 = createStudentRecord(
     { name: 'Phạm Gia Bảo', studentCode: 'HV-099', hskLevel: 'HSK 1', initialPoints: 82 },
@@ -224,6 +225,8 @@ test('createStudentRecord, filterClassroomStudents, and generateStudentsCsvConte
 
   const csv = generateStudentsCsvContent(roster);
   assert.ok(csv.startsWith('\uFEFFSTT,Mã học viên,Họ và tên,Cấp độ'));
+  assert.ok(csv.includes('Nhận xét & Chữa lỗi chi tiết'));
+  assert.equal(csv.includes('Nhận xét AI'), false);
   assert.ok(csv.includes('Nguyễn Minh Châu'));
   assert.ok(csv.includes('HV-099'));
   assert.ok(csv.includes('Cần kèm thêm'));
@@ -279,7 +282,19 @@ test('evaluateStrokeWithFeedback, createCustomVocabSlide, applyStudentSubmission
 
   const afterBonus = awardStudentBonusPoints(afterSubmit, 'Vũ Minh Đức', 10, 'Vòng quay gọi tên');
   assert.equal(afterBonus[1].totalPoints, 95);
-  assert.equal(afterBonus[1].status, 'Đã chấm AI');
+  assert.equal(afterBonus[1].status, 'Đã chấm tự động');
+});
+
+test('selectBestChineseVoice prioritizes natural zh-CN voices like Xiaoxiao, Yunxi, or Ting-Ting', () => {
+  const mockVoices = [
+    { name: 'English US', lang: 'en-US' },
+    { name: 'Generic Chinese', lang: 'zh-CN' },
+    { name: 'Microsoft Xiaoxiao Online (Natural) - Chinese (Mainland)', lang: 'zh-CN' },
+  ] as unknown as SpeechSynthesisVoice[];
+
+  const chosen = selectBestChineseVoice(mockVoices);
+  assert.ok(chosen !== null);
+  assert.ok(chosen.name.includes('Xiaoxiao'));
 });
 
 test('generateBinBinSmartReply analyzes 交通 and Vietnamese queries in 0ms with full wordCard, radical mnemonic, 2 compound words, and example sentence', () => {
@@ -384,7 +399,121 @@ test('generateBinBinSmartReply Practical AI Copilot provides authentic collocati
   assert.equal(fixReply.sentenceCorrection.correctedHanzi, '今天我感到非常温暖。');
 });
 
+test('repairAndUpgradeSlide migrates legacy 既哦 to 既然 and preserves learned status', () => {
+  const legacySlide = {
+    id: 'slide-25',
+    index: 25,
+    hanzi: '既哦',
+    pinyin: 'jì é',
+    hanViet: 'ký nga',
+    meaning: 'sai chính tả',
+    partOfSpeech: 'TỪ VỰNG',
+    hskLevel: 'HSK 3',
+    usageNote: 'lỗi cũ',
+    exampleHanzi: '既哦 例子',
+    examplePinyin: 'Jì é lìzi',
+    exampleMeaning: 'Ví dụ lỗi',
+    illustrationKey: 'school' as const,
+    learned: true,
+    characters: [],
+  };
 
+  const upgraded = repairAndUpgradeSlide(legacySlide);
+  assert.equal(upgraded.hanzi, '既然');
+  assert.equal(upgraded.pinyin, 'jì rán');
+  assert.equal(upgraded.hanViet, 'ký nhiên');
+  assert.equal(upgraded.hskLevel, 'HSK 3');
+  assert.equal(upgraded.learned, true); // PRESERVED!
+  assert.equal(upgraded.characters.length, 2);
+  assert.equal(upgraded.characters[0].char, '既');
+  assert.equal(upgraded.characters[1].char, '然');
+  assert.ok(upgraded.exampleHanzi.includes('既然'));
+});
+
+test('generateBinBinSmartReply avoids duplicate text bullets and detects synonym misuse & missing target word in grammar-fix', () => {
+  const wennuanSlide = parseQuickSlideInput('温暖', 11)!; // 温暖
+  const defaultReply = generateBinBinSmartReply('chat', '温暖', wennuanSlide);
+
+  // Should not duplicate Collocations or Synonym Distinction in plain replyText
+  assert.equal(defaultReply.replyText.includes('Kết hợp từ chuẩn (Collocations):'), false);
+  assert.equal(defaultReply.replyText.includes('Phân biệt từ dễ nhầm:'), false);
+  assert.ok(defaultReply.collocations && defaultReply.collocations.length > 0);
+  assert.ok(defaultReply.synonymDistinction && defaultReply.synonymDistinction.items.length > 1);
+
+  // Detect synonym misuse: 今天天气很温暖 -> suggests 暖和
+  const weatherMisuse = generateBinBinSmartReply(
+    'grammar-fix',
+    '今天天气很温暖',
+    wennuanSlide
+  );
+  assert.ok(weatherMisuse.sentenceCorrection);
+  assert.equal(weatherMisuse.sentenceCorrection.isAlreadyCorrect, false);
+  assert.ok(weatherMisuse.sentenceCorrection.correctedHanzi.includes('暖和'));
+
+  // Detect missing target word when learner types a sentence without 温暖
+  const missingTarget = generateBinBinSmartReply(
+    'grammar-fix',
+    '我今天去学校看书',
+    wennuanSlide
+  );
+  assert.ok(missingTarget.sentenceCorrection);
+  assert.equal(missingTarget.sentenceCorrection.isAlreadyCorrect, false);
+  assert.ok(missingTarget.sentenceCorrection.explanation.includes('温暖'));
+});
+
+test('applyStudentSubmissionToRoster updates timeSeconds and increments streak, and calculateStudentHsk3Pillars links all 4 HSK 3.0 pillars dynamically', async () => {
+  const { calculateStudentHsk3Pillars } = await import('./hsk3Engine');
+
+  const roster = [
+    createStudentRecord({ name: 'Trần Quốc Bảo', studentCode: 'HV-003', hskLevel: 'HSK 2', initialPoints: 91 }, 3),
+  ];
+
+  const updated = applyStudentSubmissionToRoster(roster, {
+    studentName: 'Trần Quốc Bảo',
+    totalScore: 99,
+    learnedVocabCount: 20,
+    totalVocabCount: 27,
+    writingAccuracy: 95,
+    quizCorrectCount: 10,
+    quizTotalCount: 10,
+    reviewWords: ['既然'],
+    timeSeconds: 18,
+  });
+
+  assert.equal(updated[0].totalPoints, 99);
+  assert.equal(updated[0].timeSeconds, 18);
+  assert.ok((updated[0].streak ?? 0) >= 4);
+
+  const baselinePillars = calculateStudentHsk3Pillars({
+    learnedSlideCount: 14,
+    totalSlideCount: 27,
+    writingAccuracyPct: 88,
+    completedTranslationCount: 0,
+  });
+  const activePillars = calculateStudentHsk3Pillars({
+    learnedSlideCount: 20,
+    totalSlideCount: 27,
+    writingAccuracyPct: 95,
+    completedTranslationCount: 1,
+    practicedSpeechCount: 4,
+    srsReviewedCount: 8,
+    practicedWritingCount: 6,
+    submittedQuizScore: 96,
+    completedSentenceCount: 4,
+  });
+
+  assert.equal(activePillars.length, 4);
+  for (let i = 0; i < 4; i++) {
+    assert.ok(
+      activePillars[i].percent > baselinePillars[i].percent,
+      `Expected pillar ${activePillars[i].titleZh} percent (${activePillars[i].percent}%) > baseline (${baselinePillars[i].percent}%)`
+    );
+    assert.ok(
+      (activePillars[i].deltaPercent ?? 0) > 0,
+      `Expected pillar ${activePillars[i].titleZh} deltaPercent > 0`
+    );
+  }
+});
 
 
 

@@ -20,8 +20,11 @@ import {
   Plus,
   RefreshCw,
   X,
+  Mic,
+  Printer,
+  Star,
 } from 'lucide-react';
-import { ClassSession, INITIAL_CLASS_SESSIONS } from '../data/chineseData';
+import { ClassSession, INITIAL_CLASS_SESSIONS, VocabSlide, INITIAL_VOCAB_SLIDES } from '../data/chineseData';
 import {
   autoGradeClassSession,
   awardStudentBonusPoints,
@@ -41,6 +44,9 @@ import {
   PRESET_ASSIGNMENT_BUOI_15,
   getStoredAssignment,
 } from '../utils/assignmentParser';
+import { ClassroomAddStudentModal } from './ClassroomAddStudentModal';
+import { ClassroomLuckyWheelModal } from './ClassroomLuckyWheelModal';
+import { WorksheetPreviewModal } from './WorksheetPreviewModal';
 
 export type ClassStudent = ClassStudentRecord;
 
@@ -56,7 +62,9 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
     writingScore: '96% độ chuẩn nét',
     quizScore: '10/10 câu đúng',
     totalPoints: 98,
-    status: 'Đã chấm AI',
+    status: 'Đã chấm tự động',
+    timeSeconds: 36,
+    streak: 12,
     feedback: 'Thuộc toàn bộ từ mới Buổi 13–19, nét chữ 初中 và 换 rất đều đẹp.',
   },
   {
@@ -68,7 +76,9 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
     writingScore: '92% độ chuẩn nét',
     quizScore: '9/10 câu đúng',
     totalPoints: 94,
-    status: 'Đã chấm AI',
+    status: 'Đã chấm tự động',
+    timeSeconds: 44,
+    streak: 8,
     feedback: 'Nắm vững cấu trúc 挺...的 và 咱们, cần lưu ý nét sổ móc chữ 刻.',
   },
   {
@@ -80,7 +90,9 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
     writingScore: '89% độ chuẩn nét',
     quizScore: '9/10 câu đúng',
     totalPoints: 91,
-    status: 'Đã chấm AI',
+    status: 'Đã chấm tự động',
+    timeSeconds: 51,
+    streak: 6,
     feedback: 'Hoàn thành đúng hạn, phản xạ ghép câu tiếng Trung rất nhanh.',
   },
   {
@@ -92,7 +104,9 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
     writingScore: '94% độ chuẩn nét',
     quizScore: '10/10 câu đúng',
     totalPoints: 97,
-    status: 'Đã chấm AI',
+    status: 'Đã chấm tự động',
+    timeSeconds: 39,
+    streak: 10,
     feedback: 'Phát âm thanh mẫu zh, ch, sh rất chuẩn, bài viết chữ Mễ sạch đẹp.',
   },
   {
@@ -105,6 +119,8 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
     quizScore: '8/10 câu đúng',
     totalPoints: 89,
     status: 'Cần kèm thêm',
+    timeSeconds: 58,
+    streak: 4,
     feedback: 'Cần phân biệt rõ hơn cách dùng 怎么 vs 怎么样.',
   },
   {
@@ -116,7 +132,9 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
     writingScore: '91% độ chuẩn nét',
     quizScore: '9/10 câu đúng',
     totalPoints: 93,
-    status: 'Đã chấm AI',
+    status: 'Đã chấm tự động',
+    timeSeconds: 47,
+    streak: 7,
     feedback: 'Tự luận đặt câu rất tự nhiên, vận dụng tốt từ vựng 四季.',
   },
   {
@@ -128,7 +146,9 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
     writingScore: '90% độ chuẩn nét',
     quizScore: '9/10 câu đúng',
     totalPoints: 92,
-    status: 'Đã chấm AI',
+    status: 'Đã chấm tự động',
+    timeSeconds: 49,
+    streak: 6,
     feedback: 'Nắm vững trợ từ ngữ khí 呢 và 吧 trong câu hỏi.',
   },
   {
@@ -140,7 +160,9 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
     writingScore: '95% độ chuẩn nét',
     quizScore: '10/10 câu đúng',
     totalPoints: 98,
-    status: 'Đã chấm AI',
+    status: 'Đã chấm tự động',
+    timeSeconds: 37,
+    streak: 11,
     feedback: 'Nét chữ thư pháp rất có hồn, đạt điểm tuyệt đối trắc nghiệm.',
   },
   {
@@ -153,6 +175,8 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
     quizScore: '8/10 câu đúng',
     totalPoints: 88,
     status: 'Cần kèm thêm',
+    timeSeconds: 62,
+    streak: 3,
     feedback: 'Tiến bộ nhanh sau khi luyện cùng Trợ Giảng Gấu Trúc · 彬彬.',
   },
   {
@@ -164,7 +188,9 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
     writingScore: '93% độ chuẩn nét',
     quizScore: '9/10 câu đúng',
     totalPoints: 95,
-    status: 'Đã chấm AI',
+    status: 'Đã chấm tự động',
+    timeSeconds: 42,
+    streak: 9,
     feedback: 'Giao bài tập về nhà đúng hẹn, điểm nghe rất cao.',
   },
   {
@@ -176,7 +202,9 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
     writingScore: '89% độ chuẩn nét',
     quizScore: '9/10 câu đúng',
     totalPoints: 90,
-    status: 'Đã chấm AI',
+    status: 'Đã chấm tự động',
+    timeSeconds: 54,
+    streak: 5,
     feedback: 'Phần ghép câu đạt 100%, chú ý thêm lượng từ 个 vs 件.',
   },
   {
@@ -188,7 +216,9 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
     writingScore: '92% độ chuẩn nét',
     quizScore: '9/10 câu đúng',
     totalPoints: 93,
-    status: 'Đã chấm AI',
+    status: 'Đã chấm tự động',
+    timeSeconds: 46,
+    streak: 7,
     feedback: 'Thái độ học tập chăm chỉ, hoàn thành xuất sắc các bài tập tuần.',
   },
 ];
@@ -206,16 +236,25 @@ export function getStoredStudentRoster(): ClassStudent[] {
             idx === 0 && item.id === 'st-1' && item.name === 'Nguyễn Minh Anh'
               ? 'Lưu Thị Minh Thư'
               : item.name;
+          const fallbackDefault = DEFAULT_STUDENTS[idx];
           return {
             ...item,
             name: migratedName,
             studentCode:
-              item.studentCode || `HV-${String(idx + 1).padStart(3, '0')}`,
-            hskLevel: item.hskLevel || 'HSK 2',
+              item.studentCode || fallbackDefault?.studentCode || `HV-${String(idx + 1).padStart(3, '0')}`,
+            hskLevel: item.hskLevel || fallbackDefault?.hskLevel || 'HSK 2',
+            timeSeconds:
+              typeof item.timeSeconds === 'number' && item.timeSeconds > 0
+                ? item.timeSeconds
+                : fallbackDefault?.timeSeconds || Math.max(28, 128 - (item.totalPoints || 90)),
+            streak:
+              typeof item.streak === 'number' && item.streak > 0
+                ? item.streak
+                : fallbackDefault?.streak || Math.max(3, Math.round((item.totalPoints || 90) / 11)),
             status:
               item.totalPoints < 90
                 ? 'Cần kèm thêm'
-                : item.status || 'Đã chấm AI',
+                : item.status || 'Đã chấm tự động',
           };
         });
         return normalized;
@@ -230,11 +269,13 @@ export function getStoredStudentRoster(): ClassStudent[] {
 interface ClassroomManagerProps {
   onSwitchToStudentView?: () => void;
   onStudentCountChange?: (count: number) => void;
+  slides?: VocabSlide[];
 }
 
 export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   onSwitchToStudentView,
   onStudentCountChange,
+  slides,
 }) => {
   // Load student roster from localStorage to persist added/deleted students across refreshes
   const [studentsList, setStudentsList] = useState<ClassStudent[]>(() =>
@@ -243,13 +284,60 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 
   const studentCount = studentsList.length;
 
+  const [readingHistory, setReadingHistory] = useState<any[]>(() => {
+    try {
+      const raw = localStorage.getItem('hanu_student_reading_eval_history_v2');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [handwritingHistory, setHandwritingHistory] = useState<any[]>(() => {
+    try {
+      const raw = localStorage.getItem('hanu_student_handwriting_history_v2');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handleExternalSync = () => {
+      setStudentsList(getStoredStudentRoster());
+    };
+    const handleReadingSync = () => {
+      try {
+        const raw = localStorage.getItem('hanu_student_reading_eval_history_v2');
+        if (raw) setReadingHistory(JSON.parse(raw));
+      } catch {
+        // ignore
+      }
+    };
+    const handleHandwritingSync = () => {
+      try {
+        const raw = localStorage.getItem('hanu_student_handwriting_history_v2');
+        if (raw) setHandwritingHistory(JSON.parse(raw));
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('hanu_students_updated', handleExternalSync);
+    window.addEventListener('hanu_srs_updated', handleExternalSync);
+    window.addEventListener('hanu_reading_history_updated', handleReadingSync);
+    window.addEventListener('hanu_handwriting_history_updated', handleHandwritingSync);
+    return () => {
+      window.removeEventListener('hanu_students_updated', handleExternalSync);
+      window.removeEventListener('hanu_srs_updated', handleExternalSync);
+      window.removeEventListener('hanu_reading_history_updated', handleReadingSync);
+      window.removeEventListener('hanu_handwriting_history_updated', handleHandwritingSync);
+    };
+  }, []);
+
   useEffect(() => {
     onStudentCountChange?.(studentCount);
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('hanu_students_updated', { detail: studentCount })
-      );
-    }
   }, [studentCount, onStudentCountChange]);
 
   // Initialize with all sessions auto-assigned & auto-graded so the 19/19 KPI cards are synchronized out of the box
@@ -263,7 +351,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       };
     })
   );
-  const [activeTab, setActiveTab] = useState<'schedule' | 'grading'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'grading' | 'analytics'>('schedule');
   const [actionBanner, setActionBanner] = useState<string>(
     'Hoàn tất tự động: Đã giao bài và chấm điểm toàn bộ 19/19 buổi học trong khóa HSK 1–3!'
   );
@@ -928,6 +1016,19 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 <Award className="w-3.5 h-3.5 text-[#C5B358]" />
                 Bảng điểm tự động học viên ({studentCount})
               </button>
+              <button
+                type="button"
+                data-testid="tab-reading-writing-analytics"
+                onClick={() => setActiveTab('analytics')}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap cursor-pointer ${
+                  activeTab === 'analytics'
+                    ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
+                    : 'bg-[#FAFBF7] text-[#3F5447] border border-[rgba(30,50,39,0.15)] hover:text-[#1E3227]'
+                }`}
+              >
+                <Mic className="w-3.5 h-3.5 text-[#C5B358]" />
+                Luyện Đọc &amp; Viết chữ ({readingHistory.length + handwritingHistory.length})
+              </button>
             </div>
 
             {/* Action Buttons: 🎡 Vòng quay & Ghép thẻ, + Thêm học viên mới & 📥 Xuất bảng điểm CSV */}
@@ -965,6 +1066,17 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               >
                 <Download className="w-3.5 h-3.5 text-[#9B8A3E]" />
                 <span>📊 Xuất Bảng Điểm CSV/In Báo Cáo</span>
+              </button>
+
+              <button
+                type="button"
+                data-testid="classroom-print-worksheet-btn"
+                onClick={() => setIsWorksheetModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-[#E7ECD9] text-[#1E3227] border border-[#9B8A3E]/60 text-xs font-bold transition-all shadow-2xs whitespace-nowrap cursor-pointer"
+                title="In phiếu luyện viết chữ Hán A4 (PDF) cả lớp"
+              >
+                <Printer className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                <span>🖨️ In Phiếu Viết A4 (PDF)</span>
               </button>
             </div>
           </div>
@@ -1127,7 +1239,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               </tbody>
             </table>
           </div>
-        ) : (
+        ) : activeTab === 'grading' ? (
           /* Detailed Student Auto-Grading Matrix (Dynamic from filteredStudents) */
           <div className="rounded-2xl border border-[#D5DEC7] bg-white p-5 pb-20">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-[#E5E9DC]">
@@ -1289,6 +1401,176 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 })}
               </div>
             )}
+          </div>
+        ) : (
+          /* Detailed Student Speech & Handwriting Analytics Dashboard */
+          <div data-testid="classroom-reading-writing-analytics" className="rounded-2xl border border-[#D5DEC7] bg-white p-5 pb-20 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#E5E9DC]">
+              <div>
+                <h4 className="text-sm font-bold text-[#1E3227] flex items-center gap-1.5">
+                  <Mic className="w-4 h-4 text-[#9B8A3E]" />
+                  <span>Thống kê Luyện Đọc Phát Âm &amp; Viết Tay Ô Mễ Tự Cách (Học viên)</span>
+                </h4>
+                <p className="text-xs text-[#5F7266] mt-0.5">
+                  Đồng bộ tức thì từ bài tập "Đọc thử" (Web Speech API zh-CN) và "Viết thử" (米字格) của học viên trong lớp.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="analytics-open-worksheet-btn"
+                  onClick={() => setIsWorksheetModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1E3227] text-[#FAFBF7] text-xs font-bold shadow-2xs hover:bg-[#2B4637] transition-all cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5 text-[#C5B358]" />
+                  <span>In Phiếu Luyện Viết A4 (PDF)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 4 Summary Metric Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="p-3.5 rounded-xl bg-[#FAFBF7] border border-[rgba(30,50,39,0.12)]">
+                <div className="text-xs text-[#5F7266] font-medium">Lượt luyện đọc đã ghi nhận</div>
+                <div className="text-xl font-bold text-[#1E3227] mt-1 tabular-nums">
+                  {readingHistory.length} lượt
+                </div>
+                <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                  Web Speech API zh-CN
+                </div>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#FAFBF7] border border-[rgba(30,50,39,0.12)]">
+                <div className="text-xs text-[#5F7266] font-medium">Độ chuẩn phát âm TB</div>
+                <div className="text-xl font-bold text-[#9B8A3E] mt-1 tabular-nums">
+                  {readingHistory.length > 0
+                    ? `${Math.round(
+                        readingHistory.reduce((acc, cur) => acc + (cur.score || 90), 0) /
+                          readingHistory.length
+                      )}%`
+                    : '94%'}
+                </div>
+                <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                  Thanh điệu chuẩn Bắc Kinh
+                </div>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#FAFBF7] border border-[rgba(30,50,39,0.12)]">
+                <div className="text-xs text-[#5F7266] font-medium">Lượt viết tay Ô Mễ Tự Cách</div>
+                <div className="text-xl font-bold text-[#1E3227] mt-1 tabular-nums">
+                  {handwritingHistory.length} nét
+                </div>
+                <div className="text-[10px] text-[#3F5447] font-semibold mt-0.5">
+                  Đối chiếu HanziWriter
+                </div>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#FAFBF7] border border-[rgba(30,50,39,0.12)]">
+                <div className="text-xs text-[#5F7266] font-medium">Độ chính xác viết nét TB</div>
+                <div className="text-xl font-bold text-[#C84B31] mt-1 tabular-nums">
+                  {handwritingHistory.length > 0
+                    ? `${Math.round(
+                        handwritingHistory.reduce((acc, cur) => acc + (cur.accuracy || 88), 0) /
+                          handwritingHistory.length
+                      )}%`
+                    : '91%'}
+                </div>
+                <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                  Bút thuận &amp; tọa độ nét
+                </div>
+              </div>
+            </div>
+
+            {/* 2 Detailed Breakdown Tables */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left Column: Recent Reading Drills */}
+              <div className="rounded-xl border border-[rgba(30,50,39,0.12)] bg-[#FAFBF7] p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between pb-2 border-b border-[rgba(30,50,39,0.1)]">
+                  <h5 className="text-xs font-bold text-[#1E3227] uppercase tracking-wide flex items-center gap-1.5">
+                    <Mic className="w-3.5 h-3.5 text-[#C84B31]" />
+                    <span>Lịch sử phát âm câu ví dụ gần đây</span>
+                  </h5>
+                  <span className="text-[10px] text-[#5F7266]">
+                    {readingHistory.length} bản ghi
+                  </span>
+                </div>
+                <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                  {readingHistory.length === 0 ? (
+                    <div className="p-4 rounded-lg bg-white text-center text-xs text-[#5F7266] italic">
+                      Chưa có lượt ghi âm mới. Khi học sinh bấm "Đọc thử" ở thẻ câu ví dụ, dữ liệu sẽ tự động đồng bộ về đây.
+                    </div>
+                  ) : (
+                    readingHistory.slice(0, 10).map((r) => (
+                      <div
+                        key={r.id}
+                        className="p-2.5 rounded-lg bg-white border border-[rgba(30,50,39,0.1)] space-y-1 text-xs"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-['Noto_Sans_SC'] font-bold text-sm text-[#1E3227]">
+                            {r.hanzi} · "{r.targetSentence}"
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#1E3227] text-white font-bold text-[11px] tabular-nums">
+                            {r.score}%
+                          </span>
+                        </div>
+                        <div className="text-[#3F5447] text-[11px]">
+                          Nhận diện: <span className="font-mono text-[#1E3227]">{r.transcript}</span>
+                        </div>
+                        <div className="text-[11px] text-emerald-800 font-medium">
+                          ✓ {r.feedback}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Recent Handwriting Drills */}
+              <div className="rounded-xl border border-[rgba(30,50,39,0.12)] bg-[#FAFBF7] p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between pb-2 border-b border-[rgba(30,50,39,0.1)]">
+                  <h5 className="text-xs font-bold text-[#1E3227] uppercase tracking-wide flex items-center gap-1.5">
+                    <Star className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                    <span>Lịch sử viết tay Ô Mễ Tự Cách gần đây</span>
+                  </h5>
+                  <span className="text-[10px] text-[#5F7266]">
+                    {handwritingHistory.length} bản ghi
+                  </span>
+                </div>
+                <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                  {handwritingHistory.length === 0 ? (
+                    <div className="p-4 rounded-lg bg-white text-center text-xs text-[#5F7266] italic">
+                      Chưa có lượt viết tay mới. Khi học sinh luyện viết nét trong Ô Mễ Tự Cách, kết quả chấm điểm sẽ hiển thị tại đây.
+                    </div>
+                  ) : (
+                    handwritingHistory.slice(0, 10).map((h) => (
+                      <div
+                        key={h.id}
+                        className="p-2.5 rounded-lg bg-white border border-[rgba(30,50,39,0.1)] space-y-1 text-xs"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-['Noto_Sans_SC'] font-bold text-sm text-[#1E3227]">
+                            Chữ: {h.char} ({h.hanziWord})
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="px-1.5 py-0.5 rounded bg-[#9B8A3E]/20 text-[#1E3227] font-bold text-[11px] tabular-nums">
+                              {h.accuracy}%
+                            </span>
+                            <span className="text-amber-500 font-bold">
+                              {'★'.repeat(h.stars || 1)}
+                            </span>
+                          </div>
+                        </div>
+                        {h.isReversedDirection && (
+                          <div className="text-[11px] text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded">
+                            ⚠️ Học sinh kéo ngược hướng bút thuận
+                          </div>
+                        )}
+                        <div className="text-[11px] text-[#3F5447]">
+                          {h.feedback}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -1488,531 +1770,37 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         </div>
       )}
 
-      {/* =======================================================================
-          MODAL: ➕ THÊM HỌC VIÊN MỚI VÀO LỚP (HỌ TÊN, MÃ HV, HSK 1-4, ĐIỂM KHỞI TẠO)
-          ======================================================================= */}
-      {isAddStudentModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="add-student-modal-title"
-          onClick={() => setIsAddStudentModalOpen(false)}
-        >
-          <form
-            onSubmit={handleSaveModalStudent}
-            className="w-full max-w-md bg-[#FAFBF7] border border-[#9B8A3E]/60 rounded-3xl shadow-2xl p-5 sm:p-6 flex flex-col space-y-4 text-[#1E3227]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-[rgba(30,50,39,0.12)]">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-[#1E3227] flex items-center justify-center text-[#C5B358] shrink-0 shadow-2xs">
-                  <UserPlus className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 id="add-student-modal-title" className="text-base font-bold text-[#1E3227]">
-                    Thêm học viên mới vào lớp
-                  </h3>
-                  <p className="text-xs text-[#5F7266]">
-                    Lớp HSK 1–3 · Mã lớp: 722229 · Tự động đồng bộ sĩ số
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label="Đóng cửa sổ thêm học viên"
-                onClick={() => setIsAddStudentModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-white hover:bg-[#F4F6EE] border border-[rgba(30,50,39,0.15)] text-[#1E3227] flex items-center justify-center text-xs font-bold transition-all cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      {/* Sub-component: Modal Thêm học viên mới */}
+      <ClassroomAddStudentModal
+        isOpen={isAddStudentModalOpen}
+        onClose={() => setIsAddStudentModalOpen(false)}
+        onAddStudent={(newStudent) => {
+          const updated = [newStudent, ...studentsList];
+          persistRosterAndSync(updated);
+          setActiveTab('grading');
+          setIsAddStudentModalOpen(false);
+          setActionBanner(
+            `✅ Đã thêm học viên "${newStudent.name}" (${newStudent.studentCode} · ${newStudent.hskLevel} · ${newStudent.totalPoints}đ) vào đầu danh sách! Sĩ số mới: ${updated.length} học viên.`
+          );
+          playGentleChime(783.99, 0.25);
+        }}
+        existingStudentsCount={studentsList.length}
+      />
 
-            {modalValidationError && (
-              <div
-                role="alert"
-                className="px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2"
-              >
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{modalValidationError}</span>
-              </div>
-            )}
+      {/* Sub-component: Mini-game Vòng quay gọi tên & Ghép thẻ */}
+      <ClassroomLuckyWheelModal
+        isOpen={isLuckyWheelOpen}
+        onClose={() => setIsLuckyWheelOpen(false)}
+        studentsList={studentsList}
+        onAwardBonusPoints={handleAwardBonusPoints}
+      />
 
-            <div className="space-y-3.5">
-              {/* 1. Họ và tên */}
-              <div>
-                <label
-                  htmlFor="modal-student-name"
-                  className="block text-xs font-bold text-[#1E3227] mb-1"
-                >
-                  Họ và tên học viên <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="modal-student-name"
-                  data-testid="modal-student-name-input"
-                  type="text"
-                  value={modalStudentName}
-                  onChange={(e) => {
-                    setModalStudentName(e.target.value);
-                    if (modalValidationError) setModalValidationError(null);
-                  }}
-                  placeholder="Ví dụ: Nguyễn Minh Châu..."
-                  autoFocus
-                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[rgba(30,50,39,0.2)] text-xs sm:text-sm text-[#1E3227] placeholder-[#5F7266] focus:outline-none focus:border-[#9B8A3E]"
-                />
-              </div>
-
-              {/* 2. Mã học viên (Tự sinh hoặc nhập tay) */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label
-                    htmlFor="modal-student-code"
-                    className="block text-xs font-bold text-[#1E3227]"
-                  >
-                    Mã học viên (Tự sinh hoặc nhập tay)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleRegenerateStudentCode}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#9B8A3E] hover:text-[#1E3227] transition-colors cursor-pointer"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    <span>Tự sinh mã mới</span>
-                  </button>
-                </div>
-                <input
-                  id="modal-student-code"
-                  data-testid="modal-student-code-input"
-                  type="text"
-                  value={modalStudentCode}
-                  onChange={(e) => setModalStudentCode(e.target.value)}
-                  placeholder="HV-013"
-                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[rgba(30,50,39,0.2)] text-xs sm:text-sm font-mono font-bold text-[#1E3227] placeholder-[#5F7266] focus:outline-none focus:border-[#9B8A3E]"
-                />
-              </div>
-
-              {/* 3. Cấp độ HSK (HSK 1 - HSK 4) & 4. Điểm khởi tạo */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label
-                    htmlFor="modal-student-hsk"
-                    className="block text-xs font-bold text-[#1E3227] mb-1"
-                  >
-                    Cấp độ (HSK 1–4)
-                  </label>
-                  <select
-                    id="modal-student-hsk"
-                    data-testid="modal-student-hsk-select"
-                    value={modalHskLevel}
-                    onChange={(e) =>
-                      setModalHskLevel(
-                        e.target.value as 'HSK 1' | 'HSK 2' | 'HSK 3' | 'HSK 4'
-                      )
-                    }
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[rgba(30,50,39,0.2)] text-xs sm:text-sm font-semibold text-[#1E3227] focus:outline-none focus:border-[#9B8A3E]"
-                  >
-                    <option value="HSK 1">HSK 1 (Sơ cấp 1)</option>
-                    <option value="HSK 2">HSK 2 (Sơ cấp 2)</option>
-                    <option value="HSK 3">HSK 3 (Trung cấp 1)</option>
-                    <option value="HSK 4">HSK 4 (Trung cấp 2)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="modal-student-points"
-                    className="block text-xs font-bold text-[#1E3227] mb-1"
-                  >
-                    Điểm khởi tạo (0–100)
-                  </label>
-                  <input
-                    id="modal-student-points"
-                    data-testid="modal-student-points-input"
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={modalInitialPoints}
-                    onChange={(e) => setModalInitialPoints(Number(e.target.value))}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-[rgba(30,50,39,0.2)] text-xs sm:text-sm font-bold text-[#1E3227] tabular-nums focus:outline-none focus:border-[#9B8A3E]"
-                  />
-                </div>
-              </div>
-
-              {/* Live Preview Box */}
-              <div className="p-3 rounded-2xl bg-[#E7ECD9]/75 border border-[#1E3227]/15 text-xs flex items-center justify-between gap-2">
-                <div>
-                  <span className="text-[#3F5447]">Phân loại tự động: </span>
-                  <strong
-                    className={
-                      modalInitialPoints < 90 ? 'text-amber-800' : 'text-[#065F46]'
-                    }
-                  >
-                    {modalInitialPoints < 90 ? 'Cần kèm thêm' : 'Đã hoàn thành'}
-                  </strong>
-                </div>
-                <span className="text-[11px] font-semibold text-[#1E3227] tabular-nums">
-                  Sĩ số sau khi lưu: {studentCount + 1} HV
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[rgba(30,50,39,0.12)]">
-              <button
-                type="button"
-                onClick={() => setIsAddStudentModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-white hover:bg-[#F4F6EE] border border-[rgba(30,50,39,0.15)] text-xs font-semibold text-[#1E3227] transition-all cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="submit"
-                data-testid="confirm-add-student-btn"
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] text-[#FAFBF7] border border-[#9B8A3E]/50 text-xs font-bold transition-all shadow-sm cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5 text-[#C5B358]" />
-                <span>Lưu &amp; Thêm vào lớp</span>
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* =======================================================================
-          MODAL: 🎡 MINI-GAME VÒNG QUAY GỌI TÊN (LUCKY WHEEL) & GHÉP THẺ TRÊN LỚP
-          ======================================================================= */}
-      {isLuckyWheelOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 animate-fade-in"
-          role="dialog"
-          aria-modal="true"
-          data-testid="lucky-wheel-modal"
-          onClick={() => setIsLuckyWheelOpen(false)}
-        >
-          <div
-            className="w-full max-w-3xl bg-[#FAFBF7] border-2 border-[#9B8A3E] rounded-3xl shadow-2xl p-5 sm:p-6 flex flex-col max-h-[90vh] overflow-y-auto text-[#1E3227] space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-[rgba(30,50,39,0.15)]">
-              <div>
-                <div className="text-[11px] font-bold text-[#9B8A3E] uppercase tracking-wider">
-                  Mini-Game Tương Tác Lớp Học · Kết nối trực tiếp Sổ Điểm ({studentsList.length} Học viên)
-                </div>
-                <h3 className="text-lg sm:text-xl font-bold text-[#1E3227] mt-0.5">
-                  🎡 Vòng Quay Gọi Tên Ngẫu Nhiên &amp; Ghép Thẻ Từ Vựng
-                </h3>
-              </div>
-              <button
-                type="button"
-                data-testid="close-lucky-wheel-btn"
-                onClick={() => setIsLuckyWheelOpen(false)}
-                className="w-8 h-8 rounded-full bg-white hover:bg-[#F4F6EE] border border-[rgba(30,50,39,0.15)] text-[#1E3227] flex items-center justify-center text-xs font-bold cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Mode Switcher */}
-            <div className="flex flex-wrap items-center justify-between gap-2 bg-[#E7ECD9]/65 p-2 rounded-2xl border border-[#1E3227]/15">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  data-testid="lucky-wheel-tab-wheel"
-                  onClick={() => setWheelModeTab('wheel')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    wheelModeTab === 'wheel'
-                      ? 'bg-[#1E3227] text-white shadow-xs'
-                      : 'bg-white text-[#1E3227] hover:bg-[#FAFBF7]'
-                  }`}
-                >
-                  🎡 Vòng Quay Gọi Tên ({studentsList.length} HV)
-                </button>
-                <button
-                  type="button"
-                  data-testid="lucky-wheel-tab-match"
-                  onClick={() => setWheelModeTab('match')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    wheelModeTab === 'match'
-                      ? 'bg-[#1E3227] text-white shadow-xs'
-                      : 'bg-white text-[#1E3227] hover:bg-[#FAFBF7]'
-                  }`}
-                >
-                  🃏 Ghép Thẻ Từ Vựng Nhanh ({matchedPairIds.length}/{CLASS_MATCH_PAIRS.length})
-                </button>
-              </div>
-
-              {selectedWheelStudent && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-[#3F5447] font-semibold">Đang gọi tên:</span>
-                  <select
-                    data-testid="wheel-student-select"
-                    value={selectedWheelStudent.id}
-                    onChange={(e) => setSelectedWheelStudentId(e.target.value)}
-                    className="px-2.5 py-1 rounded-lg bg-white border border-[#9B8A3E]/60 text-xs font-bold text-[#1E3227]"
-                  >
-                    {studentsList.map((st) => (
-                      <option key={st.id} value={st.id}>
-                        {st.name} ({st.totalPoints}đ)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            {bonusToastMessage && (
-              <div
-                data-testid="lucky-wheel-bonus-toast"
-                className="p-3 rounded-2xl bg-[#E7ECD9] border border-[#1E3227]/30 text-xs font-bold text-[#1E3227] flex items-center gap-2 shadow-2xs"
-              >
-                <CheckCircle2 className="w-4 h-4 text-[#065F46] shrink-0" />
-                <span>{bonusToastMessage}</span>
-              </div>
-            )}
-
-            {wheelModeTab === 'wheel' ? (
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
-                {/* Left: Interactive Visual Wheel */}
-                <div className="md:col-span-6 flex flex-col items-center justify-center p-4 rounded-2xl bg-white border border-[rgba(30,50,39,0.12)]">
-                  <div className="relative w-52 h-52 flex items-center justify-center">
-                    {/* Top Pointer */}
-                    <div className="absolute -top-2 z-20 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[18px] border-t-[#B91C1C] drop-shadow" />
-                    <svg
-                      viewBox="0 0 200 200"
-                      className="w-full h-full rounded-full border-4 border-[#9B8A3E] shadow-md transition-transform duration-700 ease-out"
-                      style={{ transform: `rotate(${wheelRotation}deg)` }}
-                    >
-                      <circle cx="100" cy="100" r="96" fill="#1E3227" />
-                      {studentsList.slice(0, 8).map((st, idx, arr) => {
-                        const angle = (360 / arr.length) * idx;
-                        const rad = ((angle - 90) * Math.PI) / 180;
-                        const tx = 100 + 58 * Math.cos(rad);
-                        const ty = 100 + 58 * Math.sin(rad);
-                        const shortName = st.name.split(' ').slice(-2).join(' ');
-                        return (
-                          <g key={st.id}>
-                            <line
-                              x1="100"
-                              y1="100"
-                              x2={100 + 95 * Math.cos(rad)}
-                              y2={100 + 95 * Math.sin(rad)}
-                              stroke="#C5B358"
-                              strokeWidth="1"
-                              strokeOpacity="0.45"
-                            />
-                            <text
-                              x={tx}
-                              y={ty}
-                              fill={idx % 2 === 0 ? '#FAFBF7' : '#F3D778'}
-                              fontSize="8.5"
-                              fontWeight="bold"
-                              textAnchor="middle"
-                              dominantBaseline="middle"
-                            >
-                              {shortName}
-                            </text>
-                          </g>
-                        );
-                      })}
-                      <circle cx="100" cy="100" r="22" fill="#9B8A3E" stroke="#FAFBF7" strokeWidth="3" />
-                      <text
-                        x="100"
-                        y="104"
-                        fill="#1E3227"
-                        fontSize="12"
-                        fontWeight="bold"
-                        textAnchor="middle"
-                      >
-                        龍
-                      </text>
-                    </svg>
-                  </div>
-
-                  <button
-                    type="button"
-                    data-testid="spin-lucky-wheel-btn"
-                    disabled={isSpinningWheel || studentsList.length === 0}
-                    onClick={handleSpinWheel}
-                    className="mt-4 px-5 py-2.5 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] text-white text-xs font-bold border border-[#9B8A3E] shadow-sm transition-all cursor-pointer disabled:opacity-60"
-                  >
-                    {isSpinningWheel ? '🎡 Đang quay chọn học viên...' : '🎡 Quay gọi tên ngẫu nhiên'}
-                  </button>
-                </div>
-
-                {/* Right: Selected Student & Instant Bonus Points */}
-                <div className="md:col-span-6 space-y-3">
-                  {selectedWheelStudent ? (
-                    <div
-                      data-testid="selected-wheel-student-card"
-                      className="p-4 rounded-2xl bg-white border-2 border-[#9B8A3E]/70 shadow-xs space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="px-2.5 py-0.5 rounded-full bg-[#1E3227] text-[#C5B358] text-[10px] font-bold uppercase">
-                          Học viên được gọi tên
-                        </span>
-                        <span className="text-xs font-mono font-bold text-[#5F7266]">
-                          {selectedWheelStudent.studentCode} · {selectedWheelStudent.hskLevel}
-                        </span>
-                      </div>
-
-                      <div>
-                        <div
-                          data-testid="selected-wheel-student-name"
-                          className="text-xl font-bold text-[#1E3227]"
-                        >
-                          {selectedWheelStudent.name}
-                        </div>
-                        <div className="text-xs text-[#3F5447] mt-1 flex items-center gap-3">
-                          <span>
-                            Điểm hiện tại:{' '}
-                            <strong
-                              data-testid="selected-wheel-student-points"
-                              className="text-base text-[#1E3227] tabular-nums"
-                            >
-                              {selectedWheelStudent.totalPoints}đ
-                            </strong>
-                          </span>
-                          <span>·</span>
-                          <span>Từ vựng: <strong>{selectedWheelStudent.vocabScore}</strong></span>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-[#E5E9DC] space-y-2">
-                        <div className="text-xs font-bold text-[#1E3227]">
-                          Thưởng điểm trực tiếp vào Bảng điểm:
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            data-testid="award-bonus-5-btn"
-                            onClick={() =>
-                              handleAwardBonusPoints(
-                                selectedWheelStudent.id,
-                                5,
-                                'Trả lời đúng câu hỏi Vòng quay trên lớp'
-                              )
-                            }
-                            className="py-2 px-3 rounded-xl bg-[#E7ECD9] hover:bg-[#1E3227] text-[#1E3227] hover:text-white border border-[#9B8A3E]/60 text-xs font-bold transition-all cursor-pointer"
-                          >
-                            ⭐ +5 điểm thưởng
-                          </button>
-                          <button
-                            type="button"
-                            data-testid="award-bonus-10-btn"
-                            onClick={() =>
-                              handleAwardBonusPoints(
-                                selectedWheelStudent.id,
-                                10,
-                                'Phản xạ xuất sắc Vòng quay & Ghép thẻ'
-                              )
-                            }
-                            className="py-2 px-3 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] text-[#FAFBF7] border border-[#9B8A3E] text-xs font-bold transition-all cursor-pointer"
-                          >
-                            🏆 +10 điểm thưởng
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-4 rounded-2xl bg-white text-xs text-[#5F7266]">
-                      Chưa có học viên trong danh sách lớp.
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              /* Tab 2: Card Matching Mini-Game */
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs text-[#3F5447]">
-                    Chọn 1 thẻ <strong>Chữ Hán</strong> bên trái và ghép với thẻ <strong>Pinyin + Nghĩa</strong> tương ứng bên phải:
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMatchedPairIds([]);
-                        setSelectedMatchCard(null);
-                      }}
-                      className="px-3 py-1 rounded-lg bg-white border border-[rgba(30,50,39,0.2)] text-xs font-semibold text-[#1E3227] cursor-pointer"
-                    >
-                      Chơi lại ván mới
-                    </button>
-                    {selectedWheelStudent && (
-                      <button
-                        type="button"
-                        data-testid="match-game-award-10-btn"
-                        onClick={() =>
-                          handleAwardBonusPoints(
-                            selectedWheelStudent.id,
-                            10,
-                            'Chiến thắng Mini-Game Ghép Thẻ Từ Vựng'
-                          )
-                        }
-                        className="px-3 py-1 rounded-lg bg-[#1E3227] text-white text-xs font-bold cursor-pointer"
-                      >
-                        🏆 Thưởng +10đ cho {selectedWheelStudent.name}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {CLASS_MATCH_PAIRS.map((item) => {
-                    const isMatched = matchedPairIds.includes(item.pairId);
-                    const isSelected =
-                      selectedMatchCard?.pairId === item.pairId &&
-                      selectedMatchCard?.side === 'hanzi';
-                    return (
-                      <button
-                        key={`hz-${item.pairId}`}
-                        type="button"
-                        disabled={isMatched}
-                        onClick={() => handleSelectMatchCard(item.pairId, 'hanzi', item.hanzi)}
-                        className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer ${
-                          isMatched
-                            ? 'bg-emerald-50 border-emerald-400 text-emerald-800 opacity-75'
-                            : isSelected
-                            ? 'bg-[#1E3227] text-white border-[#9B8A3E] shadow-sm'
-                            : 'bg-white hover:bg-[#FAFBF7] border-[rgba(30,50,39,0.2)] text-[#1E3227]'
-                        }`}
-                      >
-                        <div className="text-2xl font-bold font-['Noto_Serif_SC']">{item.hanzi}</div>
-                        <div className="text-[10px] mt-1 opacity-75">Thẻ Chữ Hán</div>
-                      </button>
-                    );
-                  })}
-
-                  {CLASS_MATCH_PAIRS.map((item) => {
-                    const isMatched = matchedPairIds.includes(item.pairId);
-                    const isSelected =
-                      selectedMatchCard?.pairId === item.pairId &&
-                      selectedMatchCard?.side === 'meaning';
-                    return (
-                      <button
-                        key={`mn-${item.pairId}`}
-                        type="button"
-                        disabled={isMatched}
-                        onClick={() => handleSelectMatchCard(item.pairId, 'meaning')}
-                        className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer ${
-                          isMatched
-                            ? 'bg-emerald-50 border-emerald-400 text-emerald-800 opacity-75'
-                            : isSelected
-                            ? 'bg-[#1E3227] text-white border-[#9B8A3E] shadow-sm'
-                            : 'bg-white hover:bg-[#FAFBF7] border-[rgba(30,50,39,0.2)] text-[#1E3227]'
-                        }`}
-                      >
-                        <div className="text-xs font-bold text-[#9B8A3E]">{item.pinyin}</div>
-                        <div className="text-xs font-semibold mt-0.5">{item.meaning}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Sub-component: In phiếu luyện viết chữ Hán A4 (PDF) */}
+      <WorksheetPreviewModal
+        isOpen={isWorksheetModalOpen}
+        onClose={() => setIsWorksheetModalOpen(false)}
+        slides={slides && slides.length > 0 ? slides : INITIAL_VOCAB_SLIDES}
+      />
     </div>
   );
 };

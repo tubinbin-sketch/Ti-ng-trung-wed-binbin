@@ -528,6 +528,7 @@ export interface StudentHsk3PillarMetric {
   targetCount: number;
   unitLabel: string;
   percent: number;
+  deltaPercent?: number;
   statusNote: string;
 }
 
@@ -536,6 +537,11 @@ export function calculateStudentHsk3Pillars(params: {
   totalSlideCount: number;
   writingAccuracyPct: number;
   completedTranslationCount: number;
+  practicedSpeechCount?: number;
+  srsReviewedCount?: number;
+  practicedWritingCount?: number;
+  submittedQuizScore?: number;
+  completedSentenceCount?: number;
 }): StudentHsk3PillarMetric[] {
   const learnedRatio =
     params.totalSlideCount > 0
@@ -544,10 +550,49 @@ export function calculateStudentHsk3Pillars(params: {
   const writingBoost = Math.min(1, Math.max(0.65, params.writingAccuracyPct / 100));
   const translationBoost = Math.min(25, params.completedTranslationCount * 8);
 
-  const syllableCurrent = Math.min(608, Math.round(485 + learnedRatio * 95 + translationBoost));
-  const recognitionCurrent = Math.min(900, Math.round(680 + learnedRatio * 180 + translationBoost));
-  const handwritingCurrent = Math.min(300, Math.round(215 * writingBoost + learnedRatio * 65));
-  const vocabGrammarCurrent = Math.min(2245, Math.round(1690 + learnedRatio * 420 + translationBoost * 4));
+  const speechBonus = Math.min(48, (params.practicedSpeechCount || 0) * 9);
+  const srsBonus = Math.min(65, (params.srsReviewedCount || 0) * 6);
+  const writingCharBonus = Math.min(36, (params.practicedWritingCount || 0) * 5);
+  const quizBonusRatio =
+    typeof params.submittedQuizScore === 'number' && params.submittedQuizScore > 0
+      ? Math.min(1, params.submittedQuizScore / 100)
+      : 0;
+  const sentenceBonus = Math.min(40, (params.completedSentenceCount || 0) * 8);
+
+  const baseSyllable = Math.round(485 + learnedRatio * 75);
+  const syllableCurrent = Math.min(
+    608,
+    Math.round(baseSyllable + translationBoost + speechBonus + quizBonusRatio * 18)
+  );
+
+  const baseRecognition = Math.round(680 + learnedRatio * 145);
+  const recognitionCurrent = Math.min(
+    900,
+    Math.round(baseRecognition + translationBoost + srsBonus + quizBonusRatio * 28)
+  );
+
+  const baseHandwriting = Math.round(205 * writingBoost + learnedRatio * 52);
+  const handwritingCurrent = Math.min(
+    300,
+    Math.round(baseHandwriting + writingCharBonus + quizBonusRatio * 12)
+  );
+
+  const baseVocabGrammar = Math.round(1690 + learnedRatio * 340);
+  const vocabGrammarCurrent = Math.min(
+    2245,
+    Math.round(
+      baseVocabGrammar +
+        translationBoost * 4 +
+        sentenceBonus * 3 +
+        srsBonus * 2 +
+        quizBonusRatio * 115
+    )
+  );
+
+  const syllablePct = Math.min(100, Math.round((syllableCurrent / 608) * 100));
+  const recognitionPct = Math.min(100, Math.round((recognitionCurrent / 900) * 100));
+  const handwritingPct = Math.min(100, Math.round((handwritingCurrent / 300) * 100));
+  const vocabGrammarPct = Math.min(100, Math.round((vocabGrammarCurrent / 2245) * 100));
 
   return [
     {
@@ -557,8 +602,12 @@ export function calculateStudentHsk3Pillars(params: {
       currentCount: syllableCurrent,
       targetCount: 608,
       unitLabel: 'âm tiết',
-      percent: Math.round((syllableCurrent / 608) * 100),
-      statusNote: 'Chuẩn thanh điệu & biến điệu zh-CN bậc Sơ cấp',
+      percent: syllablePct,
+      deltaPercent: Math.max(0, syllablePct - Math.round((baseSyllable / 608) * 100)),
+      statusNote:
+        (params.practicedSpeechCount || 0) > 0
+          ? `Đã luyện phát âm ${params.practicedSpeechCount} câu · Chuẩn biến điệu zh-CN`
+          : 'Chuẩn thanh điệu & biến điệu zh-CN bậc Sơ cấp',
     },
     {
       id: 'recognition',
@@ -567,8 +616,12 @@ export function calculateStudentHsk3Pillars(params: {
       currentCount: recognitionCurrent,
       targetCount: 900,
       unitLabel: 'chữ Hán',
-      percent: Math.round((recognitionCurrent / 900) * 100),
-      statusNote: 'Nhận diện đọc hiểu nhanh mặt chữ trong văn cảnh',
+      percent: recognitionPct,
+      deltaPercent: Math.max(0, recognitionPct - Math.round((baseRecognition / 900) * 100)),
+      statusNote:
+        (params.srsReviewedCount || 0) > 0
+          ? `Đã ôn ${params.srsReviewedCount} thẻ Flashcard SRS · Đọc hiểu nhanh mặt chữ`
+          : 'Nhận diện đọc hiểu nhanh mặt chữ trong văn cảnh',
     },
     {
       id: 'handwriting',
@@ -577,8 +630,9 @@ export function calculateStudentHsk3Pillars(params: {
       currentCount: handwritingCurrent,
       targetCount: 300,
       unitLabel: 'chữ viết tay',
-      percent: Math.round((handwritingCurrent / 300) * 100),
-      statusNote: `Độ chuẩn nét bút Mễ Tự Cách: ${Math.round(params.writingAccuracyPct)}%`,
+      percent: handwritingPct,
+      deltaPercent: Math.max(0, handwritingPct - Math.round((baseHandwriting / 300) * 100)),
+      statusNote: `Độ chuẩn nét bút Mễ Tự Cách: ${Math.round(params.writingAccuracyPct)}% (${handwritingCurrent}/300 chữ)`,
     },
     {
       id: 'vocab_grammar',
@@ -587,8 +641,12 @@ export function calculateStudentHsk3Pillars(params: {
       currentCount: vocabGrammarCurrent,
       targetCount: 2245,
       unitLabel: 'đơn vị',
-      percent: Math.round((vocabGrammarCurrent / 2245) * 100),
-      statusNote: 'Tích hợp 5 kỹ năng: Nghe · Nói · Đọc · Viết · Dịch',
+      percent: vocabGrammarPct,
+      deltaPercent: Math.max(0, vocabGrammarPct - Math.round((baseVocabGrammar / 2245) * 100)),
+      statusNote:
+        quizBonusRatio > 0
+          ? `Đã đồng bộ điểm Bài tập (${Math.round(params.submittedQuizScore || 0)}đ) · 5 kỹ năng HSK 3.0`
+          : 'Tích hợp 5 kỹ năng: Nghe · Nói · Đọc · Viết · Dịch',
     },
   ];
 }

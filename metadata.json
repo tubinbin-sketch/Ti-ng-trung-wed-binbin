@@ -1,6 +1,6 @@
 {
-  "name": "Halora × Lộ Trưởng Lão — Nền tảng Giảng dạy Tiếng Trung 1-Click",
-  "description": "Trang đích Halora Sage Studio kết hợp nền tảng trợ giảng tiếng Trung 1-Click: tạo bài trình chiếu từ vựng, tập viết chữ Hán theo nét, Quiz Game tương tác và quản lý lớp học tự động.",
-  "requestFramePermissions": [],
+  "name": "HANU × 阮文受 — Hệ Thống Trợ Giảng & Học Tập Hán Ngữ Chuẩn HSK 3.0",
+  "description": "Hệ thống trợ giảng, soạn bài tự động, luyện viết ô Mễ Tự Cách (米字格), bài tập 5 kỹ năng và quản lý lớp học tiếng Trung chuẩn HSK 3.0 (3 giai đoạn - 9 cấp độ).",
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

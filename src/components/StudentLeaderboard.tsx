@@ -1,21 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Trophy,
-  Medal,
   Flame,
   Clock,
-  Sparkles,
-  ArrowUp,
-  UserCheck,
-  TrendingUp,
-  Award,
   Crown,
 } from 'lucide-react';
 import { LeaderboardEntry } from '../data/chineseData';
+import { getStoredStudentRoster, ClassStudent } from './ClassroomManager';
 
 export interface ClassLeaderboardItem extends LeaderboardEntry {
+  studentCode?: string;
+  hskLevel?: string;
   completedAt?: string;
-  accuracyRate: number; // Percentage e.g. 95%
+  accuracyRate: number;
   badgeTitle?: string;
   isCurrentUser?: boolean;
 }
@@ -23,132 +20,135 @@ export interface ClassLeaderboardItem extends LeaderboardEntry {
 interface StudentLeaderboardProps {
   currentStudentName: string;
   currentStudentScore?: number;
+  currentStudentTimeSeconds?: number;
+  currentStudentStreak?: number;
   hasSubmitted?: boolean;
 }
 
 export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
   currentStudentName,
   currentStudentScore = 0,
+  currentStudentTimeSeconds,
+  currentStudentStreak,
   hasSubmitted = false,
 }) => {
   const [filterPeriod, setFilterPeriod] = useState<'today' | 'week' | 'all'>('today');
+  const [roster, setRoster] = useState<ClassStudent[]>(() => getStoredStudentRoster());
 
-  // Realistic mock class peers with authentic scores from current HSK 1-3 class
-  const baseEntries: ClassLeaderboardItem[] = [
-    {
-      id: 'lb-1',
-      studentName: 'Trần Minh Quang',
-      avatarCode: 'MQ',
-      score: 100,
-      streak: 5,
-      timeSeconds: 42,
-      accuracyRate: 100,
-      badgeTitle: 'Quán Quân HSK',
-      completedAt: '19:45',
-    },
-    {
-      id: 'lb-2',
-      studentName: 'Nguyễn Hoàng Hải Yến',
-      avatarCode: 'HY',
-      score: 95,
-      streak: 4,
-      timeSeconds: 58,
-      accuracyRate: 95,
-      badgeTitle: 'Ngữ Pháp Vàng',
-      completedAt: '19:48',
-    },
-    {
-      id: 'lb-3',
-      studentName: 'Vũ Đức Anh',
-      avatarCode: 'DA',
-      score: 90,
-      streak: 3,
-      timeSeconds: 65,
-      accuracyRate: 90,
-      badgeTitle: 'Thần Tốc',
-      completedAt: '19:52',
-    },
-    {
-      id: 'lb-4',
-      studentName: 'Lê Thảo Linh',
-      avatarCode: 'TL',
-      score: 85,
-      streak: 2,
-      timeSeconds: 78,
-      accuracyRate: 85,
-      badgeTitle: 'Chăm Chỉ',
-      completedAt: '19:55',
-    },
-    {
-      id: 'lb-5',
-      studentName: 'Phạm Gia Huy',
-      avatarCode: 'GH',
-      score: 80,
-      streak: 2,
-      timeSeconds: 84,
-      accuracyRate: 80,
-      badgeTitle: 'Kiên Trì',
-      completedAt: '19:59',
-    },
-    {
-      id: 'lb-6',
-      studentName: 'Đặng Mai Phương',
-      avatarCode: 'MP',
-      score: 75,
-      streak: 1,
-      timeSeconds: 95,
-      accuracyRate: 75,
-      badgeTitle: 'Tiến Bộ',
-      completedAt: '20:05',
-    },
-  ];
-
-  // Merge current student if they have submitted or match an existing entry
-  let allEntries: ClassLeaderboardItem[] = [...baseEntries];
-  const existingIdx = allEntries.findIndex((e) => e.studentName === currentStudentName);
-
-  if (hasSubmitted) {
-    const userItem: ClassLeaderboardItem = {
-      id: 'current-user-lb',
-      studentName: currentStudentName,
-      avatarCode: currentStudentName
-        .split(' ')
-        .map((n) => n[0])
-        .slice(-2)
-        .join('')
-        .toUpperCase() || 'HS',
-      score: currentStudentScore,
-      streak: currentStudentScore >= 80 ? 3 : 1,
-      timeSeconds: 52,
-      accuracyRate: currentStudentScore,
-      badgeTitle: currentStudentScore === 100 ? 'Xuất Sắc Tuyệt Đối' : currentStudentScore >= 80 ? 'Hảo Thủ Hán Ngữ' : 'Nỗ Lực Vượt Bậc',
-      completedAt: 'Vừa xong',
-      isCurrentUser: true,
+  useEffect(() => {
+    const syncRoster = () => {
+      setRoster(getStoredStudentRoster());
     };
+    window.addEventListener('hanu_students_updated', syncRoster);
+    window.addEventListener('storage', syncRoster);
+    return () => {
+      window.removeEventListener('hanu_students_updated', syncRoster);
+      window.removeEventListener('storage', syncRoster);
+    };
+  }, []);
 
-    if (existingIdx !== -1) {
-      allEntries[existingIdx] = {
-        ...allEntries[existingIdx],
-        score: Math.max(allEntries[existingIdx].score, currentStudentScore),
-        accuracyRate: Math.max(allEntries[existingIdx].accuracyRate, currentStudentScore),
-        isCurrentUser: true,
+  const allEntries: ClassLeaderboardItem[] = useMemo(() => {
+    const mapped: ClassLeaderboardItem[] = roster.map((st, idx) => {
+      const isMe = st.name.trim().toLowerCase() === currentStudentName.trim().toLowerCase();
+      const score =
+        isMe && hasSubmitted && currentStudentScore > 0
+          ? currentStudentScore
+          : st.totalPoints;
+      const timeSeconds =
+        isMe && hasSubmitted && typeof currentStudentTimeSeconds === 'number' && currentStudentTimeSeconds > 0
+          ? currentStudentTimeSeconds
+          : st.timeSeconds || Math.max(28, 128 - st.totalPoints);
+      const streak =
+        isMe && hasSubmitted && typeof currentStudentStreak === 'number' && currentStudentStreak > 0
+          ? currentStudentStreak
+          : st.streak || Math.max(3, Math.round(st.totalPoints / 11));
+      const avatarCode =
+        st.name
+          .split(' ')
+          .filter(Boolean)
+          .map((n) => n[0])
+          .slice(-2)
+          .join('')
+          .toUpperCase() || 'HV';
+
+      const badgeTitle =
+        score >= 97
+          ? 'Quán Quân HSK'
+          : score >= 93
+          ? 'Ngữ Pháp Vàng'
+          : score >= 90
+          ? 'Hảo Thủ Hán Ngữ'
+          : 'Tiến Bộ Bền Bỉ';
+
+      return {
+        id: st.id || `lb-${idx + 1}`,
+        studentCode: st.studentCode || `HV-${String(idx + 1).padStart(3, '0')}`,
+        hskLevel: st.hskLevel || 'HSK 2',
+        studentName: st.name,
+        avatarCode,
+        score,
+        streak,
+        timeSeconds,
+        accuracyRate: score,
+        badgeTitle,
+        completedAt: isMe && hasSubmitted ? 'Vừa nộp bài' : st.lastSubmittedAt || 'Hôm nay',
+        isCurrentUser: isMe,
       };
-    } else {
-      allEntries.push(userItem);
-    }
-  } else if (existingIdx !== -1) {
-    allEntries[existingIdx].isCurrentUser = true;
-  }
+    });
 
-  // Sort by score DESC, then timeSeconds ASC
-  allEntries.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return a.timeSeconds - b.timeSeconds;
-  });
+    // If currentStudentName wasn't in roster yet and submitted, append them
+    const hasCurrent = mapped.some(
+      (e) => e.studentName.trim().toLowerCase() === currentStudentName.trim().toLowerCase()
+    );
+    if (!hasCurrent && currentStudentName.trim()) {
+      const fallbackScore = hasSubmitted && currentStudentScore > 0 ? currentStudentScore : 91;
+      mapped.push({
+        id: 'current-user-lb',
+        studentCode: `HV-${String(mapped.length + 1).padStart(3, '0')}`,
+        hskLevel: 'HSK 2',
+        studentName: currentStudentName.trim(),
+        avatarCode:
+          currentStudentName
+            .split(' ')
+            .filter(Boolean)
+            .map((n) => n[0])
+            .slice(-2)
+            .join('')
+            .toUpperCase() || 'HS',
+        score: fallbackScore,
+        streak: currentStudentStreak || 6,
+        timeSeconds: currentStudentTimeSeconds || 45,
+        accuracyRate: fallbackScore,
+        badgeTitle: fallbackScore >= 90 ? 'Hảo Thủ Hán Ngữ' : 'Nỗ Lực Vượt Bậc',
+        completedAt: hasSubmitted ? 'Vừa nộp bài' : 'Hôm nay',
+        isCurrentUser: true,
+      });
+    }
+
+    // Sort by score DESC, then timeSeconds ASC
+    mapped.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.timeSeconds - b.timeSeconds;
+    });
+
+    return mapped;
+  }, [
+    roster,
+    currentStudentName,
+    currentStudentScore,
+    currentStudentTimeSeconds,
+    currentStudentStreak,
+    hasSubmitted,
+  ]);
 
   // Calculate current student rank
-  const myRank = allEntries.findIndex((e) => e.studentName === currentStudentName) + 1;
-  const myEntry = allEntries.find((e) => e.studentName === currentStudentName);
+  const myRank =
+    allEntries.findIndex(
+      (e) => e.studentName.trim().toLowerCase() === currentStudentName.trim().toLowerCase()
+    ) + 1;
+  const myEntry = allEntries.find(
+    (e) => e.studentName.trim().toLowerCase() === currentStudentName.trim().toLowerCase()
+  );
 
   return (
     <div
@@ -162,16 +162,16 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
             <Trophy className="w-5 h-5 text-[#C5B358]" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h4 className="text-base sm:text-lg font-bold text-[#1E3227]">
                 Bảng Xếp Hạng Thi Đua Lớp Học
               </h4>
               <span className="px-2 py-0.5 rounded-full bg-[#9B8A3E]/20 text-[#1E3227] text-[10px] font-bold uppercase">
-                HSK 1–3
+                Đồng bộ {allEntries.length} Học viên · HSK 1–3
               </span>
             </div>
             <p className="text-xs text-[#3F5447] mt-0.5">
-              Cập nhật tức thì dựa trên điểm số và tốc độ làm bài tập hôm nay
+              Cập nhật tức thì điểm số thực tế, thời gian hoàn thành (giây) & chuỗi Streak từ danh sách lớp
             </p>
           </div>
         </div>
@@ -187,7 +187,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
               key={tab.id}
               type="button"
               onClick={() => setFilterPeriod(tab.id as 'today' | 'week' | 'all')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 filterPeriod === tab.id
                   ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
                   : 'text-[#3F5447] hover:text-[#1E3227]'
@@ -209,6 +209,9 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
             </div>
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#E7ECD9] border border-[#9B8A3E]/40 font-bold text-xs sm:text-sm text-[#1E3227] flex items-center justify-center mb-1">
               {allEntries[1].avatarCode}
+            </div>
+            <div className="text-[10px] font-bold text-[#9B8A3E]">
+              {allEntries[1].studentCode}
             </div>
             <div className="text-xs sm:text-sm font-bold text-[#1E3227] truncate w-full">
               {allEntries[1].studentName}
@@ -235,6 +238,9 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
             <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#1E3227] text-[#FAFBF7] font-bold text-xs sm:text-sm flex items-center justify-center mb-1 border-2 border-[#C5B358]">
               {allEntries[0].avatarCode}
             </div>
+            <div className="text-[10px] font-extrabold text-[#9B8A3E]">
+              {allEntries[0].studentCode}
+            </div>
             <div className="text-xs sm:text-sm font-black text-[#1E3227] truncate w-full">
               {allEntries[0].studentName}
             </div>
@@ -256,6 +262,9 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#E7ECD9] border border-[#9B8A3E]/40 font-bold text-xs sm:text-sm text-[#1E3227] flex items-center justify-center mb-1">
               {allEntries[2].avatarCode}
             </div>
+            <div className="text-[10px] font-bold text-[#9B8A3E]">
+              {allEntries[2].studentCode}
+            </div>
             <div className="text-xs sm:text-sm font-bold text-[#1E3227] truncate w-full">
               {allEntries[2].studentName}
             </div>
@@ -271,42 +280,50 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
       </div>
 
       {/* Current Student Quick Status Strip */}
-      <div className="p-3 sm:p-3.5 rounded-2xl bg-[#1E3227] text-white flex flex-wrap items-center justify-between gap-3 shadow-sm">
+      <div
+        data-testid="leaderboard-current-student-banner"
+        className="p-3 sm:p-3.5 rounded-2xl bg-[#1E3227] text-white flex flex-wrap items-center justify-between gap-3 shadow-sm"
+      >
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center text-[#C5B358] font-bold text-xs">
+          <div
+            data-testid="leaderboard-current-rank-badge"
+            className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-[#C5B358] font-extrabold text-xs"
+          >
             #{myRank > 0 ? myRank : '-'}
           </div>
           <div>
-            <div className="text-xs font-bold text-[#FAFBF7] flex items-center gap-1.5">
-              <span>Vị trí của bạn: {currentStudentName}</span>
-              <span className="px-1.5 py-0.2 rounded bg-white/20 text-[10px] font-normal">Bạn</span>
+            <div className="text-xs font-bold text-[#FAFBF7] flex flex-wrap items-center gap-1.5">
+              <span>
+                Vị trí của bạn: {myEntry?.studentCode ? `${myEntry.studentCode} · ` : ''}
+                {currentStudentName}
+              </span>
+              <span className="px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-semibold">
+                Đang chọn
+              </span>
             </div>
-            <div className="text-[11px] text-white/75">
-              {hasSubmitted
-                ? `Đạt ${currentStudentScore}/100 điểm · Đang xếp hạng #${myRank} trên 12 bạn trong lớp`
-                : 'Chưa nộp bài hôm nay. Hãy hoàn thành bài tập để ghi danh lên bảng vàng!'}
+            <div className="text-[11px] text-white/80 mt-0.5">
+              {myEntry
+                ? `Đạt ${myEntry.score}/100 điểm · Thời gian ${myEntry.timeSeconds}s · Xếp hạng #${myRank}/${allEntries.length} toàn lớp`
+                : 'Hãy hoàn thành bài tập để ghi danh lên bảng vàng!'}
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-xs">
-          {hasSubmitted ? (
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/15 text-[#C5B358] font-bold">
-              <Flame className="w-3.5 h-3.5 fill-[#C5B358]" />
-              <span>{myEntry?.streak || 1} buổi liền</span>
-            </div>
-          ) : (
-            <span className="text-[11px] text-[#C5B358] font-medium italic">
-              Nộp bài để kích hoạt chuỗi Streak!
-            </span>
-          )}
+          <div
+            data-testid="leaderboard-current-streak-badge"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/15 text-[#C5B358] font-bold"
+          >
+            <Flame className="w-3.5 h-3.5 fill-[#C5B358]" />
+            <span>Streak {myEntry?.streak || 6} ngày</span>
+          </div>
         </div>
       </div>
 
       {/* Detailed Full Roster List */}
-      <div className="space-y-1.5">
+      <div className="space-y-1.5" data-testid="leaderboard-full-roster-list">
         <div className="flex items-center justify-between text-[11px] font-bold uppercase text-[#3F5447] px-3 pb-1">
-          <span>Học Viên / Thứ Hạng</span>
+          <span>Mã HV / Học Viên / Thứ Hạng</span>
           <div className="flex items-center gap-6">
             <span>Tốc độ</span>
             <span>Điểm số</span>
@@ -315,11 +332,13 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
 
         {allEntries.map((item, idx) => {
           const rank = idx + 1;
-          const isMe = item.studentName === currentStudentName;
+          const isMe =
+            item.studentName.trim().toLowerCase() === currentStudentName.trim().toLowerCase();
 
           return (
             <div
               key={item.id}
+              data-testid={`leaderboard-row-${item.studentCode || idx + 1}`}
               className={`flex items-center justify-between p-2.5 sm:p-3 rounded-2xl transition-all border ${
                 isMe
                   ? 'bg-[#E7ECD9] border-[#9B8A3E] shadow-xs'
@@ -338,7 +357,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
                       : 'bg-black/5 text-[#3F5447]'
                   }`}
                 >
-                  {rank}
+                  #{rank}
                 </div>
 
                 <div className="w-8 h-8 rounded-full bg-white border border-[rgba(30,50,39,0.12)] font-bold text-xs text-[#1E3227] flex items-center justify-center shrink-0">
@@ -346,35 +365,47 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
                 </div>
 
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs sm:text-sm font-bold text-[#1E3227] truncate">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {item.studentCode && (
+                      <span className="px-1.5 py-0.5 rounded bg-[#0F5243]/10 text-[#0F5243] text-[10px] font-extrabold shrink-0">
+                        {item.studentCode}
+                      </span>
+                    )}
+                    <span className="text-xs sm:text-sm font-bold text-[#1E3227]">
                       {item.studentName}
                     </span>
+                    {item.hskLevel && (
+                      <span className="px-1.5 py-0.5 rounded bg-[#E7ECD9] text-[#3F5447] text-[9px] font-bold shrink-0">
+                        {item.hskLevel}
+                      </span>
+                    )}
                     {isMe && (
-                      <span className="px-1.5 py-0.2 rounded bg-[#1E3227] text-white text-[9px] font-bold shrink-0">
+                      <span className="px-1.5 py-0.5 rounded bg-[#1E3227] text-white text-[9px] font-bold shrink-0">
                         Bạn
                       </span>
                     )}
                     {item.badgeTitle && (
-                      <span className="hidden sm:inline-block px-1.5 py-0.2 rounded bg-[#9B8A3E]/15 text-[#1E3227] text-[10px] font-semibold truncate">
+                      <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-[#9B8A3E]/15 text-[#1E3227] text-[10px] font-semibold">
                         {item.badgeTitle}
                       </span>
                     )}
                   </div>
-                  <div className="text-[10px] text-[#3F5447] flex items-center gap-2">
-                    <span>Chuỗi {item.streak} ngày</span>
+                  <div className="text-[10px] text-[#3F5447] flex flex-wrap items-center gap-2 mt-0.5">
+                    <span className="font-semibold text-[#9B8A3E]">
+                      🔥 Streak {item.streak} ngày
+                    </span>
                     <span>·</span>
-                    <span>Hoàn thành lúc {item.completedAt || '19:50'}</span>
+                    <span>Cập nhật: {item.completedAt || 'Hôm nay'}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-6 shrink-0 text-right">
-                <div className="text-[11px] text-[#3F5447] tabular-nums font-medium flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-[#3F5447]/50" />
+              <div className="flex items-center gap-5 sm:gap-6 shrink-0 text-right">
+                <div className="text-[11px] text-[#3F5447] tabular-nums font-semibold flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-[#3F5447]/60" />
                   <span>{item.timeSeconds}s</span>
                 </div>
-                <div className="text-sm font-black text-[#1E3227] tabular-nums min-w-[50px] text-right">
+                <div className="text-sm font-black text-[#1E3227] tabular-nums min-w-[54px] text-right">
                   {item.score} <span className="text-[10px] font-semibold text-[#9B8A3E]">đ</span>
                 </div>
               </div>

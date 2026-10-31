@@ -170,19 +170,20 @@ h4 {
 }
 
 /* ============================================================================
-   HALORA × LỘ TRƯỞNG LÃO HERO STAGE — 100vh Single-Screen Editorial Layout
+   HANU × 阮文受 HERO STAGE — Compact Editorial Banner Layout
    ============================================================================ */
 .halora-stage {
   position: relative;
   width: 100%;
-  min-height: 100vh;
+  min-height: 420px;
+  max-height: 560px;
   background-color: #CBCFB8;
   color: #1E3227;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: calc(44 * var(--s)) calc(64 * var(--s));
+  padding: calc(28 * var(--s)) calc(52 * var(--s));
   box-sizing: border-box;
 }
 
@@ -192,7 +193,7 @@ h4 {
   inset: 0;
   pointer-events: none;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   z-index: 5;
   overflow: hidden;
@@ -200,11 +201,11 @@ h4 {
 
 .halora-visual-media-wrap {
   position: relative;
-  width: min(100vw, calc(100vh * (1920 / 1084)));
-  height: 100vh;
-  max-width: 2150px;
+  width: min(100vw, 1440px);
+  height: 100%;
+  max-height: 540px;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
 }
 
@@ -833,3 +834,141 @@ h4 {
   gap: 8px;
   margin-top: 4px;
 }
+
+@keyframes soundwavePulse {
+  0%, 100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.tts-soundwave-bar {
+  display: inline-block;
+  width: 2px;
+  height: 10px;
+  border-radius: 9999px;
+  background-color: #C5B358;
+  animation: soundwavePulse 0.55s ease-in-out infinite;
+}
+
+.tts-soundwave-bar:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.tts-soundwave-bar:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* Standardized A4 Print Stylesheet for Mi Zi Ge (米字格) & Exercise Worksheet */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #1E3227 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  header,
+  footer,
+  .no-print,
+  [data-testid="binbin-floating-launcher"],
+  [data-testid="binbin-floating-window"],
+  [data-testid="live-teaching-toolkit-bar"],
+  [data-testid="teacher-ai-vocab-search-section"],
+  [data-testid="hsk3-filter-panel"],
+  [data-testid="horizontal-vocab-pill-strip"],
+  [data-testid="keyboard-shortcuts-bar"] {
+    display: none !important;
+  }
+
+  .print-a4-worksheet {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+  }
+}
+
+
+@keyframes soundwavePulse {
+  0%, 100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.tts-soundwave-bar {
+  display: inline-block;
+  width: 2px;
+  height: 10px;
+  border-radius: 9999px;
+  background-color: #C5B358;
+  animation: soundwavePulse 0.55s ease-in-out infinite;
+}
+
+.tts-soundwave-bar:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.tts-soundwave-bar:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* Standardized A4 Print Stylesheet for Mi Zi Ge (米字格) & Exercise Worksheet */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #1E3227 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  header,
+  footer,
+  .no-print,
+  [data-testid="binbin-floating-launcher"],
+  [data-testid="binbin-floating-window"],
+  [data-testid="live-teaching-toolkit-bar"],
+  [data-testid="teacher-ai-vocab-search-section"],
+  [data-testid="hsk3-filter-panel"],
+  [data-testid="horizontal-vocab-pill-strip"],
+  [data-testid="keyboard-shortcuts-bar"] {
+    display: none !important;
+  }
+
+  .print-a4-worksheet {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+  }
+}
+

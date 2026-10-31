@@ -30,7 +30,10 @@ import {
   STORAGE_KEY_STUDENTS,
   ClassStudent,
 } from './ClassroomManager';
-import { applyStudentSubmissionToRoster } from '../utils/chineseEngine';
+import {
+  applyStudentSubmissionToRoster,
+  SMART_HANZI_DICTIONARY,
+} from '../utils/chineseEngine';
 import {
   HSK3_TRANSLATION_CHALLENGES,
   Hsk3TranslationEvaluation,
@@ -38,11 +41,16 @@ import {
   evaluateHsk3Translation,
 } from '../utils/hsk3Engine';
 import {
+  applySrsRatingToRecords,
+  evaluateSentenceBuilderOrder,
   getMistakeNotebookList,
+  HSK3_SENTENCE_BUILDER_CHALLENGES,
   loadStoredSrsRecords,
+  saveStoredSrsRecords,
+  SentenceBuilderEvaluation,
   SrsWordRecord,
 } from '../utils/hskStudyHelpers';
-import { Mic } from 'lucide-react';
+import { Mic, Flame, Clock } from 'lucide-react';
 
 interface StudentAssignmentArenaProps {
   slides: VocabSlide[];
@@ -71,6 +79,144 @@ const LISTENING_CHALLENGES = [
     explanation:
       '“咱们” (zán men - chúng ta) là đại từ ngôi thứ nhất số nhiều bao gồm cả người nói và người nghe.',
     options: ['老师 (giáo viên)', '咱们 (chúng ta)', '聪明 (thông minh)', '愿意 (sẵn lòng)'],
+  },
+];
+
+interface SpeedTestQuestion {
+  id: string;
+  skillLabel: string;
+  targetWord: string;
+  prompt: string;
+  options: string[];
+  correctAnswer: string;
+  explanation: string;
+}
+
+const SPEED_TEST_10_QUESTIONS: SpeedTestQuestion[] = [
+  {
+    id: 'stq-1',
+    skillLabel: 'Kỹ năng 1 · Nghe & Ngữ âm',
+    targetWord: '温暖',
+    prompt: 'Câu 1: Từ “温暖” (ấm áp, đầm ấm) có phiên âm Pinyin chuẩn là gì?',
+    options: ['A. wēn nuǎn', 'B. wén nuàn', 'C. wēn luǎn', 'D. wèn nuǎn'],
+    correctAnswer: 'A. wēn nuǎn',
+    explanation: '温 (wēn - thanh 1) + 暖 (nuǎn - thanh 3) đọc là wēn nuǎn.',
+  },
+  {
+    id: 'stq-2',
+    skillLabel: 'Kỹ năng 2 · Từ vựng & Đại từ',
+    targetWord: '咱们',
+    prompt: 'Câu 2: Khi muốn rủ người đang nói chuyện cùng đi (“Chúng mình cùng đi nhé!”), ta ưu tiên dùng đại từ nào?',
+    options: ['A. 咱们 (zánmen)', 'B. 他们 (tāmen)', 'C. 你们 (nǐmen)', 'D. 别人 (biérén)'],
+    correctAnswer: 'A. 咱们 (zánmen)',
+    explanation: '咱们 (zánmen) bao gồm cả người nói và người nghe, rất thân mật trong giao tiếp.',
+  },
+  {
+    id: 'stq-3',
+    skillLabel: 'Kỹ năng 3 · Đọc hiểu ngữ cảnh',
+    targetWord: '办法',
+    prompt: 'Câu 3: Điền từ thích hợp vào câu: “这个问题很难，你有什么好______吗？”',
+    options: ['A. 办法 (bànfǎ - cách giải quyết)', 'B. 季节 (jìjié - mùa)', 'C. 空调 (kōngtiáo - điều hòa)', 'D. 花园 (huāyuán - vườn hoa)'],
+    correctAnswer: 'A. 办法 (bànfǎ - cách giải quyết)',
+    explanation: '好办法 (hǎo bànfǎ) nghĩa là cách giải quyết hay / biện pháp tốt.',
+  },
+  {
+    id: 'stq-4',
+    skillLabel: 'Kỹ năng 4 · Ngữ pháp vị trí trạng ngữ',
+    targetWord: '明天',
+    prompt: 'Câu 4: Câu nào dưới đây đặt đúng vị trí trạng ngữ chỉ thời gian “明天” (ngày mai)?',
+    options: [
+      'A. 我明天去图书馆复习。',
+      'B. 我去图书馆复习明天。',
+      'C. 我去明天图书馆复习。',
+      'D. 图书馆我去复习明天。',
+    ],
+    correctAnswer: 'A. 我明天去图书馆复习。',
+    explanation: 'Trong tiếng Trung, trạng ngữ thời gian (明天) đứng trước động từ (Đầu câu hoặc ngay sau Chủ ngữ).',
+  },
+  {
+    id: 'stq-5',
+    skillLabel: 'Kỹ năng 5 · Cấu trúc mức độ',
+    targetWord: '挺',
+    prompt: 'Câu 5: Cấu trúc “挺 + Tính từ + 的” (VD: 挺温暖的) biểu thị ý nghĩa gì?',
+    options: [
+      'A. Khá là / rất (nhấn mạnh mức độ vừa phải, tự nhiên)',
+      'B. Phủ định hoàn toàn',
+      'C. Câu hỏi lựa chọn',
+      'D. Mệnh lệnh bắt buộc',
+    ],
+    correctAnswer: 'A. Khá là / rất (nhấn mạnh mức độ vừa phải, tự nhiên)',
+    explanation: '挺...的 (tǐng... de) dùng rất phổ biến trong khẩu ngữ để khen hoặc nhận xét: “Khá là...”.',
+  },
+  {
+    id: 'stq-6',
+    skillLabel: 'Kỹ năng 6 · Hán tự & Bộ thủ',
+    targetWord: '换',
+    prompt: 'Câu 6: Chữ “换” (huàn - đổi, trao đổi) mang bộ thủ nào liên quan đến động tác bàn tay?',
+    options: [
+      'A. Bộ Tài gẩy (扌)',
+      'B. Bộ Thủy (氵)',
+      'C. Bộ Ngôn (讠)',
+      'D. Bộ Tâm (忄)',
+    ],
+    correctAnswer: 'A. Bộ Tài gẩy (扌)',
+    explanation: 'Bộ Tài gẩy (扌) biểu thị các động tác dùng tay như 换 (đổi), 打 (đánh), 找 (tìm).',
+  },
+  {
+    id: 'stq-7',
+    skillLabel: 'Kỹ năng 7 · Biến điệu thanh 3',
+    targetWord: '打算',
+    prompt: 'Câu 7: Khi hai thanh 3 đi liền nhau như “你好” (nǐ hǎo) hoặc “很好” (hěn hǎo), âm tiết đầu đọc biến điệu thành thanh mấy?',
+    options: [
+      'A. Thanh 2 (ní hǎo / hén hǎo)',
+      'B. Thanh 1',
+      'C. Thanh 4',
+      'D. Giữ nguyên thanh 3 nặng',
+    ],
+    correctAnswer: 'A. Thanh 2 (ní hǎo / hén hǎo)',
+    explanation: 'Quy tắc biến điệu HSK 3.0: 3 + 3 → 2 + 3 khi phát âm thực tế.',
+  },
+  {
+    id: 'stq-8',
+    skillLabel: 'Kỹ năng 8 · Giao tiếp thực tế',
+    targetWord: '照顾',
+    prompt: 'Câu 8: Từ “照顾” (zhàogù) trong câu “谢谢你照顾我” có nghĩa tiếng Việt chuẩn là gì?',
+    options: [
+      'A. Chăm sóc, quan tâm',
+      'B. Thi cử',
+      'C. Du lịch',
+      'D. Trao đổi tiền tệ',
+    ],
+    correctAnswer: 'A. Chăm sóc, quan tâm',
+    explanation: '照顾 (zhàogù - chiếu cố) nghĩa là chăm sóc, quan tâm chu đáo.',
+  },
+  {
+    id: 'stq-9',
+    skillLabel: 'Kỹ năng 9 · Dịch thuật Việt – Trung',
+    targetWord: '愿意',
+    prompt: 'Câu 9: Bản dịch chuẩn HSK 3.0 cho câu “Tôi rất sẵn lòng giúp đỡ bạn” là gì?',
+    options: [
+      'A. 我很愿意帮助你。',
+      'B. 我帮助你很愿意。',
+      'C. 愿意我很帮助你。',
+      'D. 我不愿意去。',
+    ],
+    correctAnswer: 'A. 我很愿意帮助你。',
+    explanation: '愿意 + Động từ (愿意帮助你: sẵn lòng giúp đỡ bạn).',
+  },
+  {
+    id: 'stq-10',
+    skillLabel: 'Kỹ năng 10 · Tổng hợp ngữ pháp',
+    targetWord: '四季',
+    prompt: 'Câu 10: Chọn câu miêu tả đúng về bốn mùa (四季 - sìjì):',
+    options: [
+      'A. 一年有四个季节：春、夏、秋、冬。',
+      'B. 一年有两个季节。',
+      'C. 四季是一件衣服。',
+      'D. 冬天非常炎热。',
+    ],
+    correctAnswer: 'A. 一年有四个季节：春、夏、秋、冬。',
+    explanation: 'Một năm có 4 mùa: Xuân (春), Hạ (夏), Thu (秋), Đông (冬).',
   },
 ];
 
@@ -108,7 +254,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
       writingScore: '96% độ chuẩn nét',
       quizScore: '10/10 câu đúng',
       totalPoints: 98,
-      status: 'Đã chấm AI',
+      status: 'Đã chấm tự động',
       feedback: 'Đang làm bài trực tuyến.',
     };
     return [fallbackStudent, ...roster];
@@ -153,21 +299,230 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scorecardRef = useRef<HTMLDivElement>(null);
 
-  // Submission & AI Grading states
+  // Submission & Auto Grading states
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isGrading, setIsGrading] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [pandaMood, setPandaMood] = useState<PandaMood>('idle');
   const [showBinBinFeedbackModal, setShowBinBinFeedbackModal] = useState(false);
-  const [activeSection, setActiveSection] = useState<'homework' | 'leaderboard'>('homework');
+  const [activeSection, setActiveSection] = useState<
+    'homework' | 'sentence-builder' | 'speedtest' | 'leaderboard'
+  >('homework');
   const [isPillarsExpanded, setIsPillarsExpanded] = useState(false);
+  const [isListeningExamMode, setIsListeningExamMode] = useState<boolean>(false);
+  const homeworkStartTimeRef = useRef<number>(Date.now());
+  const [lastSubmittedTimeSeconds, setLastSubmittedTimeSeconds] = useState<number>(42);
+  const [lastSubmittedStreak, setLastSubmittedStreak] = useState<number>(7);
   const [syncedSubmissionSummary, setSyncedSubmissionSummary] = useState<{
     studentName: string;
     totalScore: number;
     vocabProgress: string;
     writingAccuracy: number;
     reviewWords: string[];
+    rank?: number;
+    totalStudents?: number;
+    timeSeconds?: number;
+    streak?: number;
   } | null>(null);
+
+  // Sync missed vocabulary words directly into "📓 Sổ từ khó" (SRS Mistake Notebook)
+  const syncMistakeWordsToSrsBook = (wrongHanzis: string[]) => {
+    const cleanWords = Array.from(new Set(wrongHanzis.map((w) => w.trim()).filter(Boolean)));
+    if (cleanWords.length === 0) return;
+
+    let nextRecords = { ...srsRecords };
+    cleanWords.forEach((word) => {
+      const matchedSlide = slides.find(
+        (s) => s.hanzi === word || word.includes(s.hanzi)
+      );
+      const dictEntry = SMART_HANZI_DICTIONARY[word];
+      const slideForSrs: VocabSlide = matchedSlide || {
+        id: `mistake-${word}`,
+        index: slides.length + 1,
+        hanzi: word,
+        pinyin: dictEntry?.pinyin || word,
+        hanViet: dictEntry?.hanViet || word,
+        meaning: dictEntry?.meaning || 'Từ vựng cần củng cố qua bài tập',
+        partOfSpeech: dictEntry?.partOfSpeech || 'TỪ VỰNG HSK',
+        hskLevel: dictEntry?.hskLevel || 'HSK 2–3',
+        usageNote: 'Từ vựng cần củng cố thêm từ lỗi sai trong bài tập.',
+        exampleHanzi: dictEntry?.exampleHanzi || `请复习“${word}”的用法。`,
+        examplePinyin: dictEntry?.examplePinyin || '',
+        exampleMeaning: dictEntry?.exampleMeaning || '',
+        illustrationKey: 'school',
+        learned: false,
+        characters: [],
+      };
+      nextRecords = applySrsRatingToRecords(nextRecords, slideForSrs, 'hard');
+    });
+
+    setSrsRecords(nextRecords);
+    saveStoredSrsRecords(nextRecords);
+    window.dispatchEvent(new CustomEvent('hanu_srs_updated'));
+  };
+
+  // Trigger Trợ Giảng 彬彬 to immediately explain a specific wrong question
+  const handleAskBinBinAboutQuestion = (
+    targetWord: string,
+    questionText: string,
+    explanationText = ''
+  ) => {
+    const cleanTarget = (targetWord || '温暖').trim();
+    const prompt = `Giải thích câu hỏi bài tập về từ “${cleanTarget}”: ${questionText}${
+      explanationText ? ` (${explanationText})` : ''
+    }`;
+    window.dispatchEvent(
+      new CustomEvent('binbin:ask-question', {
+        detail: {
+          prompt,
+          targetWord: cleanTarget,
+          actionType: 'chat',
+        },
+      })
+    );
+  };
+
+  const computeRankFromRoster = (
+    list: ClassStudent[],
+    studentNameToFind: string
+  ): { rank: number; timeSeconds: number; streak: number } => {
+    const sorted = [...list].sort((a, b) => {
+      if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+      return (a.timeSeconds || 50) - (b.timeSeconds || 50);
+    });
+    const idx = sorted.findIndex(
+      (s) => s.name.trim().toLowerCase() === studentNameToFind.trim().toLowerCase()
+    );
+    const matched = idx >= 0 ? sorted[idx] : sorted[0];
+    return {
+      rank: idx >= 0 ? idx + 1 : 1,
+      timeSeconds: matched?.timeSeconds || 42,
+      streak: matched?.streak || 7,
+    };
+  };
+
+  // HSK 3.0 Sentence Builder & Word Order Arena (连词成句) states
+  const [sentenceBuilderSelectedIds, setSentenceBuilderSelectedIds] = useState<
+    Record<string, string[]>
+  >({});
+  const [sentenceBuilderEvals, setSentenceBuilderEvals] = useState<
+    Record<string, SentenceBuilderEvaluation>
+  >({});
+  const [showTilePinyin, setShowTilePinyin] = useState<boolean>(true);
+  const [sentenceBuilderSyncBanner, setSentenceBuilderSyncBanner] = useState<string | null>(
+    null
+  );
+
+  // 15-Minute Speed Test (10 Questions) & HSK 3.0 Certificate States
+  const [speedTestAnswers, setSpeedTestAnswers] = useState<Record<string, string>>({});
+  const [isSpeedTestSubmitted, setIsSpeedTestSubmitted] = useState(false);
+  const [speedTestScore, setSpeedTestScore] = useState<number>(0);
+  const [speedTestSecondsLeft, setSpeedTestSecondsLeft] = useState<number>(15 * 60);
+  const [isSpeedTestRunning, setIsSpeedTestRunning] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (activeSection !== 'speedtest' || !isSpeedTestRunning || isSpeedTestSubmitted) return;
+    const timer = window.setInterval(() => {
+      setSpeedTestSecondsLeft((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(timer);
+          setIsSpeedTestRunning(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeSection, isSpeedTestRunning, isSpeedTestSubmitted]);
+
+  const formatTimerMmSs = (sec: number): string => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const handleQuickFillSpeedTest = () => {
+    const nextAns: Record<string, string> = {};
+    SPEED_TEST_10_QUESTIONS.forEach((q) => {
+      nextAns[q.id] = q.correctAnswer;
+    });
+    setSpeedTestAnswers(nextAns);
+    playGentleChime(659.25, 0.18);
+  };
+
+  const handleSubmitSpeedTest = () => {
+    let correctCount = 0;
+    const missedWords: string[] = [];
+    SPEED_TEST_10_QUESTIONS.forEach((q) => {
+      if (speedTestAnswers[q.id] === q.correctAnswer) {
+        correctCount += 1;
+      } else {
+        missedWords.push(q.targetWord);
+      }
+    });
+    const computedScore = Math.round((correctCount / SPEED_TEST_10_QUESTIONS.length) * 100);
+    setSpeedTestScore(computedScore);
+    setIsSpeedTestSubmitted(true);
+    setIsSpeedTestRunning(false);
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 3500);
+
+    // Automatically add any wrong words into "📓 Sổ từ khó"
+    if (missedWords.length > 0) {
+      syncMistakeWordsToSrsBook(missedWords);
+    }
+
+    const elapsedSec = Math.max(
+      18,
+      Math.min(890, 15 * 60 - speedTestSecondsLeft > 5 ? 15 * 60 - speedTestSecondsLeft : 35)
+    );
+    setLastSubmittedTimeSeconds(elapsedSec);
+
+    const srsMistakeHanzis = srsMistakeWords.map((w) => w.hanzi);
+    const combinedReviewWords = Array.from(new Set([...missedWords, ...srsMistakeHanzis]));
+    const totalVocab = Math.max(18, slides.length);
+    const learnedVocab = Math.max(12, totalVocab - combinedReviewWords.length);
+
+    const currentRoster = getStoredStudentRoster();
+    const updatedRoster = applyStudentSubmissionToRoster(currentRoster, {
+      studentName: activeStudentName,
+      totalScore: computedScore,
+      learnedVocabCount: learnedVocab,
+      totalVocabCount: totalVocab,
+      writingAccuracy: 96,
+      quizCorrectCount: correctCount,
+      quizTotalCount: SPEED_TEST_10_QUESTIONS.length,
+      reviewWords: combinedReviewWords,
+      timeSeconds: elapsedSec,
+      streakDelta: 1,
+    });
+
+    try {
+      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updatedRoster));
+    } catch {
+      // ignore storage errors
+    }
+    setRoster(updatedRoster);
+    window.dispatchEvent(
+      new CustomEvent('hanu_students_updated', { detail: updatedRoster.length })
+    );
+
+    const rankMeta = computeRankFromRoster(updatedRoster, activeStudentName);
+    setLastSubmittedStreak(rankMeta.streak);
+
+    setSyncedSubmissionSummary({
+      studentName: activeStudentName,
+      totalScore: computedScore,
+      vocabProgress: `${learnedVocab}/${totalVocab} từ`,
+      writingAccuracy: 96,
+      reviewWords: combinedReviewWords,
+      rank: rankMeta.rank,
+      totalStudents: updatedRoster.length,
+      timeSeconds: rankMeta.timeSeconds,
+      streak: rankMeta.streak,
+    });
+    playGentleChime(783.99, 0.3);
+  };
 
   // Synchronize initial token maps when assignmentPackage changes
   useEffect(() => {
@@ -400,6 +755,22 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
         Math.min(quizTotal, Math.round((breakdown.totalScore / 100) * quizTotal))
       );
 
+      // Automatically add missed words from Homework into "📓 Sổ từ khó"
+      if (breakdown.reviewWords.length > 0) {
+        syncMistakeWordsToSrsBook(breakdown.reviewWords);
+      }
+
+      const elapsedSec = Math.max(
+        16,
+        Math.min(600, Math.round((Date.now() - homeworkStartTimeRef.current) / 1000) || 38)
+      );
+      setLastSubmittedTimeSeconds(elapsedSec);
+
+      // Merge SRS mistake notebook words into reviewWords so Teacher Gradebook sees all hard words
+      const combinedReviewWords = Array.from(
+        new Set([...breakdown.reviewWords, ...srsMistakeWords.map((m) => m.hanzi)])
+      );
+
       // Persist directly to Teacher's Gradebook in localStorage (hanu_classroom_students_roster_v2)
       const currentRoster = getStoredStudentRoster();
       const updatedRoster = applyStudentSubmissionToRoster(currentRoster, {
@@ -410,7 +781,9 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
         writingAccuracy: breakdown.avgWritingAccuracy,
         quizCorrectCount: quizCorrect,
         quizTotalCount: quizTotal,
-        reviewWords: breakdown.reviewWords,
+        reviewWords: combinedReviewWords,
+        timeSeconds: elapsedSec,
+        streakDelta: 1,
       });
 
       try {
@@ -423,12 +796,19 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
         new CustomEvent('hanu_students_updated', { detail: updatedRoster.length })
       );
 
+      const rankMeta = computeRankFromRoster(updatedRoster, activeStudentName);
+      setLastSubmittedStreak(rankMeta.streak);
+
       setSyncedSubmissionSummary({
         studentName: activeStudentName,
         totalScore: breakdown.totalScore,
         vocabProgress: `${learnedVocab}/${totalVocab} từ`,
         writingAccuracy: breakdown.avgWritingAccuracy,
-        reviewWords: breakdown.reviewWords,
+        reviewWords: combinedReviewWords,
+        rank: rankMeta.rank,
+        totalStudents: updatedRoster.length,
+        timeSeconds: rankMeta.timeSeconds,
+        streak: rankMeta.streak,
       });
 
       if (breakdown.totalScore >= 80) {
@@ -449,6 +829,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
   const handleResetAssignment = () => {
     setIsSubmitted(false);
     setShowConfetti(false);
+    homeworkStartTimeRef.current = Date.now();
     setMcAnswers({});
     const selMap: Record<string, string[]> = {};
     const availMap: Record<string, string[]> = {};
@@ -483,13 +864,42 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
     const completedTranslations = Object.values(translationEvaluations).filter(
       (ev) => ev.passed
     ).length;
+    const speechCount = Object.keys(partCSpeechScores).length;
+    const srsCount = Object.keys(srsRecords).length;
+    const writingCount = Object.keys(practicedChars).length;
+    const sentenceCorrectCount = Object.values(sentenceBuilderEvals).filter(
+      (ev) => ev.isCorrect
+    ).length;
+    const submittedScore = isSpeedTestSubmitted
+      ? speedTestScore
+      : isSubmitted
+      ? totalScore
+      : 0;
+
     return calculateStudentHsk3Pillars({
       learnedSlideCount: learnedCount,
       totalSlideCount: slides.length,
       writingAccuracyPct: avgWritingAccuracy,
       completedTranslationCount: completedTranslations,
+      practicedSpeechCount: speechCount,
+      srsReviewedCount: srsCount,
+      practicedWritingCount: writingCount,
+      submittedQuizScore: submittedScore,
+      completedSentenceCount: sentenceCorrectCount,
     });
-  }, [slides, avgWritingAccuracy, translationEvaluations]);
+  }, [
+    slides,
+    avgWritingAccuracy,
+    translationEvaluations,
+    partCSpeechScores,
+    srsRecords,
+    practicedChars,
+    sentenceBuilderEvals,
+    isSubmitted,
+    isSpeedTestSubmitted,
+    totalScore,
+    speedTestScore,
+  ]);
 
   return (
     <div className="space-y-6 pb-28 sm:pb-32 relative">
@@ -526,21 +936,21 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
       )}
 
       {/* =======================================================================
-          UNIFIED COMPACT STUDENT & ASSIGNMENT HEADER BAR (1 SINGLE HORIZONTAL ROW)
+          UNIFIED COMPACT STUDENT & ASSIGNMENT HEADER BAR (RESPONSIVE FLEX-WRAP, NO CLIPPING)
           ======================================================================= */}
       <div
         data-testid="student-roster-selector-bar"
-        className="px-3.5 py-2 rounded-2xl backdrop-blur-xl bg-white/75 border border-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 text-[#0F382E] flex items-center justify-between gap-2.5 flex-nowrap overflow-x-auto no-scrollbar transition-all duration-300"
+        className="px-3.5 py-2.5 rounded-2xl backdrop-blur-xl bg-white/80 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 text-[#0F382E] flex flex-wrap items-center justify-between gap-2.5 transition-all duration-300"
       >
-        {/* Left: Badge [Buổi 14 · HSK 1–3] + File Name on the exact same row */}
-        <div className="flex items-center gap-2 min-w-0 shrink-0">
+        {/* Left: Badge [Buổi 14 · HSK 1–3] + Full File Name without narrow clipping */}
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <span className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-xs font-bold whitespace-nowrap shadow-2xs shrink-0">
             Buổi {assignmentPackage.sessionNumber} · HSK 1–3
           </span>
-          <span className="font-bold text-xs text-[#0F382E] truncate max-w-[220px] sm:max-w-[320px]">
+          <span className="font-bold text-xs text-[#0F382E] break-words">
             {assignmentPackage.fileName}
           </span>
-          <span className="hidden md:inline text-xs text-[#3A544B] whitespace-nowrap">
+          <span className="text-xs text-[#3A544B] whitespace-nowrap">
             · Hạn: {assignmentPackage.dueDate}
           </span>
           <span data-testid="active-student-badge-name" className="sr-only">
@@ -548,33 +958,56 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
           </span>
         </div>
 
-        {/* Right: Student Roster Dropdown + Compact Demo Button on the exact same row */}
-        <div className="flex items-center gap-2 shrink-0">
-          <label
-            htmlFor="student-roster-select"
-            className="text-[11px] font-bold text-[#3A544B] whitespace-nowrap"
+        {/* Right: Student Roster Dropdown + Listening Mode (听力) Toggle + Demo Button */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-1.5">
+            <label
+              htmlFor="student-roster-select"
+              className="text-[11px] font-bold text-[#3A544B] whitespace-nowrap"
+            >
+              Học viên:
+            </label>
+            <select
+              id="student-roster-select"
+              data-testid="student-roster-selector"
+              value={activeStudentName}
+              onChange={(e) => {
+                const nextName = e.target.value;
+                setActiveStudentName(nextName);
+                onSelectStudentName?.(nextName);
+                setIsSubmitted(false);
+                setIsSpeedTestSubmitted(false);
+                setSyncedSubmissionSummary(null);
+                homeworkStartTimeRef.current = Date.now();
+              }}
+              className="px-2.5 py-1 rounded-xl bg-white/95 border border-[#0F5243]/25 text-xs font-bold text-[#0F382E] focus:outline-none focus:border-[#0F5243] cursor-pointer shadow-2xs max-w-full"
+            >
+              {effectiveRoster.map((st) => (
+                <option key={st.id} value={st.name}>
+                  {st.studentCode} · {st.name} ({st.hskLevel} · {st.totalPoints}đ)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            data-testid="toggle-listening-exam-mode-btn"
+            onClick={() => setIsListeningExamMode((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+              isListeningExamMode
+                ? 'bg-[#B8292F] text-white border-[#C5B358] shadow-xs'
+                : 'bg-white/95 hover:bg-[#FAF7F0] text-[#0F382E] border-[#0F5243]/25'
+            }`}
+            title="Bật chế độ Nghe hiểu HSK (听力): Ẩn câu chữ Hán gốc trước khi nộp bài để học viên nghe âm thanh chọn đáp án"
           >
-            Học viên:
-          </label>
-          <select
-            id="student-roster-select"
-            data-testid="student-roster-selector"
-            value={activeStudentName}
-            onChange={(e) => {
-              const nextName = e.target.value;
-              setActiveStudentName(nextName);
-              onSelectStudentName?.(nextName);
-              setIsSubmitted(false);
-              setSyncedSubmissionSummary(null);
-            }}
-            className="px-2.5 py-1 rounded-xl bg-white/90 border border-[#0F5243]/20 text-xs font-bold text-[#0F382E] focus:outline-none focus:border-[#0F5243] cursor-pointer shadow-2xs"
-          >
-            {effectiveRoster.map((st) => (
-              <option key={st.id} value={st.name}>
-                {st.studentCode} · {st.name} ({st.hskLevel} · {st.totalPoints}đ)
-              </option>
-            ))}
-          </select>
+            <Headphones className="w-3.5 h-3.5" />
+            <span>
+              {isListeningExamMode
+                ? '🎧 Nghe hiểu HSK (听力): BẬT'
+                : '🎧 Chế độ Nghe hiểu (听力)'}
+            </span>
+          </button>
 
           {!isSubmitted && (
             <button
@@ -605,11 +1038,19 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
             {hsk3Pillars.map((pillar) => (
               <div
                 key={`compact-${pillar.id}`}
-                className="inline-flex flex-col gap-0.5 px-2.5 py-1 rounded-xl bg-white/85 border border-[#0F5243]/15 shadow-2xs min-w-[112px]"
+                data-testid={`hsk3-compact-pillar-${pillar.id}`}
+                className="inline-flex flex-col gap-0.5 px-2.5 py-1 rounded-xl bg-white/85 border border-[#0F5243]/15 shadow-2xs min-w-[118px]"
               >
-                <div className="flex items-center justify-between gap-2 text-[11px] font-bold">
+                <div className="flex items-center justify-between gap-1.5 text-[11px] font-bold">
                   <span className="text-[#0F382E] font-['Noto_Sans_SC']">{pillar.titleZh}</span>
-                  <span className="text-[#0F5243] tabular-nums">{pillar.percent}%</span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="text-[#0F5243] tabular-nums">{pillar.percent}%</span>
+                    {pillar.deltaPercent && pillar.deltaPercent > 0 ? (
+                      <span className="text-[9px] px-1 rounded bg-emerald-100 text-emerald-800 font-extrabold">
+                        +{pillar.deltaPercent}%
+                      </span>
+                    ) : null}
+                  </span>
                 </div>
                 <div className="w-full h-1.5 rounded-full bg-[#0F5243]/10 overflow-hidden">
                   <div
@@ -619,7 +1060,10 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                 </div>
               </div>
             ))}
-            <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#FAF7F0] border border-[#9B8A3E]/40 text-[11px] font-bold text-[#0F382E]">
+            <span
+              data-testid="srs-mistake-count-pill"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#FAF7F0] border border-[#9B8A3E]/40 text-[11px] font-bold text-[#0F382E]"
+            >
               📓 Sổ từ khó: <span className="text-[#B8292F] tabular-nums">{srsMistakeWords.length} từ</span>
             </span>
           </div>
@@ -706,40 +1150,73 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
         )}
       </div>
 
-      {/* Sub-tab Switcher: Phiếu Bài Tập vs Bảng Xếp Hạng Thi Đua */}
-      <div className="flex items-center justify-between gap-3 p-1.5 rounded-2xl bg-[#E7ECD9] border border-[rgba(30,50,39,0.15)] shadow-inner">
+      {/* Sub-tab Switcher: Phiếu Bài Tập vs Ghép Câu HSK 3.0 vs Kiểm Tra Nhanh 10 Câu vs Bảng Xếp Hạng */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 p-1.5 rounded-2xl bg-[#E7ECD9] border border-[rgba(30,50,39,0.15)] shadow-inner">
         <button
           type="button"
+          data-testid="arena-subtab-homework"
           onClick={() => setActiveSection('homework')}
-          className={`flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+          className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeSection === 'homework'
               ? 'bg-[#1E3227] text-[#FAFBF7] shadow-sm'
               : 'text-[#3F5447] hover:text-[#1E3227]'
           }`}
         >
-          <BookOpen className="w-4 h-4" />
-          <span>
-            Phiếu Làm Bài Tập (
+          <BookOpen className="w-4 h-4 shrink-0" />
+          <span className="truncate">
+            Phiếu Bài Tập (
             {assignmentPackage.multipleChoiceList.length +
               assignmentPackage.sentenceOrderingList.length +
               assignmentPackage.essayList.length}{' '}
-            câu hỏi)
+            câu)
           </span>
         </button>
 
         <button
           type="button"
+          data-testid="arena-subtab-sentence-builder"
+          onClick={() => setActiveSection('sentence-builder')}
+          className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            activeSection === 'sentence-builder'
+              ? 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAFBF7] shadow-sm'
+              : 'text-[#3F5447] hover:text-[#0F5243]'
+          }`}
+        >
+          <span className="truncate">🧩 Ghép câu HSK 3.0 (连词成句)</span>
+        </button>
+
+        <button
+          type="button"
+          data-testid="arena-subtab-speedtest"
+          onClick={() => {
+            setActiveSection('speedtest');
+            if (!isSpeedTestSubmitted && !isSpeedTestRunning) {
+              setIsSpeedTestRunning(true);
+            }
+          }}
+          className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            activeSection === 'speedtest'
+              ? 'bg-gradient-to-r from-[#B8292F] to-[#961C21] text-[#FAFBF7] shadow-sm'
+              : 'text-[#3F5447] hover:text-[#B8292F]'
+          }`}
+        >
+          <span className="truncate">🏆 Kiểm tra 10 câu (15p)</span>
+        </button>
+
+        <button
+          type="button"
+          data-testid="arena-subtab-leaderboard"
           onClick={() => setActiveSection('leaderboard')}
-          className={`flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+          className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeSection === 'leaderboard'
               ? 'bg-[#1E3227] text-[#FAFBF7] shadow-sm'
               : 'text-[#3F5447] hover:text-[#1E3227]'
           }`}
         >
-          <Trophy className="w-4 h-4 text-[#C5B358]" />
-          <span>Bảng Xếp Hạng Học Tập (Thi đua lớp)</span>
-          {isSubmitted && (
-            <span className="w-2 h-2 rounded-full bg-[#9B8A3E] animate-pulse" />
+          <Trophy className="w-4 h-4 text-[#C5B358] shrink-0" />
+          <span className="truncate">Bảng Xếp Hạng Lớp</span>
+          {(isSubmitted || isSpeedTestSubmitted) && (
+            <span className="w-2 h-2 rounded-full bg-[#9B8A3E] animate-pulse shrink-0" />
           )}
         </button>
       </div>
@@ -808,29 +1285,61 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
               data-testid="teacher-gradebook-sync-banner"
               className="p-3.5 rounded-2xl bg-[#E7ECD9] border border-[#1E3227]/25 text-xs text-[#1E3227] flex flex-col sm:flex-row sm:items-center justify-between gap-2"
             >
-              <div className="space-y-0.5">
-                <div className="font-bold text-[#1E3227]">
-                  ✅ Đã lưu điểm vào Sổ điểm Giáo viên cho học viên “{activeStudentName}”:
+              <div className="space-y-1">
+                <div className="font-bold text-[#1E3227] flex flex-wrap items-center gap-2">
+                  <span>
+                    ✅ Đã đồng bộ Bảng Xếp Hạng &amp; Sổ điểm Giáo viên cho học viên “{activeStudentName}”:
+                  </span>
+                  {syncedSubmissionSummary.rank && (
+                    <span
+                      data-testid="submitted-rank-pill"
+                      className="px-2 py-0.5 rounded-lg bg-[#1E3227] text-[#C5B358] font-extrabold text-[11px]"
+                    >
+                      🏆 Xếp hạng #{syncedSubmissionSummary.rank}/{syncedSubmissionSummary.totalStudents || 12}
+                    </span>
+                  )}
+                  {syncedSubmissionSummary.timeSeconds && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white text-[#1E3227] font-bold text-[11px]">
+                      <Clock className="w-3 h-3 text-[#9B8A3E]" />
+                      {syncedSubmissionSummary.timeSeconds}s
+                    </span>
+                  )}
+                  {syncedSubmissionSummary.streak && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-[11px]">
+                      <Flame className="w-3 h-3 fill-amber-600 text-amber-600" />
+                      Streak {syncedSubmissionSummary.streak} ngày
+                    </span>
+                  )}
                 </div>
                 <div className="text-[#3F5447]">
                   Tiến độ từ vựng: <strong>{syncedSubmissionSummary.vocabProgress}</strong> · Nét viết:{' '}
-                  <strong>{syncedSubmissionSummary.writingAccuracy}%</strong> · Từ vựng cần ôn:{' '}
-                  <strong className="text-[#9B8A3E]">
+                  <strong>{syncedSubmissionSummary.writingAccuracy}%</strong> · Đã lưu vào 📓 Sổ từ khó:{' '}
+                  <strong className="text-[#B8292F]">
                     {syncedSubmissionSummary.reviewWords.length > 0
                       ? syncedSubmissionSummary.reviewWords.join(', ')
-                      : 'Không có (Đã nắm vững 100%)'}
+                      : 'Không có lỗi sai (Đã nắm vững 100%)'}
                   </strong>
                 </div>
               </div>
-              {onSwitchToTeacherView && (
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={onSwitchToTeacherView}
-                  className="px-3 py-1.5 rounded-xl bg-[#1E3227] text-[#FAFBF7] font-bold text-xs whitespace-nowrap cursor-pointer"
+                  data-testid="scorecard-jump-leaderboard-btn"
+                  onClick={() => setActiveSection('leaderboard')}
+                  className="px-3 py-1.5 rounded-xl bg-[#9B8A3E] text-white font-bold text-xs whitespace-nowrap cursor-pointer"
                 >
-                  📊 Xem Bảng điểm Giáo viên
+                  🏆 Xem Bảng Xếp Hạng Lớp
                 </button>
-              )}
+                {onSwitchToTeacherView && (
+                  <button
+                    type="button"
+                    onClick={onSwitchToTeacherView}
+                    className="px-3 py-1.5 rounded-xl bg-[#1E3227] text-[#FAFBF7] font-bold text-xs whitespace-nowrap cursor-pointer"
+                  >
+                    📊 Xem Bảng điểm Giáo viên
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -941,6 +1450,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                 const userChoice = mcAnswers[q.id];
                 const selectedOpt = q.options.find((o) => o.key === userChoice);
                 const isCorrect = selectedOpt?.isCorrect === true;
+                const fullSpokenSentence = q.question.replace('______', q.targetWord);
 
                 return (
                   <div
@@ -948,27 +1458,49 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                     className="rounded-2xl bg-white/80 backdrop-blur-md border border-white/70 shadow-[0_4px_20px_rgba(15,82,67,0.04)] p-4 sm:p-5 space-y-3"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <span className="px-2.5 py-0.5 rounded-lg bg-[#0F5243]/10 text-[#0F5243] text-xs font-bold">
-                          Câu {idx + 1}
-                        </span>
-                        <h5 className="text-sm sm:text-base font-bold text-[#0F382E] mt-1 font-['Noto_Sans_SC']">
-                          {q.question}
-                        </h5>
-                        {q.pinyinSentence && (
-                          <div className="flex items-center gap-2 mt-1">
-                            <p className="text-xs text-[#9B8A3E] font-medium">
-                              {q.pinyinSentence}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => speakChinese(q.question.replace('______', q.targetWord))}
-                              className="text-xs text-[#3A544B] hover:text-[#0F5243]"
-                              title="Nghe phát âm chuẩn zh-CN"
-                            >
-                              <Volume2 className="w-3.5 h-3.5 inline" />
-                            </button>
+                      <div className="w-full">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="px-2.5 py-0.5 rounded-lg bg-[#0F5243]/10 text-[#0F5243] text-xs font-bold">
+                            Câu {idx + 1}
+                          </span>
+                          <button
+                            type="button"
+                            data-testid={`part-a-listen-btn-${q.id}`}
+                            onClick={() => speakChinese(fullSpokenSentence)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-xs font-bold shadow-2xs cursor-pointer"
+                            title="Nghe câu tiếng Trung chuẩn zh-CN"
+                          >
+                            <Volume2 className="w-3.5 h-3.5 text-[#C5B358]" />
+                            <span>🔊 Nghe câu (听力)</span>
+                          </button>
+                        </div>
+
+                        {isListeningExamMode && !isSubmitted ? (
+                          <div
+                            data-testid={`part-a-listening-mask-${q.id}`}
+                            className="mt-2 p-3 rounded-xl bg-[#FAF7F0] border border-dashed border-[#0F5243]/35 flex flex-wrap items-center justify-between gap-2"
+                          >
+                            <div className="text-xs font-bold text-[#0F382E] flex items-center gap-2">
+                              <Headphones className="w-4 h-4 text-[#B8292F] shrink-0" />
+                              <span>
+                                🎧 Chế độ Nghe hiểu HSK (听力): Đang ẩn chữ Hán gốc — Hãy bấm{' '}
+                                <strong>“🔊 Nghe câu (听力)”</strong> để chọn đáp án đúng! (Chữ Hán &amp; Pinyin sẽ tự hiện sau khi Nộp bài)
+                              </span>
+                            </div>
                           </div>
+                        ) : (
+                          <>
+                            <h5 className="text-sm sm:text-base font-bold text-[#0F382E] mt-1.5 font-['Noto_Sans_SC']">
+                              {q.question}
+                            </h5>
+                            {q.pinyinSentence && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <p className="text-xs text-[#9B8A3E] font-medium">
+                                  {q.pinyinSentence}
+                                </p>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -1030,29 +1562,46 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                       })}
                     </div>
 
-                    {/* Detailed AI Explanation & Grammar Diagnostic */}
+                    {/* Detailed AI Explanation & Grammar Diagnostic + "🐼 Hỏi 彬彬 câu này" */}
                     {isSubmitted && (
                       <div
-                        className={`p-3.5 rounded-xl text-xs space-y-1.5 ${
+                        className={`p-3.5 rounded-xl text-xs space-y-2 ${
                           isCorrect
                             ? 'bg-[#E7ECD9] text-[#1E3227]'
                             : 'bg-red-50 text-red-900 border border-red-200'
                         }`}
                       >
-                        <div className="flex items-center gap-1.5 font-bold">
-                          {isCorrect ? (
-                            <>
-                              <CheckCircle2 className="w-4 h-4 text-[#1E3227]" />
-                              <span>Đáp án chính xác! (+10 điểm)</span>
-                            </>
-                          ) : (
-                            <>
-                              <AlertCircle className="w-4 h-4 text-red-600" />
-                              <span>
-                                Chưa chính xác (0/10 điểm) — Bạn đã chọn {userChoice || 'trống'}.
-                              </span>
-                            </>
-                          )}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            {isCorrect ? (
+                              <>
+                                <CheckCircle2 className="w-4 h-4 text-[#1E3227]" />
+                                <span>Đáp án chính xác! (+10 điểm)</span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="w-4 h-4 text-red-600" />
+                                <span>
+                                  Chưa chính xác (0/10 điểm) — Bạn đã chọn {userChoice || 'trống'} · Đã lưu từ “{q.targetWord}” vào 📓 Sổ từ khó.
+                                </span>
+                              </>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            data-testid={`ask-binbin-mc-${q.id}`}
+                            onClick={() =>
+                              handleAskBinBinAboutQuestion(
+                                q.targetWord,
+                                q.question,
+                                q.explanation
+                              )
+                            }
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-[11px] font-bold border border-[#C5B358]/60 shadow-2xs cursor-pointer hover:opacity-95"
+                          >
+                            <span>🐼 Hỏi 彬彬 câu này</span>
+                          </button>
                         </div>
                         <div>
                           <strong>Giải thích chuẩn xác:</strong> {q.explanation}
@@ -1208,18 +1757,34 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                             : 'bg-red-50 text-red-900 border border-red-200'
                         }`}
                       >
-                        <div className="flex items-center gap-1.5 font-bold">
-                          {isCorrect ? (
-                            <>
-                              <CheckCircle2 className="w-4 h-4 text-[#1E3227]" />
-                              <span>Chính xác hoàn hảo! (+20 điểm)</span>
-                            </>
-                          ) : (
-                            <>
-                              <AlertCircle className="w-4 h-4 text-red-600" />
-                              <span>Chưa chính xác (0/20 điểm)</span>
-                            </>
-                          )}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 font-bold">
+                            {isCorrect ? (
+                              <>
+                                <CheckCircle2 className="w-4 h-4 text-[#1E3227]" />
+                                <span>Chính xác hoàn hảo! (+20 điểm)</span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertCircle className="w-4 h-4 text-red-600" />
+                                <span>Chưa chính xác (0/20 điểm)</span>
+                              </>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            data-testid={`ask-binbin-so-${q.id}`}
+                            onClick={() =>
+                              handleAskBinBinAboutQuestion(
+                                q.correctTokens[0] || '温暖',
+                                q.correctTokens.join(''),
+                                q.explanation
+                              )
+                            }
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-[11px] font-bold border border-[#C5B358]/60 shadow-2xs cursor-pointer"
+                          >
+                            <span>🐼 Hỏi 彬彬 câu này</span>
+                          </button>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -1812,7 +2377,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
           {!isSubmitted && (
             <div
               data-testid="sticky-submit-assignment-bar"
-              className="sticky bottom-4 z-20 sm:mr-44 md:mr-48 p-3 sm:px-5 sm:py-3.5 rounded-2xl bg-[rgba(30,50,39,0.95)] text-white border border-[#C5B358]/40 backdrop-blur-md shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3"
+              className="sticky bottom-4 z-20 p-3 sm:px-5 sm:py-3.5 rounded-2xl bg-[rgba(30,50,39,0.95)] text-white border border-[#C5B358]/40 backdrop-blur-md shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3"
             >
               <div className="flex items-center gap-2.5 text-xs">
                 <Sparkles className="w-4 h-4 text-[#C5B358] shrink-0" />
@@ -1847,18 +2412,617 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
       )}
 
       {/* =======================================================================
-          VIEW 2: LEADERBOARD DISPLAY
+          VIEW 1B: HSK 3.0 SENTENCE BUILDER & WORD ORDER ARENA (连词成句)
+          ======================================================================= */}
+      {activeSection === 'sentence-builder' && (
+        <div
+          data-testid="sentence-builder-arena"
+          className="rounded-3xl backdrop-blur-xl bg-white/80 border-2 border-[#C5B358]/55 p-5 sm:p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-5"
+        >
+          {/* Top Header & Quick Actions */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[rgba(30,50,39,0.14)]">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#0F5243]">
+                PHÒNG LUYỆN CẤU TRÚC CÂU &amp; TRẬT TỰ TỪ HSK 3.0 · 连词成句
+              </div>
+              <h3 className="text-lg sm:text-xl font-bold text-[#0F382E] mt-0.5">
+                🧩 Lắp Ghép Thẻ Từ Loại &amp; Chẩn Đoán Ngữ Pháp Hán Ngữ ({HSK3_SENTENCE_BUILDER_CHALLENGES.length} cấu trúc trọng tâm)
+              </h3>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                data-testid="sentence-builder-toggle-pinyin-btn"
+                onClick={() => setShowTilePinyin((v) => !v)}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] border border-[#0F5243]/20 text-xs font-bold text-[#0F382E] cursor-pointer"
+              >
+                {showTilePinyin ? '🔤 Ẩn Pinyin & Từ loại' : '🔤 Hiện Pinyin & Từ loại'}
+              </button>
+
+              <button
+                type="button"
+                data-testid="sentence-builder-quick-solve-btn"
+                onClick={() => {
+                  const nextSel: Record<string, string[]> = {};
+                  const nextEval: Record<string, SentenceBuilderEvaluation> = {};
+                  HSK3_SENTENCE_BUILDER_CHALLENGES.forEach((ch) => {
+                    const ids = ch.tilesInCorrectOrder.map((t) => t.id);
+                    nextSel[ch.id] = ids;
+                    nextEval[ch.id] = evaluateSentenceBuilderOrder(ids, ch);
+                  });
+                  setSentenceBuilderSelectedIds(nextSel);
+                  setSentenceBuilderEvals(nextEval);
+                  playGentleChime(783.99, 0.22);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-[#E7ECD9] hover:bg-[#dce3c8] text-[#1E3227] border border-[#9B8A3E]/50 text-xs font-bold cursor-pointer"
+              >
+                ⚡ Điền mẫu nhanh 5 câu
+              </button>
+
+              <button
+                type="button"
+                data-testid="sentence-builder-check-btn"
+                onClick={() => {
+                  const nextEval: Record<string, SentenceBuilderEvaluation> = {};
+                  let totalPoints = 0;
+                  HSK3_SENTENCE_BUILDER_CHALLENGES.forEach((ch) => {
+                    const sel = sentenceBuilderSelectedIds[ch.id] || [];
+                    const ev = evaluateSentenceBuilderOrder(sel, ch);
+                    nextEval[ch.id] = ev;
+                    totalPoints += ev.score;
+                  });
+                  setSentenceBuilderEvals(nextEval);
+                  const avgScore = Math.round(
+                    totalPoints / HSK3_SENTENCE_BUILDER_CHALLENGES.length
+                  );
+                  const currentRoster = getStoredStudentRoster();
+                  const updatedRoster = applyStudentSubmissionToRoster(currentRoster, {
+                    studentName: activeStudentName,
+                    totalScore: Math.max(85, avgScore),
+                    learnedVocabCount: Math.max(16, slides.length - 2),
+                    totalVocabCount: Math.max(18, slides.length),
+                    writingAccuracy: 95,
+                    quizCorrectCount: HSK3_SENTENCE_BUILDER_CHALLENGES.length,
+                    quizTotalCount: HSK3_SENTENCE_BUILDER_CHALLENGES.length,
+                    reviewWords: [],
+                  });
+                  try {
+                    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updatedRoster));
+                  } catch {
+                    // ignore storage errors
+                  }
+                  setRoster(updatedRoster);
+                  window.dispatchEvent(
+                    new CustomEvent('hanu_students_updated', {
+                      detail: updatedRoster.length,
+                    })
+                  );
+                  setSentenceBuilderSyncBanner(
+                    `✅ Đã chấm cấu trúc câu (${avgScore}/100đ) và đồng bộ điểm của học viên “${activeStudentName}” vào Sổ điểm Giáo viên!`
+                  );
+                  playGentleChime(880, 0.25);
+                }}
+                className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-xs font-bold shadow-sm cursor-pointer"
+              >
+                ✨ Kiểm tra &amp; Chấm cấu trúc câu
+              </button>
+            </div>
+          </div>
+
+          {sentenceBuilderSyncBanner && (
+            <div
+              data-testid="sentence-builder-sync-banner"
+              className="p-3.5 rounded-2xl bg-[#E7ECD9] border border-[#0F5243]/30 text-xs font-bold text-[#0F382E] flex flex-wrap items-center justify-between gap-2"
+            >
+              <span>{sentenceBuilderSyncBanner}</span>
+              {onSwitchToTeacherView && (
+                <button
+                  type="button"
+                  onClick={onSwitchToTeacherView}
+                  className="px-3 py-1 rounded-xl bg-[#0F5243] text-white text-xs font-bold cursor-pointer"
+                >
+                  📊 Xem Sổ điểm Giáo viên →
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* 5 Sentence Construction Challenges */}
+          <div className="space-y-4">
+            {HSK3_SENTENCE_BUILDER_CHALLENGES.map((challenge, idx) => {
+              const selectedIds = sentenceBuilderSelectedIds[challenge.id] || [];
+              const tileLookup = new Map(
+                challenge.tilesInCorrectOrder.map((t) => [t.id, t])
+              );
+              const selectedTiles = selectedIds
+                .map((id) => tileLookup.get(id))
+                .filter(Boolean);
+              const availableTiles = challenge.shuffledTiles.filter(
+                (t) => !selectedIds.includes(t.id)
+              );
+              const evalItem = sentenceBuilderEvals[challenge.id];
+
+              return (
+                <div
+                  key={challenge.id}
+                  data-testid={`sentence-builder-card-${challenge.id}`}
+                  className="p-4 sm:p-5 rounded-2xl bg-[#FAF7F0] border border-[#0F5243]/15 space-y-3.5 shadow-2xs"
+                >
+                  {/* Top Info Row */}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-lg bg-[#0F5243] text-white text-xs font-bold">
+                        Câu {idx + 1} · {challenge.hskLevel}
+                      </span>
+                      <span className="text-xs sm:text-sm font-bold text-[#0F382E]">
+                        {challenge.grammarPointTitle}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => speakChinese(challenge.targetSentence, 0.88)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white border border-[#9B8A3E]/45 text-xs font-bold text-[#0F382E] hover:bg-[#E7ECD9] cursor-pointer"
+                      >
+                        <Volume2 className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                        <span>Nghe câu chuẩn</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSentenceBuilderSelectedIds((prev) => ({
+                            ...prev,
+                            [challenge.id]: [],
+                          }));
+                          setSentenceBuilderEvals((prev) => {
+                            const next = { ...prev };
+                            delete next[challenge.id];
+                            return next;
+                          });
+                        }}
+                        className="px-2.5 py-1 rounded-xl bg-white border border-black/10 text-xs font-semibold text-[#3A544B] hover:text-[#0F382E] cursor-pointer"
+                      >
+                        Xóa chọn
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Vietnamese Prompt + Grammar Formula Pill */}
+                  <div className="p-3 rounded-xl bg-white border border-[#C5B358]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div>
+                      <span className="font-bold text-[#9B8A3E] uppercase mr-1.5">
+                        Nghĩa tiếng Việt:
+                      </span>
+                      <strong className="text-[#0F382E]">“{challenge.vietnamesePrompt}”</strong>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-[#F4EFE6] text-[#0F5243] font-mono text-[11px] font-bold">
+                      📐 {challenge.grammarFormula}
+                    </span>
+                  </div>
+
+                  {/* Assembled Sentence Drop Zone */}
+                  <div
+                    data-testid={`sentence-builder-dropzone-${challenge.id}`}
+                    className="min-h-[56px] p-3 rounded-2xl bg-white border-2 border-dashed border-[#0F5243]/30 flex flex-wrap items-center gap-2"
+                  >
+                    {selectedTiles.length === 0 ? (
+                      <span className="text-xs text-[#3A544B] italic">
+                        Bấm vào các thẻ từ bên dưới theo đúng trật tự ngữ pháp tiếng Trung...
+                      </span>
+                    ) : (
+                      selectedTiles.map((tile) =>
+                        tile ? (
+                          <button
+                            key={`sel-${tile.id}`}
+                            type="button"
+                            onClick={() => {
+                              setSentenceBuilderSelectedIds((prev) => ({
+                                ...prev,
+                                [challenge.id]: (prev[challenge.id] || []).filter(
+                                  (id) => id !== tile.id
+                                ),
+                              }));
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-white text-left shadow-xs cursor-pointer hover:opacity-90 transition-all"
+                            title="Bấm để bỏ thẻ từ này ra"
+                          >
+                            <div className="font-['Noto_Sans_SC'] text-base font-bold leading-tight">
+                              {tile.hanzi}
+                            </div>
+                            {showTilePinyin && (
+                              <div className="text-[10px] text-[#C5B358] font-semibold">
+                                {tile.pinyin} · {tile.posTag}
+                              </div>
+                            )}
+                          </button>
+                        ) : null
+                      )
+                    )}
+                  </div>
+
+                  {/* Available Word Tiles Bank */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {availableTiles.map((tile) => (
+                      <button
+                        key={`avail-${tile.id}`}
+                        type="button"
+                        data-testid={`sentence-tile-${tile.id}`}
+                        onClick={() => {
+                          speakChinese(tile.hanzi, 0.95);
+                          const nextIds = [...selectedIds, tile.id];
+                          setSentenceBuilderSelectedIds((prev) => ({
+                            ...prev,
+                            [challenge.id]: nextIds,
+                          }));
+                          if (nextIds.length === challenge.tilesInCorrectOrder.length) {
+                            const autoEval = evaluateSentenceBuilderOrder(
+                              nextIds,
+                              challenge
+                            );
+                            setSentenceBuilderEvals((prev) => ({
+                              ...prev,
+                              [challenge.id]: autoEval,
+                            }));
+                            playGentleChime(autoEval.isCorrect ? 880 : 440, 0.2);
+                          }
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-[#E7ECD9]/60 border border-[#0F5243]/25 hover:border-[#0F5243] text-left shadow-2xs transition-all cursor-pointer"
+                      >
+                        <div className="font-['Noto_Sans_SC'] text-base font-bold text-[#0F382E] leading-tight">
+                          {tile.hanzi}
+                        </div>
+                        {showTilePinyin && (
+                          <div className="text-[10px] font-semibold text-[#9B8A3E] mt-0.5">
+                            {tile.pinyin} · <span className="text-[#0F5243]">{tile.posTag}</span> ({tile.meaningHint})
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Evaluation Diagnostic Box */}
+                  {evalItem && (
+                    <div
+                      data-testid={`sentence-builder-feedback-${challenge.id}`}
+                      className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                        evalItem.isCorrect
+                          ? 'bg-emerald-50 border-emerald-400 text-emerald-950'
+                          : 'bg-amber-50 border-amber-300 text-amber-950'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 font-bold">
+                        <span>
+                          {evalItem.isCorrect ? '✅ Trật tự chuẩn HSK 3.0:' : '⚠️ Chẩn đoán trật tự câu:'}{' '}
+                          <span className="font-['Noto_Sans_SC'] text-sm">
+                            {evalItem.assembledHanzi}
+                          </span>
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-md bg-white/80 text-[#0F382E] tabular-nums">
+                            Điểm: {evalItem.score}/100đ
+                          </span>
+                          <button
+                            type="button"
+                            data-testid={`ask-binbin-sb-${challenge.id}`}
+                            onClick={() =>
+                              handleAskBinBinAboutQuestion(
+                                challenge.tilesInCorrectOrder[0]?.hanzi || '温暖',
+                                challenge.targetSentence,
+                                evalItem.grammarDiagnostic
+                              )
+                            }
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#0F5243] text-[#FAF7F0] text-[11px] font-bold cursor-pointer"
+                          >
+                            <span>🐼 Hỏi 彬彬 câu này</span>
+                          </button>
+                        </div>
+                      </div>
+                      <p className="font-semibold">{evalItem.feedbackVi}</p>
+                      <p className="text-[11px] opacity-90">{evalItem.grammarDiagnostic}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* =======================================================================
+          VIEW 2: 15-MINUTE SPEED TEST (10 QUESTIONS) & HSK 3.0 COMPLETION CERTIFICATE
+          ======================================================================= */}
+      {activeSection === 'speedtest' && (
+        <div
+          data-testid="speed-test-10-arena"
+          className="rounded-3xl bg-white/85 backdrop-blur-xl border-2 border-[#C5B358]/60 p-5 sm:p-6 shadow-md space-y-5"
+        >
+          {/* Top Timer & Action Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[rgba(30,50,39,0.14)]">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#B8292F]">
+                CHẾ ĐỘ THI THỬ TỐC ĐỘ 15 PHÚT · ĐÁNH GIÁ CHUẨN HSK 3.0
+              </div>
+              <h3 className="text-lg sm:text-xl font-bold text-[#1E3227] mt-0.5">
+                🏆 Bài Kiểm Tra Nhanh 10 Câu Toàn Diện (Nghe · Đọc · Ngữ Pháp · Hán Tự · Dịch)
+              </h3>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                data-testid="speed-test-timer-badge"
+                className="px-3.5 py-1.5 rounded-xl bg-[#1E3227] text-[#C5B358] font-mono text-sm font-extrabold tabular-nums flex items-center gap-1.5 shadow-2xs"
+              >
+                <span>⏱️ Thời gian:</span>
+                <span>{formatTimerMmSs(speedTestSecondsLeft)}</span>
+              </div>
+
+              {!isSpeedTestSubmitted ? (
+                <button
+                  type="button"
+                  data-testid="speed-test-quick-fill-btn"
+                  onClick={handleQuickFillSpeedTest}
+                  className="px-3 py-1.5 rounded-xl bg-[#E7ECD9] hover:bg-[#dce3c8] text-[#1E3227] border border-[#9B8A3E]/50 text-xs font-bold cursor-pointer"
+                >
+                  ⚡ Điền nhanh 10 câu mẫu
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="speed-test-reset-btn"
+                  onClick={() => {
+                    setSpeedTestAnswers({});
+                    setIsSpeedTestSubmitted(false);
+                    setSpeedTestSecondsLeft(15 * 60);
+                    setIsSpeedTestRunning(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#1E3227] border border-[#1E3227]/25 text-xs font-bold cursor-pointer"
+                >
+                  🔄 Làm lại đề 10 câu
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* HSK 3.0 Completion Certificate Card upon submission */}
+          {isSpeedTestSubmitted && (
+            <div
+              data-testid="hsk3-completion-certificate"
+              className="p-6 rounded-3xl bg-gradient-to-br from-[#FAF7F0] via-[#FFFDF7] to-[#F3ECE0] border-2 border-[#C5B358] shadow-xl space-y-4 relative overflow-hidden"
+            >
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-[#C5B358]/50 pb-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-14 h-14 rounded-2xl bg-[#0F5243] text-[#C5B358] flex items-center justify-center font-['Noto_Serif_SC'] text-2xl font-bold border border-[#C5B358] shrink-0">
+                    证
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-extrabold uppercase tracking-widest text-[#9B8A3E]">
+                      HANU × 阮文受 · CHỨNG NHẬN NĂNG LỰC HÁN NGỮ QUỐC TẾ
+                    </div>
+                    <h4 className="text-lg sm:text-xl font-black text-[#0F382E] mt-0.5">
+                      📜 PHIẾU CHỨNG NHẬN HOÀN THÀNH BÀI HỌC CHUẨN HSK 3.0
+                    </h4>
+                    <p className="text-xs text-[#3A544B] mt-0.5">
+                      Cấp cho học viên: <strong className="text-[#0F382E]">{activeStudentName}</strong> · Lớp HSK 1–3 (Mã lớp: 722229)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="px-4 py-2.5 rounded-2xl bg-[#0F5243] text-[#FAF7F0] text-right border border-[#C5B358] shrink-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#C5B358]">
+                    ĐIỂM KIỂM TRA 10 CÂU
+                  </div>
+                  <div
+                    data-testid="speed-test-final-score"
+                    className="text-2xl sm:text-3xl font-black tabular-nums"
+                  >
+                    {speedTestScore} <span className="text-xs font-bold text-[#C5B358]">/ 100đ</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center">
+                {[
+                  { label: 'Nghe hiểu', score: `${Math.min(100, speedTestScore + 2)}%` },
+                  { label: 'Phát âm', score: '96%' },
+                  { label: 'Đọc hiểu', score: `${speedTestScore}%` },
+                  { label: 'Chữ viết Mễ', score: '96%' },
+                  { label: 'Dịch ngữ pháp', score: `${speedTestScore}%` },
+                ].map((skill) => (
+                  <div
+                    key={skill.label}
+                    className="p-2.5 rounded-xl bg-white border border-[#C5B358]/45 shadow-2xs"
+                  >
+                    <div className="text-[11px] text-[#3A544B] font-semibold">{skill.label}</div>
+                    <div className="text-sm font-black text-[#0F5243] tabular-nums mt-0.5">
+                      {skill.score}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-[#3A544B]">
+                <span>
+                  ✅ Đã đồng bộ tự động vào Sổ điểm của <strong>GV Nguyễn Văn Thụ (阮文受)</strong>.
+                </span>
+                {onSwitchToTeacherView && (
+                  <button
+                    type="button"
+                    data-testid="certificate-view-teacher-gradebook-btn"
+                    onClick={onSwitchToTeacherView}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#0F5243] text-[#FAF7F0] font-bold text-xs cursor-pointer"
+                  >
+                    📊 Xem Bảng điểm Giáo viên →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 10 Questions List */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {SPEED_TEST_10_QUESTIONS.map((q, qIdx) => {
+              const selected = speedTestAnswers[q.id];
+              const isAnsweredWrong = isSpeedTestSubmitted && selected !== q.correctAnswer;
+              return (
+                <div
+                  key={q.id}
+                  data-testid={`speed-test-q-${q.id}`}
+                  className="p-4 rounded-2xl bg-[#FAFBF7] border border-[rgba(30,50,39,0.14)] space-y-2.5 flex flex-col justify-between"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="px-2 py-0.5 rounded-md bg-[#0F5243]/10 text-[#0F5243] text-[10px] font-bold">
+                        {q.skillLabel}
+                      </span>
+                      <button
+                        type="button"
+                        data-testid={`speed-test-listen-btn-${q.id}`}
+                        onClick={() => speakChinese(q.targetWord)}
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#0F5243] text-white border border-[#C5B358]/50 text-[11px] font-bold cursor-pointer"
+                      >
+                        <Volume2 className="w-3 h-3 text-[#C5B358]" />
+                        <span className="font-['Noto_Sans_SC']">
+                          {isListeningExamMode && !isSpeedTestSubmitted
+                            ? `🔊 Nghe câu #${qIdx + 1}`
+                            : q.targetWord}
+                        </span>
+                      </button>
+                    </div>
+
+                    {isListeningExamMode && !isSpeedTestSubmitted ? (
+                      <div
+                        data-testid={`speed-test-listening-mask-${q.id}`}
+                        className="p-2.5 rounded-xl bg-white border border-dashed border-[#0F5243]/35 text-xs font-bold text-[#0F382E] flex items-center justify-between gap-2"
+                      >
+                        <span>
+                          🎧 Câu #{qIdx + 1} (听力): Bấm nghe âm thanh để chọn đáp án đúng
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => speakChinese(q.prompt)}
+                          className="px-2 py-1 rounded-lg bg-[#E7ECD9] text-[#1E3227] text-[11px] font-bold cursor-pointer shrink-0"
+                        >
+                          🔊 Nghe cả câu
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-xs sm:text-sm font-bold text-[#1E3227] leading-snug">
+                        {q.prompt}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5 pt-1">
+                    {q.options.map((opt) => {
+                      const isPicked = selected === opt;
+                      const isCorrect = opt === q.correctAnswer;
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          disabled={isSpeedTestSubmitted}
+                          onClick={() =>
+                            setSpeedTestAnswers((prev) => ({
+                              ...prev,
+                              [q.id]: opt,
+                            }))
+                          }
+                          className={`w-full text-left px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                            isSpeedTestSubmitted
+                              ? isCorrect
+                                ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold'
+                                : isPicked
+                                ? 'bg-red-50 border-red-400 text-red-900'
+                                : 'bg-white/70 border-gray-200 text-gray-500'
+                              : isPicked
+                              ? 'bg-[#0F5243] border-[#0F5243] text-white font-bold shadow-2xs'
+                              : 'bg-white hover:bg-[#F4F6EE] border-[rgba(30,50,39,0.15)] text-[#1E3227]'
+                          }`}
+                        >
+                          <span className="font-['Noto_Sans_SC']">{opt}</span>
+                          {isSpeedTestSubmitted && isCorrect && (
+                            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {isSpeedTestSubmitted && (
+                    <div
+                      className={`p-2.5 rounded-xl text-[11px] space-y-1.5 ${
+                        isAnsweredWrong
+                          ? 'bg-red-50 text-red-900 border border-red-200'
+                          : 'bg-[#E7ECD9]/80 text-[#1E3227]'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-1.5">
+                        <span>
+                          <strong>Giải thích chuẩn HSK 3.0:</strong> {q.explanation}
+                        </span>
+                        <button
+                          type="button"
+                          data-testid={`ask-binbin-stq-${q.id}`}
+                          onClick={() =>
+                            handleAskBinBinAboutQuestion(
+                              q.targetWord,
+                              q.prompt,
+                              q.explanation
+                            )
+                          }
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#0F5243] text-[#FAF7F0] text-[10px] font-bold cursor-pointer shrink-0"
+                        >
+                          <span>🐼 Hỏi 彬彬 câu này</span>
+                        </button>
+                      </div>
+                      {isAnsweredWrong && (
+                        <div className="text-[10px] font-bold text-[#B8292F]">
+                          📓 Đã tự động thêm từ “{q.targetWord}” vào Sổ từ khó để ôn lại!
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {!isSpeedTestSubmitted && (
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-[rgba(30,50,39,0.14)]">
+              <span className="text-xs text-[#3F5447]">
+                Đã chọn: <strong>{Object.keys(speedTestAnswers).length}/10 câu</strong> · Nộp bài để nhận Phiếu Chứng Nhận HSK 3.0 ngay lập tức.
+              </span>
+              <button
+                type="button"
+                data-testid="submit-speed-test-btn"
+                onClick={handleSubmitSpeedTest}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-xs sm:text-sm font-bold shadow-md cursor-pointer"
+              >
+                <Send className="w-4 h-4 text-[#C5B358]" />
+                <span>Nộp Đề 10 Câu &amp; Nhận Chứng Nhận HSK 3.0</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =======================================================================
+          VIEW 3: LEADERBOARD DISPLAY
           ======================================================================= */}
       {activeSection === 'leaderboard' && (
         <StudentLeaderboard
           currentStudentName={activeStudentName}
-          currentStudentScore={finalScore}
-          hasSubmitted={isSubmitted}
+          currentStudentScore={isSpeedTestSubmitted ? speedTestScore : finalScore}
+          currentStudentTimeSeconds={lastSubmittedTimeSeconds}
+          currentStudentStreak={lastSubmittedStreak}
+          hasSubmitted={isSubmitted || isSpeedTestSubmitted}
         />
       )}
 
       {/* =======================================================================
-          FEEDBACK MODAL FROM BIN BIN PANDA AI
+          FEEDBACK MODAL FROM BIN BIN PANDA TUTOR
           ======================================================================= */}
       {showBinBinFeedbackModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1869,10 +3033,10 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
               </div>
               <div>
                 <h4 className="text-base font-bold text-[#1E3227]">
-                  Lời khuyên từ Trợ lý Gấu trúc Bin Bin (彬彬)
+                  Lời khuyên từ Trợ Giảng Gấu Trúc · 彬彬
                 </h4>
                 <p className="text-xs text-[#9B8A3E]">
-                  Đánh giá bài tập: {assignmentPackage.fileName}
+                  Nhận xét &amp; Chữa lỗi chi tiết: {assignmentPackage.fileName}
                 </p>
               </div>
             </div>
@@ -1900,7 +3064,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
               onClick={() => setShowBinBinFeedbackModal(false)}
               className="w-full py-2.5 rounded-xl bg-[#1E3227] text-white text-xs font-bold hover:bg-[#2B4637] transition-all"
             >
-              Đã hiểu, cảm ơn Bin Bin!
+              Đã hiểu, cảm ơn 彬彬!
             </button>
           </div>
         </div>

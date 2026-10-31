@@ -20,6 +20,14 @@ export interface ToneSandhiAnalysis {
 const THIRD_TONE_CHARS = /[ǎǒěǐǔǚ]/;
 const FOURTH_TONE_CHARS = /[àòèìùǜ]/;
 
+export function getToneNumberFromPinyin(syllable: string): 1 | 2 | 3 | 4 | 0 {
+  if (/[āōēīūǖ]/.test(syllable)) return 1;
+  if (/[áóéíúǘ]/.test(syllable)) return 2;
+  if (/[ǎǒěǐǔǚ]/.test(syllable)) return 3;
+  if (/[àòèìùǜ]/.test(syllable)) return 4;
+  return 0; // neutral tone (轻声)
+}
+
 function convertThirdToSecondTone(syllable: string): string {
   return syllable
     .replace('ǎ', 'á')
@@ -32,6 +40,12 @@ function convertThirdToSecondTone(syllable: string): string {
 
 /**
  * Analyzes Tone Sandhi (Biến điệu thanh điệu - 变调规则) for a Chinese word and its example sentence.
+ * Strictly adheres to standard Beijing phonological rules:
+ * - T3 + T3 -> 2 + 3 (Biến điệu thanh 3: Âm tiết đầu đọc thành thanh 2)
+ * - T3 + (T1 / T2 / T4 / neutral) -> Nửa thanh 3 (211): Chỉ khi thanh 3 đứng TRƯỚC âm khác
+ * - (T1 / T2 / T4) + T3 (như 温暖 wēn nuǎn) -> Giữ nguyên thanh điệu chuẩn, KHÔNG biến điệu âm đầu
+ * - "一 (yī)" & "不 (bù)" tone sandhi rules
+ * - Neutral tone (轻声)
  */
 export function analyzeToneSandhi(
   hanzi: string,
@@ -42,11 +56,55 @@ export function analyzeToneSandhi(
   const cleanHanzi = (hanzi || '').trim();
   const cleanPinyin = (pinyin || '').trim();
   const syllables = cleanPinyin.split(/\s+/).filter(Boolean);
+  const toneNumbers = syllables.map(getToneNumberFromPinyin);
 
-  // 1. Check 3rd tone + 3rd tone -> 2nd tone + 3rd tone (3 + 3 -> 2 + 3)
+  // 1. Check "一 (yī)" tone sandhi ONLY when the vocabulary word itself contains 一
+  if (cleanHanzi.includes('一')) {
+    const yiIndex = Array.from(cleanHanzi).indexOf('一');
+    const nextSyl = syllables[yiIndex + 1];
+    const nextTone = nextSyl ? getToneNumberFromPinyin(nextSyl) : 0;
+    const isFollowedByFourth = nextTone === 4 || FOURTH_TONE_CHARS.test(cleanPinyin);
+
+    return {
+      hasSandhi: true,
+      ruleBadge: 'Biến điệu chữ “一 (yī)”',
+      ruleTitle: 'Quy tắc biến điệu của “一” trong từ vựng',
+      originalPinyin: cleanPinyin,
+      spokenPinyin: isFollowedByFourth
+        ? `${cleanPinyin} (一 đọc thành yí trước thanh 4)`
+        : `${cleanPinyin} (一 đọc thành yì trước thanh 1, 2, 3)`,
+      explanationVi:
+        'Chữ “一 (yī)” khi đứng trước âm tiết mang thanh 4 sẽ biến điệu thành thanh 2 (yí, ví dụ: 一个 yí gè, 一定 yí dìng); khi đứng trước thanh 1, 2, 3 sẽ biến điệu thành thanh 4 (yì, ví dụ: 一起 yì qǐ, 一杯 yì bēi). Khi đứng độc lập hoặc đếm số thì giữ nguyên thanh 1 (yī).',
+      exampleHint: 'Ứng dụng trực tiếp khi đọc từ vựng chứa “一” trên lớp.',
+    };
+  }
+
+  // 2. Check "不 (bù)" tone sandhi ONLY when the vocabulary word itself contains 不
+  if (cleanHanzi.includes('不')) {
+    const buIndex = Array.from(cleanHanzi).indexOf('不');
+    const nextSyl = syllables[buIndex + 1];
+    const nextTone = nextSyl ? getToneNumberFromPinyin(nextSyl) : 0;
+    const isFollowedByFourth = nextTone === 4 || FOURTH_TONE_CHARS.test(nextSyl || '');
+
+    return {
+      hasSandhi: true,
+      ruleBadge: 'Biến điệu chữ “不 (bù)”',
+      ruleTitle: 'Quy tắc biến điệu của “不” trước thanh 4',
+      originalPinyin: cleanPinyin,
+      spokenPinyin: isFollowedByFourth
+        ? `${cleanPinyin} (不 + thanh 4 → bú)`
+        : `${cleanPinyin} (不 giữ thanh 4 → bù)`,
+      explanationVi: isFollowedByFourth
+        ? 'Chữ “不 (bù)” khi đứng trước âm tiết mang thanh 4 sẽ biến điệu đọc thành thanh 2 “bú” (ví dụ: 不是 bú shì, 不对 bú duì).'
+        : 'Chữ “不 (bù)” khi đứng trước âm tiết mang thanh 1, 2, 3 hoặc đứng cuối câu thì giữ nguyên thanh 4 “bù” (ví dụ: 不吃 bù chī, 不来 bù lái, 不好 bù hǎo).',
+      exampleHint: 'Giúp giọng đọc tự nhiên, mượt mà chuẩn Bắc Kinh (zh-CN).',
+    };
+  }
+
+  // 3. Check 3rd tone + 3rd tone -> 2nd tone + 3rd tone (3 + 3 -> 2 + 3)
   if (syllables.length >= 2) {
     for (let i = 0; i < syllables.length - 1; i++) {
-      if (THIRD_TONE_CHARS.test(syllables[i]) && THIRD_TONE_CHARS.test(syllables[i + 1])) {
+      if (toneNumbers[i] === 3 && toneNumbers[i + 1] === 3) {
         const spokenSyllables = [...syllables];
         spokenSyllables[i] = convertThirdToSecondTone(syllables[i]);
         return {
@@ -55,87 +113,72 @@ export function analyzeToneSandhi(
           ruleTitle: 'Quy tắc hai thanh 3 đi liền (三声变调)',
           originalPinyin: cleanPinyin,
           spokenPinyin: spokenSyllables.join(' '),
-          explanationVi: `Hai âm tiết mang thanh 3 đi liền nhau: âm tiết thứ nhất “${syllables[i]}” biến điệu đọc thành thanh 2 “${spokenSyllables[i]}” (${cleanPinyin} → ${spokenSyllables.join(' ')}).`,
-          exampleHint: 'Ví dụ chuẩn: 你好 (nǐ hǎo → ní hǎo) · 可以 (kě yǐ → ké yǐ)',
+          explanationVi: `Hai âm tiết mang thanh 3 đi liền nhau: âm tiết thứ ${i + 1} “${syllables[i]}” biến điệu đọc thành thanh 2 “${spokenSyllables[i]}” (${cleanPinyin} → ${spokenSyllables.join(' ')}).`,
+          exampleHint: 'Ví dụ chuẩn: 你好 (nǐ hǎo → ní hǎo) · 可以 (kě yǐ → ké yǐ) · 了解 (liǎojiě → liáojiě)',
         };
       }
     }
   }
 
-  // 2. Check "一 (yī)" or "不 (bù)" tone sandhi ONLY when the vocabulary word itself contains 一 or 不
-  if (cleanHanzi.includes('一')) {
-    const hasFourthAfterYi =
-      FOURTH_TONE_CHARS.test(cleanPinyin) || /y[īíì]\s+[a-z]*[àòèìùǜ]/i.test(examplePinyin);
-    return {
-      hasSandhi: true,
-      ruleBadge: 'Biến điệu chữ “一 (yī)”',
-      ruleTitle: 'Quy tắc biến điệu của “一” trong từ vựng',
-      originalPinyin: cleanPinyin,
-      spokenPinyin: hasFourthAfterYi
-        ? `${cleanPinyin} (一 đọc thành yí trước thanh 4)`
-        : `${cleanPinyin} (一 đọc thành yì trước thanh 1, 2, 3)`,
-      explanationVi:
-        'Chữ “一 (yī)” khi đứng trước âm tiết thanh 4 sẽ biến điệu thành thanh 2 (yí, ví dụ: 一个 yí gè, 一定 yí dìng); khi đứng trước thanh 1, 2, 3 sẽ biến điệu thành thanh 4 (yì, ví dụ: 一起 yì qǐ, 一杯 yì bēi).',
-      exampleHint: 'Ứng dụng trực tiếp khi đọc từ vựng chứa “一” trên lớp.',
-    };
-  }
-
-  if (cleanHanzi.includes('不')) {
-    return {
-      hasSandhi: true,
-      ruleBadge: 'Biến điệu chữ “不 (bù)”',
-      ruleTitle: 'Quy tắc biến điệu của “不” trước thanh 4',
-      originalPinyin: cleanPinyin,
-      spokenPinyin: `${cleanPinyin} (不 + thanh 4 → bú)`,
-      explanationVi:
-        'Chữ “不 (bù)” khi đứng trước âm tiết mang thanh 4 sẽ biến điệu đọc thành thanh 2 “bú” (ví dụ: 不是 bú shì, 不对 bú duì).',
-      exampleHint: 'Giúp giọng đọc tự nhiên, mượt mà chuẩn Bắc Kinh (zh-CN).',
-    };
-  }
-
-  // 3. Check Neutral Tone (Thanh nhẹ - 轻声) when a syllable has no tone mark
+  // 4. Check Half 3rd Tone (Nửa thanh 3 - 半三声 211):
+  // ONLY occurs when a 3rd tone syllable stands BEFORE a 1st, 2nd, 4th, or neutral tone syllable!
+  // If the 3rd tone is in the LAST syllable (e.g. 温暖 wēn nuǎn - T1 + T3), it does NOT turn into half 3rd tone!
   if (syllables.length >= 2) {
-    const lastSyl = syllables[syllables.length - 1];
-    const hasToneMark = /[āáǎàōóǒòēéěèīíǐìūúǔùǖǘǚǜ]/.test(lastSyl);
-    if (!hasToneMark) {
-      return {
-        hasSandhi: true,
-        ruleBadge: 'Quy tắc Thanh nhẹ (轻声)',
-        ruleTitle: 'Âm tiết sau đọc lướt nhẹ & ngắn (轻声规则)',
-        originalPinyin: cleanPinyin,
-        spokenPinyin: `${syllables.slice(0, -1).join(' ')} · ${lastSyl} (thanh nhẹ)`,
-        explanationVi: `Âm tiết “${lastSyl}” trong từ “${cleanHanzi}” mang thanh nhẹ (轻声): đọc ngắn, nhẹ và phụ thuộc vào độ cao của âm tiết đứng trước.`,
-        exampleHint: 'Ví dụ chuẩn: 咱们 (zánmen) · 朋友 (péngyou) · 暖和 (nuǎnhuo)',
-      };
+    for (let i = 0; i < syllables.length - 1; i++) {
+      if (toneNumbers[i] === 3 && toneNumbers[i + 1] !== 3) {
+        const nextToneName =
+          toneNumbers[i + 1] === 0 ? 'thanh nhẹ' : `thanh ${toneNumbers[i + 1]}`;
+        return {
+          hasSandhi: true,
+          ruleBadge: 'Quy tắc Nửa thanh 3 (半三声)',
+          ruleTitle: 'Biến điệu Nửa thanh 3 (211) trước thanh khác',
+          originalPinyin: cleanPinyin,
+          spokenPinyin: `${cleanPinyin} (âm “${syllables[i]}” hạ trầm 211)`,
+          explanationVi: `Âm tiết “${syllables[i]}” (thanh 3) đứng trước âm tiết “${syllables[i + 1]}” (${nextToneName}): chỉ đọc phần hạ trầm (cao độ 211 - nửa thanh 3) rồi nối liền sang âm sau, không lượn cao lên 214.`,
+          exampleHint: 'Ví dụ chuẩn: 首都 (shǒudū) · 语言 (yǔyán) · 努力 (nǔlì)',
+        };
+      }
     }
   }
 
-  // 4. Check Half 3rd Tone (Nửa thanh 3 - 半三声) when 1st syllable is 3rd tone or 2nd syllable is 3rd tone
-  if (syllables.some((s) => THIRD_TONE_CHARS.test(s))) {
+  // 5. Check Neutral Tone (Thanh nhẹ - 轻声) when the last syllable has no tone mark
+  if (syllables.length >= 2 && toneNumbers[toneNumbers.length - 1] === 0) {
+    const lastSyl = syllables[syllables.length - 1];
     return {
       hasSandhi: true,
-      ruleBadge: 'Quy tắc Nửa thanh 3 (半三声)',
-      ruleTitle: 'Biến điệu Nửa thanh 3 (211) & Giữ trọn thanh điệu',
+      ruleBadge: 'Quy tắc Thanh nhẹ (轻声)',
+      ruleTitle: 'Âm tiết sau đọc lướt nhẹ & ngắn (轻声规则)',
       originalPinyin: cleanPinyin,
-      spokenPinyin: `${cleanPinyin} (chú ý độ trầm thanh 3)`,
-      explanationVi: `Từ “${cleanHanzi}” (${cleanPinyin}) có chứa thanh 3: Khi thanh 3 đứng trước thanh 1, 2, 4 thì chỉ đọc phần trầm xuống (211 - nửa thanh 3) không ngân cao lên; khi đứng cuối câu đọc đủ độ trầm rồi ngân nhẹ (214).`,
-      exampleHint: 'Lưu ý: Kết hợp với từ thanh 3 khác (ví dụ 很温暖 hěn wēnnuǎn) cần chú ý nhịp ngắt.',
+      spokenPinyin: `${syllables.slice(0, -1).join(' ')} · ${lastSyl} (thanh nhẹ)`,
+      explanationVi: `Âm tiết “${lastSyl}” trong từ “${cleanHanzi}” mang thanh nhẹ (轻声): đọc ngắn, nhẹ và nương theo độ cao của âm tiết đứng trước.`,
+      exampleHint: 'Ví dụ chuẩn: 咱们 (zánmen) · 朋友 (péngyou) · 暖和 (nuǎnhuo)',
     };
   }
 
-  // Default standard tone contour guidance
+  // 6. Default standard tone contour guidance (e.g. 温暖 wēn nuǎn: T1 + T3 - KHÔNG BIẾN ĐIỆU)
+  const toneDescription = syllables
+    .map((s, idx) => {
+      const t = toneNumbers[idx];
+      return t === 0 ? 'Thanh nhẹ' : `Thanh ${t}`;
+    })
+    .join(' + ');
+
   return {
     hasSandhi: false,
     ruleBadge: 'Chuẩn thanh điệu HSK 3.0',
-    ruleTitle: 'Giữ chuẩn cao độ 4 thanh điệu phổ thông (四声标准)',
+    ruleTitle: `Giữ trọn cao độ gốc (${toneDescription})`,
     originalPinyin: cleanPinyin,
     spokenPinyin: cleanPinyin,
-    explanationVi: `Từ “${cleanHanzi}” (${cleanPinyin}) giữ nguyên thanh điệu gốc khi phát âm độc lập. Chú ý phát âm rõ bật hơi và giữ đúng trường độ âm tiết.`,
-    exampleHint: 'Kết hợp luyện đọc to cả câu ví dụ để rèn ngữ điệu tự nhiên.',
+    explanationVi: `Từ “${cleanHanzi}” (${cleanPinyin}) có cấu trúc thanh điệu [${toneDescription}]: Giữ nguyên thanh điệu chuẩn của từng âm tiết khi phát âm. ${
+      toneNumbers[toneNumbers.length - 1] === 3
+        ? `Âm tiết cuối “${syllables[syllables.length - 1]}” mang thanh 3 giữ trọn đường cong cao độ chuẩn (214).`
+        : 'Phát âm rõ âm đầu và trường độ chuẩn Bắc Kinh.'
+    }`,
+    exampleHint: 'Đọc mẫu rõ ràng, kết hợp luyện câu ví dụ để rèn ngữ điệu đàm thoại tự nhiên.',
   };
 }
 
-export type SrsRating = 'again' | 'hard' | 'good';
+export type SrsRating = 'forgot' | 'hard' | 'good' | 'mastered' | 'again';
 
 export interface SrsWordRecord {
   slideId: string;
@@ -148,17 +191,20 @@ export interface SrsWordRecord {
   intervalLabel: string;
   reviewCount: number;
   inMistakeBook: boolean;
+  nextReviewTimestamp: number;
   updatedAt: string;
 }
 
 export const STORAGE_KEY_SRS_MISTAKE_BOOK = 'hanu_student_srs_mistake_book_v2';
 
 export function getInitialSrsRecords(slides: VocabSlide[]): Record<string, SrsWordRecord> {
-  // Seed 2 difficult words into "Sổ tay từ hay quên (错题本)" by default so student immediately sees active SRS state
   const defaults: Record<string, SrsWordRecord> = {};
   const seedHanzis = ['温暖', '融会贯通', '坚持'];
+  const now = Date.now();
+
   slides.forEach((s) => {
     if (seedHanzis.includes(s.hanzi)) {
+      const isDifficult = s.hanzi === '融会贯通';
       defaults[s.id] = {
         slideId: s.id,
         hanzi: s.hanzi,
@@ -166,10 +212,11 @@ export function getInitialSrsRecords(slides: VocabSlide[]): Record<string, SrsWo
         hanViet: s.hanViet,
         meaning: s.meaning,
         hskLevel: s.hskLevel,
-        rating: s.hanzi === '融会贯通' ? 'again' : 'hard',
-        intervalLabel: s.hanzi === '融会贯通' ? 'Ôn lại ngay (1 phút)' : 'Cần củng cố (10 phút)',
+        rating: isDifficult ? 'forgot' : 'hard',
+        intervalLabel: isDifficult ? 'Ôn lại ngay (1 phút)' : 'Cần củng cố (10 phút)',
         reviewCount: 1,
         inMistakeBook: true,
+        nextReviewTimestamp: isDifficult ? now - 1000 : now + 10 * 60 * 1000,
         updatedAt: 'Hôm nay',
       };
     }
@@ -202,6 +249,14 @@ export function saveStoredSrsRecords(records: Record<string, SrsWordRecord>): vo
   }
 }
 
+export function isSrsDueToday(record?: SrsWordRecord | null): boolean {
+  if (!record) return false;
+  if (record.inMistakeBook) return true;
+  if (record.rating === 'forgot' || record.rating === 'hard' || record.rating === 'again') return true;
+  if (record.nextReviewTimestamp && record.nextReviewTimestamp <= Date.now()) return true;
+  return false;
+}
+
 export function applySrsRatingToRecords(
   currentRecords: Record<string, SrsWordRecord>,
   slide: VocabSlide,
@@ -209,15 +264,29 @@ export function applySrsRatingToRecords(
 ): Record<string, SrsWordRecord> {
   const existing = currentRecords[slide.id];
   const prevCount = existing?.reviewCount || 0;
+  const now = Date.now();
 
-  const intervalLabel =
-    rating === 'again'
-      ? 'Ôn lại ngay (1 phút)'
-      : rating === 'hard'
-      ? 'Cần củng cố (10 phút)'
-      : 'Đã thuộc lòng (4 ngày)';
+  let intervalLabel = 'Cần củng cố (10 phút)';
+  let nextReviewTimestamp = now + 10 * 60 * 1000;
+  let inMistakeBook = false;
 
-  const inMistakeBook = rating === 'again' || rating === 'hard';
+  if (rating === 'forgot' || rating === 'again') {
+    intervalLabel = 'Ôn lại ngay (1 phút)';
+    nextReviewTimestamp = now + 60 * 1000;
+    inMistakeBook = true;
+  } else if (rating === 'hard') {
+    intervalLabel = 'Cần củng cố (10 phút)';
+    nextReviewTimestamp = now + 10 * 60 * 1000;
+    inMistakeBook = true;
+  } else if (rating === 'good') {
+    intervalLabel = 'Ôn lại sau (1 ngày)';
+    nextReviewTimestamp = now + 24 * 60 * 60 * 1000;
+    inMistakeBook = false;
+  } else if (rating === 'mastered') {
+    intervalLabel = 'Thuộc làu (4 ngày)';
+    nextReviewTimestamp = now + 4 * 24 * 60 * 60 * 1000;
+    inMistakeBook = false;
+  }
 
   const nextRecord: SrsWordRecord = {
     slideId: slide.id,
@@ -230,6 +299,7 @@ export function applySrsRatingToRecords(
     intervalLabel,
     reviewCount: prevCount + 1,
     inMistakeBook,
+    nextReviewTimestamp,
     updatedAt: 'Vừa xong',
   };
 
@@ -770,5 +840,361 @@ export function generateContextualDialogue(
     turns,
   };
 }
+
+// ============================================================================
+// 5. TEACHER CLASSROOM DICTATION STUDIO (听写 · TĪNGXIĚ) HELPERS
+// ============================================================================
+
+export interface ClassroomDictationItem {
+  id: string;
+  index: number;
+  hanzi: string;
+  pinyin: string;
+  hanViet: string;
+  meaning: string;
+  partOfSpeech: string;
+  hskLevel: string;
+  maskedHanzi: string;
+  strokeHint: string;
+  radicalHint: string;
+  exampleHanzi: string;
+  examplePinyin: string;
+  exampleVi: string;
+}
+
+export interface DictationEvaluationResult {
+  isExactHanzi: boolean;
+  isPinyinMatch: boolean;
+  accuracyPct: number;
+  matchedChars: string[];
+  missingChars: string[];
+  pedagogicalFeedback: string;
+}
+
+export function generateClassroomDictationDeck(
+  slides: VocabSlide[]
+): ClassroomDictationItem[] {
+  const source = slides.length > 0 ? slides : [];
+  return source.map((slide, idx) => {
+    const charArray = Array.from(slide.hanzi);
+    const strokeParts =
+      slide.characters && slide.characters.length > 0
+        ? slide.characters.map((c) => `${c.strokeCount} nét`).join(' + ')
+        : `${charArray.length * 8} nét`;
+    const radicalParts =
+      slide.characters && slide.characters.length > 0
+        ? slide.characters.map((c) => c.radical).join(' · ')
+        : 'Bộ thủ chuẩn HSK 3.0';
+
+    return {
+      id: `dict-${slide.id}`,
+      index: idx + 1,
+      hanzi: slide.hanzi,
+      pinyin: slide.pinyin,
+      hanViet: slide.hanViet,
+      meaning: slide.meaning,
+      partOfSpeech: slide.partOfSpeech,
+      hskLevel: slide.hskLevel,
+      maskedHanzi: charArray.map(() => '？').join(' '),
+      strokeHint: `${charArray.length} chữ Hán (${strokeParts})`,
+      radicalHint: `Bộ thủ: ${radicalParts}`,
+      exampleHanzi: slide.exampleHanzi,
+      examplePinyin: slide.examplePinyin,
+      exampleVi: slide.exampleMeaning,
+    };
+  });
+}
+
+function normalizePinyinComparison(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '');
+}
+
+export function evaluateDictationAttempt(
+  userInput: string,
+  item: ClassroomDictationItem
+): DictationEvaluationResult {
+  const cleaned = userInput.trim();
+  const targetChars = Array.from(item.hanzi);
+
+  if (!cleaned) {
+    return {
+      isExactHanzi: false,
+      isPinyinMatch: false,
+      accuracyPct: 0,
+      matchedChars: [],
+      missingChars: targetChars,
+      pedagogicalFeedback: `Hãy nghe kỹ âm đọc của từ (${item.meaning}) và nhập chữ Hán vào ô chính tả.`,
+    };
+  }
+
+  if (cleaned === item.hanzi) {
+    return {
+      isExactHanzi: true,
+      isPinyinMatch: true,
+      accuracyPct: 100,
+      matchedChars: targetChars,
+      missingChars: [],
+      pedagogicalFeedback: `Chính xác 100%! Bạn đã viết đúng chuẩn chữ Hán “${item.hanzi}” (${item.pinyin} - ${item.meaning}).`,
+    };
+  }
+
+  const matchedChars = targetChars.filter((ch) => cleaned.includes(ch));
+  const missingChars = targetChars.filter((ch) => !cleaned.includes(ch));
+  const isPinyinMatch =
+    normalizePinyinComparison(cleaned) === normalizePinyinComparison(item.pinyin);
+
+  if (matchedChars.length > 0) {
+    const pct = Math.round((matchedChars.length / targetChars.length) * 100);
+    return {
+      isExactHanzi: false,
+      isPinyinMatch,
+      accuracyPct: pct,
+      matchedChars,
+      missingChars,
+      pedagogicalFeedback: `Đã viết đúng chữ “${matchedChars.join(', ')}”, cần lưu ý bổ sung chữ “${missingChars.join(', ')}” (${item.radicalHint}).`,
+    };
+  }
+
+  if (isPinyinMatch) {
+    return {
+      isExactHanzi: false,
+      isPinyinMatch: true,
+      accuracyPct: 60,
+      matchedChars: [],
+      missingChars: targetChars,
+      pedagogicalFeedback: `Bạn đã nghe đúng phiên âm Pinyin “${item.pinyin}”! Hãy chuyển sang chữ Hán chuẩn: “${item.hanzi}” (${item.strokeHint}).`,
+    };
+  }
+
+  return {
+    isExactHanzi: false,
+    isPinyinMatch: false,
+    accuracyPct: 20,
+    matchedChars: [],
+    missingChars: targetChars,
+    pedagogicalFeedback: `Chưa khớp chữ Hán. Đáp án chuẩn là “${item.hanzi}” (${item.pinyin} · Hán Việt: ${item.hanViet.toUpperCase()} · Nghĩa: ${item.meaning}).`,
+  };
+}
+
+// ============================================================================
+// 6. STUDENT HSK 3.0 SENTENCE BUILDER & WORD ORDER ARENA (连词成句)
+// ============================================================================
+
+export interface Hsk3SentenceTile {
+  id: string;
+  hanzi: string;
+  pinyin: string;
+  posTag: string;
+  meaningHint: string;
+}
+
+export interface Hsk3SentenceBuilderChallenge {
+  id: string;
+  hskLevel: string;
+  grammarPointTitle: string;
+  grammarFormula: string;
+  vietnamesePrompt: string;
+  targetSentence: string;
+  targetPinyin: string;
+  tilesInCorrectOrder: Hsk3SentenceTile[];
+  shuffledTiles: Hsk3SentenceTile[];
+  pedagogicalExplanation: string;
+}
+
+export interface SentenceBuilderEvaluation {
+  isCorrect: boolean;
+  score: number;
+  assembledHanzi: string;
+  feedbackVi: string;
+  grammarDiagnostic: string;
+}
+
+export const HSK3_SENTENCE_BUILDER_CHALLENGES: Hsk3SentenceBuilderChallenge[] = [
+  {
+    id: 'sb-1',
+    hskLevel: 'HSK 1–2',
+    grammarPointTitle: 'Trật tự Trạng ngữ Thời gian & Địa điểm trước Động từ',
+    grammarFormula: 'Chủ ngữ + Thời gian + [在 + Địa điểm] + Cách thức + Động từ + Tân ngữ',
+    vietnamesePrompt:
+      'Chúng mình hôm nay ở trong lớp học chăm chỉ học tiếng Hán.',
+    targetSentence: '咱们今天在教室里认真学习汉语。',
+    targetPinyin: 'Zánmen jīntiān zài jiàoshì lǐ rènzhēn xuéxí Hànyǔ.',
+    tilesInCorrectOrder: [
+      { id: 'sb1-t1', hanzi: '咱们', pinyin: 'zánmen', posTag: 'Chủ ngữ', meaningHint: 'chúng mình' },
+      { id: 'sb1-t2', hanzi: '今天', pinyin: 'jīntiān', posTag: 'Thời gian', meaningHint: 'hôm nay' },
+      { id: 'sb1-t3', hanzi: '在教室里', pinyin: 'zài jiàoshì lǐ', posTag: 'Địa điểm', meaningHint: 'ở trong lớp' },
+      { id: 'sb1-t4', hanzi: '认真', pinyin: 'rènzhēn', posTag: 'Trạng ngữ', meaningHint: 'chăm chỉ' },
+      { id: 'sb1-t5', hanzi: '学习汉语', pinyin: 'xuéxí Hànyǔ', posTag: 'Động + Tân', meaningHint: 'học tiếng Hán' },
+    ],
+    shuffledTiles: [
+      { id: 'sb1-t3', hanzi: '在教室里', pinyin: 'zài jiàoshì lǐ', posTag: 'Địa điểm', meaningHint: 'ở trong lớp' },
+      { id: 'sb1-t5', hanzi: '学习汉语', pinyin: 'xuéxí Hànyǔ', posTag: 'Động + Tân', meaningHint: 'học tiếng Hán' },
+      { id: 'sb1-t1', hanzi: '咱们', pinyin: 'zánmen', posTag: 'Chủ ngữ', meaningHint: 'chúng mình' },
+      { id: 'sb1-t4', hanzi: '认真', pinyin: 'rènzhēn', posTag: 'Trạng ngữ', meaningHint: 'chăm chỉ' },
+      { id: 'sb1-t2', hanzi: '今天', pinyin: 'jīntiān', posTag: 'Thời gian', meaningHint: 'hôm nay' },
+    ],
+    pedagogicalExplanation:
+      'Trong tiếng Trung, trạng ngữ chỉ thời gian (今天) đứng trước trạng ngữ chỉ nơi chốn (在教室里), và cả hai bắt buộc đứng trước cụm động từ chính (认真学习汉语).',
+  },
+  {
+    id: 'sb-2',
+    hskLevel: 'HSK 2–3',
+    grammarPointTitle: 'Câu chữ 把 (把字句) chỉ sự tác động làm thay đổi trạng thái',
+    grammarFormula: '请 / Chủ ngữ + 把 + [Định ngữ + Tân ngữ] + Động từ + Bổ ngữ kết quả',
+    vietnamesePrompt: 'Xin hãy bật chiếc điều hòa ở trong phòng lên.',
+    targetSentence: '请把房间里的空调打开。',
+    targetPinyin: 'Qǐng bǎ fángjiān lǐ de kōngtiáo dǎkāi.',
+    tilesInCorrectOrder: [
+      { id: 'sb2-t1', hanzi: '请', pinyin: 'qǐng', posTag: 'Động từ lịch sự', meaningHint: 'xin hãy' },
+      { id: 'sb2-t2', hanzi: '把', pinyin: 'bǎ', posTag: 'Giới từ 把', meaningHint: 'đem / lấy' },
+      { id: 'sb2-t3', hanzi: '房间里的', pinyin: 'fángjiān lǐ de', posTag: 'Định ngữ', meaningHint: 'trong phòng' },
+      { id: 'sb2-t4', hanzi: '空调', pinyin: 'kōngtiáo', posTag: 'Tân ngữ', meaningHint: 'điều hòa' },
+      { id: 'sb2-t5', hanzi: '打开', pinyin: 'dǎkāi', posTag: 'Động + Bổ ngữ', meaningHint: 'mở / bật lên' },
+    ],
+    shuffledTiles: [
+      { id: 'sb2-t4', hanzi: '空调', pinyin: 'kōngtiáo', posTag: 'Tân ngữ', meaningHint: 'điều hòa' },
+      { id: 'sb2-t1', hanzi: '请', pinyin: 'qǐng', posTag: 'Động từ lịch sự', meaningHint: 'xin hãy' },
+      { id: 'sb2-t5', hanzi: '打开', pinyin: 'dǎkāi', posTag: 'Động + Bổ ngữ', meaningHint: 'mở / bật lên' },
+      { id: 'sb2-t2', hanzi: '把', pinyin: 'bǎ', posTag: 'Giới từ 把', meaningHint: 'đem / lấy' },
+      { id: 'sb2-t3', hanzi: '房间里的', pinyin: 'fángjiān lǐ de', posTag: 'Định ngữ', meaningHint: 'trong phòng' },
+    ],
+    pedagogicalExplanation:
+      'Cấu trúc câu chữ 把 đưa đối tượng chịu tác động (房间里的空调) lên trước động từ kèm bổ ngữ kết quả (打开), tuyệt đối không viết “请把打开空调”.',
+  },
+  {
+    id: 'sb-3',
+    hskLevel: 'HSK 2',
+    grammarPointTitle: 'Cấu trúc 挺 + Tính từ + 的 biểu thị mức độ khá cao',
+    grammarFormula: 'Chủ ngữ (Cụm danh từ có 的) + Danh từ thuộc tính + 挺 + Tính từ + 的',
+    vietnamesePrompt: 'Món ăn mẹ nấu hương vị khá là ngon.',
+    targetSentence: '妈妈做的菜味道挺好的。',
+    targetPinyin: 'Māma zuò de cài wèidào tǐng hǎo de.',
+    tilesInCorrectOrder: [
+      { id: 'sb3-t1', hanzi: '妈妈', pinyin: 'māma', posTag: 'Định ngữ', meaningHint: 'mẹ' },
+      { id: 'sb3-t2', hanzi: '做的菜', pinyin: 'zuò de cài', posTag: 'Trung tâm ngữ', meaningHint: 'món ăn nấu' },
+      { id: 'sb3-t3', hanzi: '味道', pinyin: 'wèidào', posTag: 'Chủ ngữ nhỏ', meaningHint: 'hương vị' },
+      { id: 'sb3-t4', hanzi: '挺', pinyin: 'tǐng', posTag: 'Phó từ mức độ', meaningHint: 'khá là' },
+      { id: 'sb3-t5', hanzi: '好的', pinyin: 'hǎo de', posTag: 'Tính từ + 的', meaningHint: 'ngon / tốt' },
+    ],
+    shuffledTiles: [
+      { id: 'sb3-t3', hanzi: '味道', pinyin: 'wèidào', posTag: 'Chủ ngữ nhỏ', meaningHint: 'hương vị' },
+      { id: 'sb3-t5', hanzi: '好的', pinyin: 'hǎo de', posTag: 'Tính từ + 的', meaningHint: 'ngon / tốt' },
+      { id: 'sb3-t1', hanzi: '妈妈', pinyin: 'māma', posTag: 'Định ngữ', meaningHint: 'mẹ' },
+      { id: 'sb3-t4', hanzi: '挺', pinyin: 'tǐng', posTag: 'Phó từ mức độ', meaningHint: 'khá là' },
+      { id: 'sb3-t2', hanzi: '做的菜', pinyin: 'zuò de cài', posTag: 'Trung tâm ngữ', meaningHint: 'món ăn nấu' },
+    ],
+    pedagogicalExplanation:
+      'Trong cụm danh từ tiếng Trung, định ngữ miêu tả (妈妈做的) đứng trước danh từ chính (菜), sau đó dùng cấu trúc vị ngữ chủ-vị “味道挺好的”.',
+  },
+  {
+    id: 'sb-4',
+    hskLevel: 'HSK 3',
+    grammarPointTitle: 'Mệnh đề chỉ mục đích 为了... và Bổ ngữ kết quả 好',
+    grammarFormula: '为了 + Mục đích + Chủ ngữ + 已经 + Động từ + 好 + 了',
+    vietnamesePrompt: 'Vì kỳ thi ngày mai, tôi đã ôn tập kỹ càng xong xuôi rồi.',
+    targetSentence: '为了明天的考试我已经复习好了。',
+    targetPinyin: 'Wèile míngtiān de kǎoshì wǒ yǐjīng fùxí hǎo le.',
+    tilesInCorrectOrder: [
+      { id: 'sb4-t1', hanzi: '为了', pinyin: 'wèile', posTag: 'Giới từ mục đích', meaningHint: 'vì / để' },
+      { id: 'sb4-t2', hanzi: '明天的考试', pinyin: 'míngtiān de kǎoshì', posTag: 'Cụm danh từ', meaningHint: 'kỳ thi ngày mai' },
+      { id: 'sb4-t3', hanzi: '我', pinyin: 'wǒ', posTag: 'Chủ ngữ', meaningHint: 'tôi' },
+      { id: 'sb4-t4', hanzi: '已经', pinyin: 'yǐjīng', posTag: 'Phó từ thời gian', meaningHint: 'đã' },
+      { id: 'sb4-t5', hanzi: '复习好了', pinyin: 'fùxí hǎo le', posTag: 'Động + Bổ ngữ', meaningHint: 'ôn tập xong' },
+    ],
+    shuffledTiles: [
+      { id: 'sb4-t4', hanzi: '已经', pinyin: 'yǐjīng', posTag: 'Phó từ thời gian', meaningHint: 'đã' },
+      { id: 'sb4-t2', hanzi: '明天的考试', pinyin: 'míngtiān de kǎoshì', posTag: 'Cụm danh từ', meaningHint: 'kỳ thi ngày mai' },
+      { id: 'sb4-t5', hanzi: '复习好了', pinyin: 'fùxí hǎo le', posTag: 'Động + Bổ ngữ', meaningHint: 'ôn tập xong' },
+      { id: 'sb4-t1', hanzi: '为了', pinyin: 'wèile', posTag: 'Giới từ mục đích', meaningHint: 'vì / để' },
+      { id: 'sb4-t3', hanzi: '我', pinyin: 'wǒ', posTag: 'Chủ ngữ', meaningHint: 'tôi' },
+    ],
+    pedagogicalExplanation:
+      'Giới từ “为了” + mục đích (明天的考试) đặt ở đầu câu; phó từ “已经” đi liền với bổ ngữ kết quả “复习好了” để nhấn mạnh hành động đã hoàn tất trọn vẹn.',
+  },
+  {
+    id: 'sb-5',
+    hskLevel: 'HSK 2–3',
+    grammarPointTitle: 'Bổ ngữ trạng thái với trợ từ kết cấu 得 (V + 得 + 非常 + Adj)',
+    grammarFormula: 'Bối cảnh + Chủ ngữ (Định ngữ + 的 + Danh từ) + Động từ + 得 + 非常 + Tính từ',
+    vietnamesePrompt: 'Mùa xuân đến rồi, hoa trong vườn nở vô cùng đẹp.',
+    targetSentence: '春天来了花园里的花开得非常漂亮。',
+    targetPinyin: 'Chūntiān lái le huāyuán lǐ de huā kāi de fēicháng piàoliang.',
+    tilesInCorrectOrder: [
+      { id: 'sb5-t1', hanzi: '春天来了', pinyin: 'chūntiān lái le', posTag: 'Mệnh đề thời tiết', meaningHint: 'xuân đến rồi' },
+      { id: 'sb5-t2', hanzi: '花园里的花', pinyin: 'huāyuán lǐ de huā', posTag: 'Chủ ngữ', meaningHint: 'hoa trong vườn' },
+      { id: 'sb5-t3', hanzi: '开得', pinyin: 'kāi de', posTag: 'Động từ + 得', meaningHint: 'nở (đến mức)' },
+      { id: 'sb5-t4', hanzi: '非常', pinyin: 'fēicháng', posTag: 'Phó từ mức độ', meaningHint: 'vô cùng' },
+      { id: 'sb5-t5', hanzi: '漂亮', pinyin: 'piàoliang', posTag: 'Bổ ngữ trạng thái', meaningHint: 'đẹp' },
+    ],
+    shuffledTiles: [
+      { id: 'sb5-t3', hanzi: '开得', pinyin: 'kāi de', posTag: 'Động từ + 得', meaningHint: 'nở (đến mức)' },
+      { id: 'sb5-t5', hanzi: '漂亮', pinyin: 'piàoliang', posTag: 'Bổ ngữ trạng thái', meaningHint: 'đẹp' },
+      { id: 'sb5-t2', hanzi: '花园里的花', pinyin: 'huāyuán lǐ de huā', posTag: 'Chủ ngữ', meaningHint: 'hoa trong vườn' },
+      { id: 'sb5-t1', hanzi: '春天来了', pinyin: 'chūntiān lái le', posTag: 'Mệnh đề thời tiết', meaningHint: 'xuân đến rồi' },
+      { id: 'sb5-t4', hanzi: '非常', pinyin: 'fēicháng', posTag: 'Phó từ mức độ', meaningHint: 'vô cùng' },
+    ],
+    pedagogicalExplanation:
+      'Để miêu tả mức độ/trạng thái của động tác “开” (nở), bắt buộc dùng trợ từ kết cấu “得” ngay sau động từ: “开得非常漂亮”.',
+  },
+];
+
+export function evaluateSentenceBuilderOrder(
+  selectedTileIds: string[],
+  challenge: Hsk3SentenceBuilderChallenge
+): SentenceBuilderEvaluation {
+  const expectedIds = challenge.tilesInCorrectOrder.map((t) => t.id);
+  const tileLookup = new Map(
+    challenge.tilesInCorrectOrder.map((t) => [t.id, t])
+  );
+  const assembledHanzi = selectedTileIds
+    .map((id) => tileLookup.get(id)?.hanzi || '')
+    .join('');
+
+  if (selectedTileIds.length === 0) {
+    return {
+      isCorrect: false,
+      score: 0,
+      assembledHanzi: '',
+      feedbackVi: 'Bạn chưa chọn thẻ từ nào. Hãy bấm vào các thẻ từ bên dưới để ghép thành câu hoàn chỉnh.',
+      grammarDiagnostic: challenge.grammarFormula,
+    };
+  }
+
+  const isExactLength = selectedTileIds.length === expectedIds.length;
+  const exactMatches = selectedTileIds.filter(
+    (id, index) => id === expectedIds[index]
+  ).length;
+  const isCorrect =
+    isExactLength && exactMatches === expectedIds.length;
+
+  if (isCorrect) {
+    return {
+      isCorrect: true,
+      score: 100,
+      assembledHanzi: `${assembledHanzi}。`,
+      feedbackVi: `Chính xác 100%! Bạn đã nắm vững cấu trúc “${challenge.grammarPointTitle}”.`,
+      grammarDiagnostic: challenge.pedagogicalExplanation,
+    };
+  }
+
+  const partialScore = Math.max(
+    15,
+    Math.round((exactMatches / expectedIds.length) * 80)
+  );
+
+  return {
+    isCorrect: false,
+    score: partialScore,
+    assembledHanzi,
+    feedbackVi: `Đúng ${exactMatches}/${expectedIds.length} vị trí từ loại. Lưu ý công thức chuẩn: ${challenge.grammarFormula}.`,
+    grammarDiagnostic: `${challenge.pedagogicalExplanation} → Câu chuẩn: “${challenge.targetSentence}”`,
+  };
+}
+
 
 

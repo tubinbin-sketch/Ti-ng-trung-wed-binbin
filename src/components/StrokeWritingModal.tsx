@@ -362,7 +362,7 @@ export const StrokeWritingModal: React.FC<StrokeWritingModalProps> = ({
               value={speechRate}
               onChange={(e) => setPreferredSpeechRate(parseFloat(e.target.value))}
               className="w-16 accent-[#DFC470] cursor-pointer"
-              aria-label="Tốc độ giọng đọc AI trong cửa sổ tập viết"
+              aria-label="Tốc độ giọng đọc chuẩn trong cửa sổ tập viết"
             />
             <span className="text-[#F7E29C] font-semibold tabular-nums">
               {speechRate.toFixed(2).replace(/0$/, '')}x

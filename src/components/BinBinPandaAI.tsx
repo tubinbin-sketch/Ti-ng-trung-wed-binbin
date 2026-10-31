@@ -26,9 +26,11 @@ import {
   generateBinBinSmartReply,
 } from '../utils/chineseEngine';
 import {
+  getIsSpeaking,
   isSpeechRecognitionSupported,
   speakChinese,
   startChineseSpeechRecognition,
+  subscribeSpeakingState,
 } from '../utils/speech';
 
 export type PandaMood = 'idle' | 'happy' | 'thinking' | 'speaking' | 'cheering';
@@ -51,6 +53,8 @@ export interface BinBinPandaAIProps {
   title?: string;
   /** Callback to push a vocabulary word or example sentence directly into the Slide Deck */
   onApplyToSlide?: (payload: BinBinSlidePayload) => void;
+  /** Hide the closed floating trigger button (e.g. on Homework/Leaderboard tab where Top Navbar already has a fixed 🐼 trigger) */
+  hideFloatingTrigger?: boolean;
 }
 
 interface ChatMessage {
@@ -221,6 +225,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
   externalMood,
   title,
   onApplyToSlide,
+  hideFloatingTrigger = false,
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [displayMode, setDisplayMode] = useState<BinBinDisplayMode>('compact');
@@ -229,9 +234,30 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isListeningMic, setIsListeningMic] = useState(false);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
-  const [appliedSlideMsgId, setAppliedSlideMsgId] = useState<string | null>(null);
+  const [activeInteractivePanel, setActiveInteractivePanel] = useState<
+    'none' | 'sentence-builder' | 'roleplay'
+  >('none');
+  const [roleplayStep, setRoleplayStep] = useState<number>(0);
   const stopRecognitionRef = useRef<(() => void) | null>(null);
   const messageStreamRef = useRef<HTMLDivElement | null>(null);
+  const chatInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const handleOpen = () => setIsOpen(true);
+    window.addEventListener('binbin:open-assistant', handleOpen);
+    return () => window.removeEventListener('binbin:open-assistant', handleOpen);
+  }, []);
+
+  // Broadcast dock state so App.tsx can shift main content when BinBin is open & docked right
+  useEffect(() => {
+    if (typeof window !== 'undefined' && variant === 'floating') {
+      window.dispatchEvent(
+        new CustomEvent('binbin:dock-state', {
+          detail: { isOpen, displayMode },
+        })
+      );
+    }
+  }, [isOpen, displayMode, variant]);
 
   const buildInitialMessage = (slide?: VocabSlide | null): ChatMessage => {
     const initialReply = generateBinBinSmartReply(
@@ -260,6 +286,16 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
     buildInitialMessage(activeSlide),
   ]);
 
+  const [isSpeakingTts, setIsSpeakingTts] = useState<boolean>(() => getIsSpeaking());
+  const [appliedSlideMsgId, setAppliedSlideMsgId] = useState<string | null>(null);
+
+  useEffect(() => {
+    return subscribeSpeakingState((speaking) => {
+      setIsSpeakingTts(speaking);
+      setMood((prev) => (speaking ? 'speaking' : prev === 'speaking' ? 'happy' : prev));
+    });
+  }, []);
+
   useEffect(() => {
     if (externalMood) {
       setMood(externalMood);
@@ -269,6 +305,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
   // Keep welcome card synced with activeSlide if user hasn't started chatting yet
   useEffect(() => {
     if (!activeSlide) return;
+    setRoleplayStep(0);
     setMessages((prev) => {
       if (prev.length === 1 && prev[0].id === 'binbin-welcome') {
         return [buildInitialMessage(activeSlide)];
@@ -285,7 +322,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
     } else {
       messageStreamRef.current.scrollTop = messageStreamRef.current.scrollHeight;
     }
-  }, [messages.length, isOpen, activeSlide?.hanzi]);
+  }, [messages.length, isOpen, activeSlide?.hanzi, activeInteractivePanel]);
 
   const handleSpeakPhrase = (hanzi: string) => {
     setMood('speaking');
@@ -381,7 +418,11 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
     if (!userInput.trim()) return;
     const text = userInput.trim();
     setUserInput('');
-    triggerAction('chat', text, text);
+    if (activeInteractivePanel === 'sentence-builder') {
+      triggerAction('grammar-fix', text, text);
+    } else {
+      triggerAction('chat', text, text);
+    }
   };
 
   const handleToggleVoiceChat = () => {
@@ -392,7 +433,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
     }
 
     if (!isSpeechRecognitionSupported()) {
-      const sampleSpoken = activeSlide?.exampleHanzi || '春天 的 阳光 非常 温暖。';
+      const sampleSpoken = activeSlide?.exampleHanzi || '春天的阳光非常温暖。';
       triggerAction('grammar-fix', sampleSpoken, sampleSpoken);
       return;
     }
@@ -479,12 +520,15 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
 
   const handleClearChat = () => {
     setMessages([buildInitialMessage(activeSlide)]);
+    setActiveInteractivePanel('none');
     setMood('idle');
   };
 
   const currentFocusWord = activeSlide?.hanzi || '温暖';
+  const currentFocusPinyin = activeSlide?.pinyin || 'wēn nuǎn';
+  const currentFocusMeaning = activeSlide?.meaning || 'ấm áp';
 
-  // 28px Horizontal Scrollable Quick-Action Chips right above the input box
+  // Quick-Action Chips right above the input box (flex-wrap so no button is ever clipped)
   const quickActionChips: {
     id: BinBinActionType;
     label: string;
@@ -519,6 +563,52 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
     },
   ];
 
+  const handleQuickChipClick = (chip: {
+    id: BinBinActionType;
+    label: string;
+    prompt: string;
+  }) => {
+    if (chip.id === 'grammar-fix') {
+      setActiveInteractivePanel('sentence-builder');
+      if (userInput.trim()) {
+        const text = userInput.trim();
+        setUserInput('');
+        triggerAction('grammar-fix', text, text);
+      } else {
+        setTimeout(() => chatInputRef.current?.focus(), 60);
+      }
+      return;
+    }
+    if (chip.id === 'dialogue') {
+      setActiveInteractivePanel('roleplay');
+      setRoleplayStep(0);
+      triggerAction('dialogue', chip.prompt);
+      return;
+    }
+    setActiveInteractivePanel('none');
+    triggerAction(chip.id, chip.prompt);
+  };
+
+  // Listen for contextual "🐼 Hỏi 彬彬 câu này" events from wrong quiz questions
+  useEffect(() => {
+    const handleAskQuestion = (e: Event) => {
+      const customEvent = e as CustomEvent<{
+        prompt?: string;
+        targetWord?: string;
+        actionType?: BinBinActionType;
+      }>;
+      const promptText = (customEvent.detail?.prompt || '').trim();
+      const actionType = customEvent.detail?.actionType || 'chat';
+      setIsOpen(true);
+      setActiveInteractivePanel('none');
+      if (promptText) {
+        triggerAction(actionType, promptText, promptText);
+      }
+    };
+    window.addEventListener('binbin:ask-question', handleAskQuestion);
+    return () => window.removeEventListener('binbin:ask-question', handleAskQuestion);
+  }, [activeSlide?.hanzi]);
+
   // Closed state trigger button (renders for both inline and floating when !isOpen)
   if (!isOpen) {
     if (variant === 'inline') {
@@ -540,30 +630,25 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
       );
     }
 
+    if (hideFloatingTrigger) {
+      return null;
+    }
+
     return (
       <div
-        className="fixed bottom-3 right-3 sm:bottom-4 sm:right-5 z-50 flex flex-col items-end"
+        className="fixed bottom-2.5 right-2.5 z-40 flex items-center justify-center opacity-75 hover:opacity-100 transition-opacity duration-200"
         data-testid="binbin-floating-widget"
       >
         <button
           type="button"
           onClick={() => setIsOpen(true)}
+          title="Hỏi Trợ Giảng Gấu Trúc · 彬彬"
           aria-label="Mở Trợ Giảng Gấu Trúc · 彬彬"
           data-testid="binbin-floating-toggle"
-          className="group flex items-center gap-2 px-3.5 py-2 rounded-full bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] border border-[#C5B358]/80 shadow-[0_8px_28px_rgb(15,82,67,0.28)] hover:scale-[1.02] active:scale-95 transition-all duration-200 cursor-pointer"
+          className="group relative w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] border-2 border-[#C5B358] shadow-[0_4px_14px_rgba(15,82,67,0.3)] hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer"
         >
-          <div className="relative w-7 h-7 rounded-full bg-[#FAF7F0] p-0.5 flex items-center justify-center shrink-0">
-            <PandaMascotSVG mood={mood} className="w-6 h-6" />
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#10B981] border border-[#0F5243]" />
-          </div>
-          <div className="text-left pr-1">
-            <div className="text-xs font-bold text-[#FAF7F0] flex items-center gap-1.5 leading-none">
-              <span>🐼 Trợ Giảng Gấu Trúc · 彬彬</span>
-            </div>
-            <div className="text-[9.5px] font-semibold text-[#FDE68A] mt-0.5 leading-none">
-              Hệ Thống Trợ Giảng Hán Ngữ Thông Minh · 彬彬
-            </div>
-          </div>
+          <span className="text-base sm:text-lg leading-none select-none">🐼</span>
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#10B981] border border-[#0F5243] animate-pulse" />
         </button>
       </div>
     );
@@ -573,7 +658,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
   const containerClassName =
     displayMode === 'docked'
       ? 'fixed top-0 right-0 z-50 w-full sm:w-[360px] h-screen flex flex-col bg-[#FAF7F0] border-l-2 border-[#C5B358] shadow-[-12px_0_40px_rgb(15,56,46,0.22)]'
-      : 'fixed bottom-3 right-3 sm:bottom-4 sm:right-5 z-50 w-[94vw] sm:w-[410px] h-[480px] max-h-[78vh] rounded-2xl flex flex-col overflow-hidden bg-[#FAF7F0] border-2 border-[#C5B358]/80 shadow-[0_20px_50px_rgb(15,56,46,0.25)]';
+      : 'fixed bottom-3 right-3 sm:bottom-4 sm:right-5 z-50 w-[94vw] sm:w-[415px] h-[510px] max-h-[82vh] rounded-2xl flex flex-col overflow-hidden bg-[#FAF7F0] border-2 border-[#C5B358]/80 shadow-[0_20px_50px_rgb(15,56,46,0.25)]';
 
   return (
     <div
@@ -581,10 +666,11 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
         variant === 'inline' ? 'binbin-inline-card' : 'binbin-floating-widget'
       }
       data-display-mode={displayMode}
+      onKeyDown={(e) => e.stopPropagation()}
       className={containerClassName}
     >
       {/* =====================================================================
-          1. COMPACT HEADER (Single Minimize Button + Mode Switcher + Clear)
+          1. COMPACT HEADER (Dock Right / Floating Mode Switcher + Clear + Close)
           ===================================================================== */}
       <div className="px-3 py-2 bg-[#0F5243] text-[#FAF7F0] flex items-center justify-between gap-1.5 shrink-0 border-b border-[#C5B358]/50">
         <div className="flex items-center gap-2 min-w-0">
@@ -596,7 +682,9 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
               {title || '🐼 Trợ Giảng Gấu Trúc · 彬彬'}
             </div>
             <div className="flex items-center gap-1.5 text-[10px] text-[#E6EFEA]/90 truncate">
-              <span className="text-[#FDE68A] font-bold">Gia Sư Hán Ngữ Trực Tuyến</span>
+              <span className="text-[#FDE68A] font-bold">
+                {isSpeakingTts ? '🔊 Đang phát âm chuẩn...' : 'Gia Sư Hán Ngữ Trực Tuyến'}
+              </span>
               <span>·</span>
               <strong className="text-[#FDE68A] font-['Noto_Sans_SC']">
                 {activeSlide?.hanzi || '温暖'}
@@ -605,7 +693,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
           </div>
         </div>
 
-        {/* Right Header Controls: [Mode Toggle: Compact / Side Panel 360px] + [🗑️ Xóa chat] + [Thu nhỏ ✕] */}
+        {/* Right Header Controls: [Neo phải / Cửa sổ nổi] + [🗑️ Xóa] + [Thu nhỏ ✕] */}
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
@@ -615,20 +703,24 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
             }
             title={
               displayMode === 'compact'
-                ? 'Chuyển sang Chế độ Thanh bên (Docked Side Panel 360px)'
-                : 'Chuyển sang Chế độ Cửa sổ gọn (Compact Popover)'
+                ? 'Neo sang phải (Dock right) để không che khuất thẻ từ vựng & Ô Mễ Tự Cách'
+                : 'Chuyển về cửa sổ nổi (Floating)'
             }
-            className="inline-flex items-center gap-1 px-1.5 py-1 rounded-lg bg-white/12 hover:bg-white/22 text-[10px] font-bold text-[#FAF7F0] border border-white/15 transition-colors cursor-pointer"
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+              displayMode === 'docked'
+                ? 'bg-[#C5B358] text-[#0F382E] border-[#FDE68A]'
+                : 'bg-white/12 hover:bg-white/22 text-[#FAF7F0] border-white/15'
+            }`}
           >
             {displayMode === 'compact' ? (
               <>
                 <PanelRight className="w-3 h-3 text-[#FDE68A]" />
-                <span>Ghim</span>
+                <span>Neo phải</span>
               </>
             ) : (
               <>
-                <PanelRightClose className="w-3 h-3 text-[#FDE68A]" />
-                <span>Gọn</span>
+                <PanelRightClose className="w-3 h-3 text-[#0F382E]" />
+                <span>Đang neo</span>
               </>
             )}
           </button>
@@ -658,7 +750,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
       </div>
 
       {/* =====================================================================
-          2. SPACIOUS MESSAGE STREAM (75%+ Window Area)
+          2. SPACIOUS MESSAGE STREAM (Zero Duplicate Text + Clean Visual Cards)
           ===================================================================== */}
       <div
         ref={messageStreamRef}
@@ -678,6 +770,50 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
 
           const isCopied = copiedMsgId === msg.id;
           const isSlideApplied = appliedSlideMsgId === msg.id;
+          const hasCollocationsCard = Boolean(
+            msg.collocations && msg.collocations.length > 0
+          );
+          const hasSynonymCard = Boolean(
+            msg.synonymDistinction && msg.synonymDistinction.items.length > 1
+          );
+          const hasCorrectionCard = Boolean(msg.sentenceCorrection);
+          const hasExerciseCard = Boolean(msg.teacherExercise);
+
+          // Filter out any text lines that duplicate the dedicated visual cards below
+          const nonDuplicateLines = msg.text
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((trimmedLine) => {
+              if (!trimmedLine) return false;
+              if (
+                hasCollocationsCard &&
+                (/^•\s*(\d+\.\s*)?Kết hợp từ chuẩn/i.test(trimmedLine) ||
+                  /Collocations/i.test(trimmedLine))
+              ) {
+                return false;
+              }
+              if (
+                hasSynonymCard &&
+                /^•\s*(\d+\.\s*)?Phân biệt từ dễ nhầm/i.test(trimmedLine)
+              ) {
+                return false;
+              }
+              if (
+                hasCorrectionCard &&
+                (/^•\s*Câu chuẩn/i.test(trimmedLine) ||
+                  /^•\s*Dịch nghĩa/i.test(trimmedLine))
+              ) {
+                return false;
+              }
+              if (
+                hasExerciseCard &&
+                (/^\d+\.\s*Câu\s*\d+/i.test(trimmedLine) ||
+                  /^→\s*Đáp án:/i.test(trimmedLine))
+              ) {
+                return false;
+              }
+              return true;
+            });
 
           return (
             <div key={msg.id} className="flex justify-start">
@@ -707,11 +843,9 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                   </div>
                 )}
 
-                {/* Main Structured Explanation (Bullet Lines) */}
+                {/* Main Structured Explanation (Non-duplicated Bullet Lines) */}
                 <div className="space-y-1 text-xs leading-relaxed text-[#1E3227]">
-                  {msg.text.split('\n').map((line, lIdx) => {
-                    const trimmedLine = line.trim();
-                    if (!trimmedLine) return null;
+                  {nonDuplicateLines.map((trimmedLine, lIdx) => {
                     const isBullet =
                       trimmedLine.startsWith('•') || /^\d+\./.test(trimmedLine);
                     return (
@@ -767,7 +901,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                   </div>
                 )}
 
-                {/* Authentic Collocations Strip (100% Real Native Combinations) */}
+                {/* Authentic Collocations Strip (Single Visual Card) */}
                 {msg.collocations && msg.collocations.length > 0 && (
                   <div
                     data-testid="binbin-collocations-box"
@@ -801,7 +935,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                   </div>
                 )}
 
-                {/* Synonym Distinction Box */}
+                {/* Synonym Distinction Box (Single Visual Card) */}
                 {msg.synonymDistinction &&
                   msg.synonymDistinction.items.length > 1 && (
                     <div
@@ -963,6 +1097,143 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
           );
         })}
 
+        {/* Interactive Sentence Builder & Grammar Checker Card */}
+        {activeInteractivePanel === 'sentence-builder' && (
+          <div
+            data-testid="binbin-interactive-sentence-builder"
+            className="rounded-2xl bg-[#FFFDF7] border-2 border-[#C84B31]/45 p-3 shadow-xs space-y-2 text-[#0F382E]"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#C84B31]">
+                ✍️ Thử thách Tự đặt câu với “{currentFocusWord}” ({currentFocusPinyin})
+              </span>
+              <button
+                type="button"
+                onClick={() => setActiveInteractivePanel('none')}
+                className="text-[10px] font-bold text-[#5F7266] hover:text-[#0F382E] cursor-pointer"
+              >
+                Đóng ✕
+              </button>
+            </div>
+            <p className="text-[11px] text-[#3F5447] leading-snug">
+              Hãy gõ 1 câu tiếng Trung có chứa từ <strong>“{currentFocusWord}”</strong> ({currentFocusMeaning}) vào ô bên dưới để 彬彬 kiểm tra ngữ pháp, hoặc bấm thử các câu mẫu hay nhầm:
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                data-testid="binbin-sample-error-1"
+                onClick={() => {
+                  const s =
+                    currentFocusWord === '温暖'
+                      ? '今天天气很温暖'
+                      : `我非常${currentFocusWord}今天`;
+                  triggerAction('grammar-fix', s, s);
+                }}
+                className="px-2 py-1 rounded-lg bg-[#FDF2F2] hover:bg-[#FCE8E8] border border-[#C84B31]/30 text-[10.5px] font-bold text-[#7F1D1D] cursor-pointer"
+              >
+                Thử câu dễ nhầm: “
+                {currentFocusWord === '温暖'
+                  ? '今天天气很温暖'
+                  : `我非常${currentFocusWord}今天`}
+                ”
+              </button>
+              <button
+                type="button"
+                data-testid="binbin-sample-error-2"
+                onClick={() => {
+                  const s = `今天天气是${currentFocusWord}`;
+                  triggerAction('grammar-fix', s, s);
+                }}
+                className="px-2 py-1 rounded-lg bg-[#FDF2F2] hover:bg-[#FCE8E8] border border-[#C84B31]/30 text-[10.5px] font-bold text-[#7F1D1D] cursor-pointer"
+              >
+                Thử lỗi dùng 是: “今天天气是{currentFocusWord}”
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Interactive Roleplay A/B Practice Card */}
+        {activeInteractivePanel === 'roleplay' && (
+          <div
+            data-testid="binbin-interactive-roleplay-card"
+            className="rounded-2xl bg-[#F4F6EE] border-2 border-[#0F5243]/30 p-3 shadow-xs space-y-2 text-[#0F382E]"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0F5243]">
+                🗣️ Đóng vai Hội thoại Tương tác A / B · Từ khóa “{currentFocusWord}”
+              </span>
+              <button
+                type="button"
+                onClick={() => setActiveInteractivePanel('none')}
+                className="text-[10px] font-bold text-[#5F7266] hover:text-[#0F382E] cursor-pointer"
+              >
+                Đóng ✕
+              </button>
+            </div>
+
+            <div className="space-y-1.5 text-xs">
+              <div className="p-2 rounded-xl bg-white border border-[#0F5243]/15 flex items-center justify-between gap-2">
+                <div>
+                  <span className="font-bold text-[#0F5243]">🐼 彬彬 (Vai A): </span>
+                  <span className="font-['Noto_Sans_SC'] font-bold">
+                    你能用“{currentFocusWord}”说一句话吗？
+                  </span>
+                  <div className="text-[10.5px] text-[#5F7266]">
+                    (Bạn có thể dùng từ “{currentFocusWord}” đặt một câu trong giao tiếp không?)
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleSpeakPhrase(`你能用${currentFocusWord}说一句话吗？`)
+                  }
+                  className="px-2 py-1 rounded-lg bg-[#0F5243] text-white text-[10px] font-bold shrink-0 cursor-pointer"
+                >
+                  🔊 Nghe A
+                </button>
+              </div>
+
+              <div className="p-2 rounded-xl bg-[#FAF7F0] border border-[#C5B358]/50 space-y-1.5">
+                <div className="text-[10.5px] font-bold text-[#8A7630]">
+                  🎓 Lượt của bạn (Vai B) — Chọn câu trả lời hoặc bấm 🎙️ để nói:
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    data-testid="binbin-roleplay-reply-1"
+                    onClick={() => {
+                      const replyLine =
+                        activeSlide?.exampleHanzi || `春天的阳光非常${currentFocusWord}。`;
+                      setRoleplayStep(1);
+                      handleSpeakPhrase(replyLine);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-[#0F5243] hover:bg-[#166E5B] text-[#FAF7F0] text-[11px] font-bold cursor-pointer text-left"
+                  >
+                    🗣️ Đáp mẫu 1: “{activeSlide?.exampleHanzi || `春天的阳光非常${currentFocusWord}。`}”
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="binbin-roleplay-reply-2"
+                    onClick={() => {
+                      const replyLine = `这个词“${currentFocusWord}”在生活里很常用！`;
+                      setRoleplayStep(2);
+                      handleSpeakPhrase(replyLine);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-[#E6EFEA] text-[#0F382E] border border-[#0F5243]/25 text-[11px] font-bold cursor-pointer text-left"
+                  >
+                    🗣️ Đáp mẫu 2: “这个词“{currentFocusWord}”在生活里很常用！”
+                  </button>
+                </div>
+                {roleplayStep > 0 && (
+                  <div className="pt-1 text-[11px] font-bold text-[#059669]">
+                    🌟 彬彬 khen: 说得太棒了！ Phát âm và ngữ điệu rất tự nhiên chuẩn HSK!
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {isLoading && (
           <div className="flex items-center gap-2 text-[11px] text-[#3F5447] italic px-2">
             <Sparkles className="w-3.5 h-3.5 text-[#9B8A3E] animate-spin" />
@@ -972,36 +1243,52 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
       </div>
 
       {/* =====================================================================
-          3. ULTRA-SLEEK 28PX HORIZONTAL CHIP BAR + INPUT BOX + FOOTER LABEL
+          3. FLEX-WRAP QUICK-ACTION CHIPS + INPUT BOX + FOOTER LABEL
           ===================================================================== */}
       <div className="px-3 py-2 bg-white/95 border-t border-[#0F5243]/12 space-y-1.5 shrink-0">
-        {/* 28px Horizontal Scrollable Quick-Action Chips */}
+        {/* Flex-Wrap Quick-Action Chips (All 5 buttons visible without clipping) */}
         <div
           data-testid="binbin-quick-chips-bar"
-          className="h-7 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-0.5"
+          className="flex flex-wrap items-center gap-1.5 py-0.5"
         >
-          {quickActionChips.map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              data-testid={`binbin-action-${chip.id}`}
-              disabled={isLoading}
-              onClick={() => triggerAction(chip.id, chip.prompt)}
-              className="h-6 px-2.5 rounded-full bg-[#F4F6EE] hover:bg-[#0F5243] text-[#0F382E] hover:text-[#FAF7F0] border border-[#0F5243]/18 text-[11px] font-bold transition-colors shrink-0 cursor-pointer"
-            >
-              {chip.label}
-            </button>
-          ))}
+          {quickActionChips.map((chip) => {
+            const isChipActive =
+              (chip.id === 'grammar-fix' &&
+                activeInteractivePanel === 'sentence-builder') ||
+              (chip.id === 'dialogue' && activeInteractivePanel === 'roleplay');
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                data-testid={`binbin-action-${chip.id}`}
+                disabled={isLoading}
+                onClick={() => handleQuickChipClick(chip)}
+                className={`px-2.5 py-1 rounded-full border text-[11px] font-bold transition-colors shrink-0 cursor-pointer ${
+                  isChipActive
+                    ? 'bg-[#0F5243] text-[#FAF7F0] border-[#C5B358]'
+                    : 'bg-[#F4F6EE] hover:bg-[#0F5243] text-[#0F382E] hover:text-[#FAF7F0] border-[#0F5243]/18'
+                }`}
+              >
+                {chip.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Input Form */}
         <form onSubmit={handleFormSubmit} className="flex items-center gap-1.5">
           <input
+            ref={chatInputRef}
             type="text"
             data-testid="binbin-chat-input"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
-            placeholder={`Gia Sư Hán Ngữ Trực Tuyến: Hỏi từ (${currentFocusWord}), chữa câu, tạo bài tập...`}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder={
+              activeInteractivePanel === 'sentence-builder'
+                ? `Gõ câu có chứa từ “${currentFocusWord}” để 彬彬 chấm & sửa lỗi...`
+                : `Hỏi từ (${currentFocusWord}), tự đặt câu, tạo bài tập...`
+            }
             className="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-[#FAF7F0] border border-[#0F5243]/20 text-xs text-[#0F382E] placeholder:text-[#5F7266] focus:outline-none focus:border-[#0F5243]"
           />
           <button
@@ -1027,7 +1314,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] disabled:opacity-50 text-[#FAF7F0] text-xs font-bold transition-all shrink-0 cursor-pointer"
           >
             <Send className="w-3.5 h-3.5 text-[#FDE68A]" />
-            <span>Gửi</span>
+            <span>{activeInteractivePanel === 'sentence-builder' ? 'Chấm câu' : 'Gửi'}</span>
           </button>
         </form>
 

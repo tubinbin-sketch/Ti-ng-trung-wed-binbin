@@ -1548,63 +1548,7 @@ export const HaloraCenterScene: React.FC = () => {
           </g>
         </svg>
 
-        {/* ========================================================
-            INTERACTIVE THEME / MASCOT SWITCHER DOCK (3 MODES + MODAL)
-            ======================================================== */}
-        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 pointer-events-auto flex flex-col items-center gap-2">
-          <div className="flex items-center gap-1.5 p-1.5 rounded-full bg-[#13241B]/90 backdrop-blur-md border border-[#D4AF37]/55 shadow-xl">
-            {/* Primary Cycle Switcher Button: [🏮 ... · Đổi kiểu] */}
-            <button
-              type="button"
-              onClick={handleCycleMode}
-              data-testid="mascot-style-switcher-btn"
-              className="group flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#8E1913] to-[#B82017] hover:from-[#A51D16] hover:to-[#CE281E] text-[#FFF8E7] text-xs font-bold shadow-md transition-all cursor-pointer whitespace-nowrap shrink-0 border border-[#ECC869]/50"
-              title="Bấm để chuyển đổi nhanh giữa 3 biểu tượng văn hóa Trung Hoa"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-[#FFE082] group-hover:rotate-12 transition-transform shrink-0" />
-              <span>
-                {currentThemeMeta.badgeIcon} {currentThemeMeta.label}
-              </span>
-              <span className="text-[#FFE082] text-[11px] font-medium">· Đổi kiểu</span>
-            </button>
-
-            {/* Quick 3-Mode Selector Tabs */}
-            <div className="hidden sm:flex items-center gap-1 pl-1 border-l border-[#D4AF37]/30">
-              {CYCLE_MASCOT_ORDER.map((modeKey) => {
-                const meta = HERO_MASCOT_THEMES[modeKey];
-                const isSelected = activeMode === modeKey;
-                return (
-                  <button
-                    key={modeKey}
-                    type="button"
-                    onClick={() => handleSelectMode(modeKey)}
-                    data-testid={`mascot-mode-${modeKey}`}
-                    aria-pressed={isSelected}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                      isSelected
-                        ? 'bg-[#ECC869] text-[#14231A] shadow-sm font-bold'
-                        : 'text-[#D7E4DA] hover:text-white hover:bg-white/10'
-                    }`}
-                  >
-                    {meta.badgeIcon} {meta.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Open Full Customization Modal Button */}
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              data-testid="mascot-custom-modal-btn"
-              className="p-1.5 rounded-full text-[#ECC869] hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
-              aria-label="Tùy chỉnh linh vật và thư pháp"
-              title="Tùy chỉnh linh vật & tải ảnh riêng"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
+        {/* Mascot style customization is controlled via the Top Navbar Theme Switcher to avoid duplicate bottom floating bars */}
       </div>
 
       {/* ========================================================

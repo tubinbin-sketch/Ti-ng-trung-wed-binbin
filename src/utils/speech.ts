@@ -1,7 +1,71 @@
 let preferredSpeechRate = 0.8;
 let preferredStrokeSpeedMs = 660;
+let isCurrentlySpeakingState = false;
+let speakingResetTimer: ReturnType<typeof setTimeout> | null = null;
 const settingsListeners = new Set<() => void>();
+const speakingListeners = new Set<(speaking: boolean) => void>();
 let sharedAudioCtx: AudioContext | null = null;
+
+function notifySpeakingState(nextState: boolean): void {
+  if (isCurrentlySpeakingState === nextState) return;
+  isCurrentlySpeakingState = nextState;
+  speakingListeners.forEach((fn) => fn(isCurrentlySpeakingState));
+}
+
+export function getIsSpeaking(): boolean {
+  return isCurrentlySpeakingState;
+}
+
+export function subscribeSpeakingState(
+  listener: (speaking: boolean) => void
+): () => void {
+  speakingListeners.add(listener);
+  return () => {
+    speakingListeners.delete(listener);
+  };
+}
+
+export function selectBestChineseVoice(
+  voices: SpeechSynthesisVoice[]
+): SpeechSynthesisVoice | null {
+  if (!Array.isArray(voices) || voices.length === 0) return null;
+  const zhVoices = voices.filter(
+    (v) =>
+      v.lang &&
+      (v.lang.toLowerCase().startsWith('zh-cn') ||
+        v.lang.toLowerCase().startsWith('zh_cn') ||
+        v.lang.toLowerCase().startsWith('cmn') ||
+        v.lang.toLowerCase().startsWith('zh'))
+  );
+  if (zhVoices.length === 0) return null;
+
+  const preferredPriority = [
+    'xiaoxiao',
+    'yunxi',
+    'xiaoyi',
+    'yunjian',
+    'ting-ting',
+    'tingting',
+    'google 普通话',
+    'google 國語',
+    'meijia',
+    'sin-ji',
+    'natural',
+    'neural',
+  ];
+
+  for (const keyword of preferredPriority) {
+    const matched = zhVoices.find((v) =>
+      v.name.toLowerCase().includes(keyword)
+    );
+    if (matched) return matched;
+  }
+
+  const mainlandVoice = zhVoices.find((v) =>
+    v.lang.toLowerCase().includes('cn')
+  );
+  return mainlandVoice || zhVoices[0];
+}
 
 export function getPreferredSpeechRate(): number {
   return preferredSpeechRate;
@@ -38,6 +102,19 @@ export function speakChinese(text: string, customRate?: number): void {
       ? Math.max(0.45, Math.min(1.5, customRate))
       : preferredSpeechRate;
 
+  if (speakingResetTimer) {
+    clearTimeout(speakingResetTimer);
+    speakingResetTimer = null;
+  }
+  notifySpeakingState(true);
+  const estimatedMs = Math.max(
+    650,
+    Math.min(4500, Math.round((text.length * 360) / effectiveRate))
+  );
+  speakingResetTimer = setTimeout(() => {
+    notifySpeakingState(false);
+  }, estimatedMs);
+
   try {
     if ('speechSynthesis' in window && window.speechSynthesis) {
       if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
@@ -47,8 +124,27 @@ export function speakChinese(text: string, customRate?: number): void {
       utterance.lang = 'zh-CN';
       utterance.rate = effectiveRate;
       utterance.pitch = 1.0;
+
+      const availableVoices = window.speechSynthesis.getVoices?.() || [];
+      const bestVoice = selectBestChineseVoice(availableVoices);
+      if (bestVoice) {
+        utterance.voice = bestVoice;
+      }
+
+      utterance.onstart = () => notifySpeakingState(true);
+      utterance.onend = () => {
+        if (speakingResetTimer) {
+          clearTimeout(speakingResetTimer);
+          speakingResetTimer = null;
+        }
+        notifySpeakingState(false);
+      };
       utterance.onerror = () => {
-        // Silently ignore canceled/interrupted speech events
+        if (speakingResetTimer) {
+          clearTimeout(speakingResetTimer);
+          speakingResetTimer = null;
+        }
+        notifySpeakingState(false);
       };
       window.speechSynthesis.speak(utterance);
     }

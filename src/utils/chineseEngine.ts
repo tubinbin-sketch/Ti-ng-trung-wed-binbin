@@ -207,9 +207,24 @@ export const CHAR_META_DICTIONARY: Record<string, CharMetaEntry> = {
   读: { pinyin: 'dú', hanViet: 'độc', meaning: 'đọc sách,朗读', radical: '讠 (Ngôn - Lời nói)', strokeCount: 10 },
   团: { pinyin: 'tuán', hanViet: 'đoàn', meaning: 'đoàn tụ, tập thể', radical: '囗 (Vi - Vây quanh)', strokeCount: 6 },
   圆: { pinyin: 'yuán', hanViet: 'viên', meaning: 'tròn đầy, viên mãn', radical: '囗 (Vi - Vây quanh)', strokeCount: 10 },
+  既: { pinyin: 'jì', hanViet: 'ký', meaning: 'đã, vừa... (既...又...)', radical: '旡 (Ký - Há miệng)', strokeCount: 9 },
+  然: { pinyin: 'rán', hanViet: 'nhiên', meaning: 'đúng, thế, tự nhiên', radical: '灬 (Hỏa - 4 chấm lửa)', strokeCount: 12 },
 };
 
 export const SMART_HANZI_DICTIONARY: Record<string, SmartDictEntry> = {
+  既然: {
+    pinyin: 'jì rán',
+    hanViet: 'ký nhiên',
+    meaning: 'đã... thì, nếu đã... thì',
+    partOfSpeech: 'LIÊN TỪ',
+    hskLevel: 'HSK 3',
+    usageNote:
+      'Cấu trúc liên từ HSK 3: 既然...就/那就/也... (biểu thị tiền đề đã thành sự thực, đưa ra kết luận hoặc phương án giải quyết).',
+    exampleHanzi: '既然 你 喜欢，就 买下来 吧。',
+    examplePinyin: 'Jìrán nǐ xǐhuan, jiù mǎi xiàlai ba.',
+    exampleMeaning: 'Nếu bạn đã thích thì mua đi.',
+    illustrationKey: 'school',
+  },
   温暖: {
     pinyin: 'wēn nuǎn',
     hanViet: 'ôn noãn',
@@ -1718,6 +1733,26 @@ export function parseQuickSlideInput(rawInput: string, nextIndex: number): Vocab
 export function repairAndUpgradeSlide(slide: VocabSlide): VocabSlide {
   if (!slide || !slide.hanzi) return slide;
   const cleanHanzi = slide.hanzi.trim();
+
+  // Automatic Data Migration: If slide is legacy "既哦" or legacy slide 25, migrate to standard "既然"
+  if (
+    cleanHanzi === '既哦' ||
+    cleanHanzi === '既 哦' ||
+    cleanHanzi === '既噢' ||
+    ((slide.id === 'slide-25' || slide.index === 25) && cleanHanzi !== '既然')
+  ) {
+    const standard25 =
+      INITIAL_VOCAB_SLIDES.find((s) => s.hanzi === '既然') || INITIAL_VOCAB_SLIDES[24];
+    if (standard25) {
+      return {
+        ...standard25,
+        id: slide.id || 'slide-25',
+        index: slide.index || 25,
+        learned: slide.learned ?? false,
+      };
+    }
+  }
+
   const dictEntry = SMART_HANZI_DICTIONARY[cleanHanzi];
   const presetEntry = INITIAL_VOCAB_SLIDES.find((s) => s.hanzi === cleanHanzi);
 
@@ -1955,7 +1990,7 @@ const HANZI_MNEMONIC_STORIES: Record<string, string> = {
  * 100% Authentic Native Chinese Collocations (Cấu trúc kết hợp từ thực tế).
  * NEVER uses mechanical "学习X" or "常用X".
  */
-const WORD_COLLOCATIONS_MAP: Record<
+export const WORD_COLLOCATIONS_MAP: Record<
   string,
   { hanzi: string; pinyin: string; meaning: string }[]
 > = {
@@ -2096,10 +2131,12 @@ const WORD_COLLOCATIONS_MAP: Record<
   ],
 };
 
+export const COMMON_COLLOCATIONS_MAP = WORD_COLLOCATIONS_MAP;
+
 /**
  * Curated Synonym & Confusable Words Distinction Database (Phân biệt từ dễ nhầm)
  */
-const SYNONYM_DISTINCTION_MAP: Record<string, BinBinSynonymComparison> = {
+export const SYNONYM_DISTINCTION_MAP: Record<string, BinBinSynonymComparison> = {
   初中: {
     title: 'Phân biệt 初中 (chūzhōng) vs 高中 (gāozhōng) & 小学 (xiǎoxué)',
     summary: 'Hệ thống phổ thông Trung Quốc chia Trung học (中学) thành 2 bậc rõ rệt: 初中 (Cấp 2) và 高中 (Cấp 3).',
@@ -2434,7 +2471,7 @@ const SECOND_EXAMPLE_MAP: Record<string, BinBinExampleItem> = {
   },
 };
 
-function getAuthenticCollocationsForWord(
+export function getAuthenticCollocationsForWord(
   hanzi: string,
   pinyin: string,
   meaning: string,
@@ -2472,7 +2509,7 @@ function getAuthenticCollocationsForWord(
   ];
 }
 
-function getSynonymDistinctionForWord(
+export function getSynonymDistinctionForWord(
   hanzi: string,
   pinyin: string,
   meaning: string,
@@ -2814,6 +2851,24 @@ function buildSentenceCorrectionAnalysis(
 ): BinBinSentenceCorrection {
   const clean = rawInput.trim();
 
+  // Pattern 0: Synonym misuse — using "温暖" for everyday weather temperature ("今天天气很温暖" / "天气温暖")
+  if (
+    wordCard.hanzi === '温暖' &&
+    /天气.*温暖|温暖.*天气/.test(clean) &&
+    !/阳光|春风|春天/.test(clean)
+  ) {
+    return {
+      originalInput: clean,
+      isAlreadyCorrect: false,
+      correctedHanzi: '今天天气很暖和。（或：春天的阳光很温暖。）',
+      correctedPinyin: 'Jīntiān tiānqì hěn nuǎnhuo. (Hoặc: Chūntiān de yángguāng hěn wēnnuǎn.)',
+      vietnameseTranslation:
+        'Hôm nay thời tiết rất ấm áp. (Hoặc: Ánh nắng mùa xuân rất ấm áp.)',
+      explanation:
+        'Lỗi chọn từ gần nghĩa (温暖 vs 暖和): Khi miêu tả thời tiết hoặc nhiệt độ không khí ấm áp trong khẩu ngữ hằng ngày, người bản xứ dùng “暖和 (nuǎnhuo)”. Còn “温暖 (wēnnuǎn)” mang sắc thái trang trọng/văn viết, thường đi với ánh nắng (阳光), gió xuân (春风) hoặc sự ấm áp trong lòng (心里很温暖 / 温暖的家庭).',
+    };
+  }
+
   // Pattern 1: Time word placed at the end of the Chinese sentence (e.g., "我非常温暖今天", "我去学校明天")
   const timeAtEndMatch = clean.match(/^(.+?)(今天|明天|昨天|现在|周末|早上|晚上)[。！？!?]*$/);
   if (timeAtEndMatch) {
@@ -2862,8 +2917,8 @@ function buildSentenceCorrectionAnalysis(
   }
 
   // Pattern 3: Using "是" before an adjective (e.g., "今天天气是温暖" or "我是累")
-  if (/是(温暖|热|冷|累|忙|漂亮|聪明|高兴|好)/.test(clean)) {
-    const fixed = clean.replace(/是(温暖|热|冷|累|忙|漂亮|聪明|高兴|好)/, '很$1');
+  if (/是(温暖|暖和|热|冷|累|忙|漂亮|聪明|高兴|好)/.test(clean)) {
+    const fixed = clean.replace(/是(温暖|暖和|热|冷|累|忙|漂亮|聪明|高兴|好)/, '很$1');
     return {
       originalInput: clean,
       isAlreadyCorrect: false,
@@ -2875,14 +2930,30 @@ function buildSentenceCorrectionAnalysis(
     };
   }
 
+  // Pattern 4: User typed a custom sentence that is missing the target word `wordCard.hanzi`
+  if (
+    clean.length > 0 &&
+    !clean.includes(wordCard.hanzi) &&
+    clean !== defaultExample.hanzi
+  ) {
+    return {
+      originalInput: clean,
+      isAlreadyCorrect: false,
+      correctedHanzi: defaultExample.hanzi,
+      correctedPinyin: defaultExample.pinyin,
+      vietnameseTranslation: defaultExample.meaning,
+      explanation: `Câu của bạn (“${clean}”) hiện chưa có từ khóa mục tiêu “${wordCard.hanzi}” (${wordCard.pinyin} — ${wordCard.meaning}). Khi đặt câu với “${wordCard.hanzi}”, hãy ưu tiên dùng theo cấu trúc chuẩn bản xứ như câu mẫu phía trên.`,
+    };
+  }
+
   // Default: Bilingual translation + natural native refinement
   return {
     originalInput: clean,
     isAlreadyCorrect: true,
-    correctedHanzi: defaultExample.hanzi,
+    correctedHanzi: clean.endsWith('。') || clean.endsWith('！') || clean.endsWith('？') ? clean : `${clean}。`,
     correctedPinyin: defaultExample.pinyin,
     vietnameseTranslation: defaultExample.meaning,
-    explanation: `Cấu trúc chuẩn bản xứ với “${wordCard.hanzi}” (${wordCard.pinyin}): Chú ý quy tắc 【Chủ ngữ + Thời gian + Địa điểm + Phó từ + Động từ/Tính từ + Tân ngữ】 để câu tự nhiên 100%.`,
+    explanation: `Câu đặt đúng ngữ pháp HSK với từ “${wordCard.hanzi}” (${wordCard.pinyin})! Tuân thủ chuẩn cấu trúc 【Chủ ngữ + Thời gian + Địa điểm + Phó từ + Động từ/Tính từ + Tân ngữ】.`,
   };
 }
 
@@ -2962,7 +3033,14 @@ export function generateBinBinSmartReply(
   } | null
 ): BinBinReply {
   const slide = contextSlide || INITIAL_VOCAB_SLIDES[10] || INITIAL_VOCAB_SLIDES[0];
-  const resolved = resolveTargetFromUserPrompt(userPrompt, slide);
+  const resolved =
+    actionType === 'grammar-fix' && contextSlide
+      ? {
+          targetHanzi: slide.hanzi,
+          matchedEntry: SMART_HANZI_DICTIONARY[slide.hanzi] || null,
+          isDirectWordLookup: false,
+        }
+      : resolveTargetFromUserPrompt(userPrompt, slide);
   const targetDetails = buildWordCardForTarget(
     resolved.targetHanzi,
     resolved.matchedEntry
@@ -2979,10 +3057,6 @@ export function generateBinBinSmartReply(
     exampleMeaning,
   } = targetDetails;
 
-  const collocationsText = collocations
-    .map((c) => `${c.hanzi} (${c.pinyin}: ${c.meaning})`)
-    .join(' · ');
-
   const lowerPrompt = userPrompt.trim().toLowerCase();
 
   // 1. TEACHER EXERCISE / QUIZ GENERATION
@@ -2996,12 +3070,9 @@ export function generateBinBinSmartReply(
       examples,
       synonymDistinction
     );
-    const formattedList = exerciseSet.items
-      .map((it, idx) => `${idx + 1}. ${it.question}\n   → Đáp án: ${it.answer}`)
-      .join('\n');
 
     return {
-      replyText: `Bin Bin đã soạn ngay cho bạn ${exerciseSet.title}:\n${formattedList}`,
+      replyText: `🎯 Bin Bin đã thiết kế trọn bộ 5 câu hỏi kiểm tra thực hành chuẩn HSK 3.0 cho từ khóa “${wordCard.hanzi}” (${wordCard.pinyin} — ${wordCard.meaning}) bên dưới:`,
       chinesePhrase: examples[0].hanzi,
       pinyinPhrase: examples[0].pinyin,
       vietnamesePhrase: examples[0].meaning,
@@ -3024,10 +3095,10 @@ export function generateBinBinSmartReply(
     const c2 = collocations[1]?.hanzi || wordCard.hanzi;
     return {
       replyText:
-        `Hội thoại thực tế HSK 3.0 với từ khóa “${wordCard.hanzi}” (${wordCard.pinyin} — ${wordCard.meaning}) cùng Bin Bin:\n` +
-        `• A (Giáo viên): 你知道“${wordCard.hanzi}”常跟哪些词搭配吗？ (Bạn có biết “${wordCard.hanzi}” thường kết hợp với cụm từ nào không?)\n` +
+        `🗣️ Đóng vai hội thoại thực tế HSK 3.0 với từ khóa “${wordCard.hanzi}” (${wordCard.pinyin} — ${wordCard.meaning}) cùng Bin Bin:\n` +
+        `• A (Giáo viên / Bạn đồng hành): 你知道“${wordCard.hanzi}”常跟哪些词搭配吗？ (Bạn có biết “${wordCard.hanzi}” thường kết hợp với cụm từ nào không?)\n` +
         `• B (Học viên): 老师，我们可以说“${c1}”或者“${c2}”。 (${examples[0].hanzi})\n` +
-        `• Gợi ý mở rộng cho bạn: ${examples[1].hanzi} (${examples[1].meaning})`,
+        `• A (Mở rộng tình huống): 太棒了！那你能再用“${wordCard.hanzi}”造一个句子吗？ (${examples[1].hanzi} — ${examples[1].meaning})`,
       chinesePhrase: `你好！我是熊猫彬彬。今天我们用“${wordCard.hanzi}”来练习对话吧：${exampleHanzi}`,
       pinyinPhrase: `Nǐ hǎo! Wǒ shì xióngmāo Bīnbīn. Jīntiān wǒmen yòng “${wordCard.pinyin}” lái liànxí duìhuà ba: ${examplePinyin}`,
       vietnamesePhrase: `Xin chào! Mình là Gấu trúc Bin Bin. Hôm nay chúng mình dùng từ “${wordCard.meaning}” để luyện hội thoại nhé: ${exampleMeaning}`,
@@ -3045,15 +3116,10 @@ export function generateBinBinSmartReply(
     actionType === 'distinguish' ||
     /phân biệt|khác nhau|so sánh|\bvs\b/.test(lowerPrompt)
   ) {
-    const bulletItems = synonymDistinction.items
-      .map((it) => `• ${it.word} (${it.pinyin}): ${it.nuance} Ví dụ: ${it.example}`)
-      .join('\n');
     return {
       replyText:
-        `⚖️ ${synonymDistinction.title} (Bin Bin tổng hợp cho bạn):\n` +
-        `• Trọng tâm: ${synonymDistinction.summary}\n` +
-        `${bulletItems}\n` +
-        `• Kết hợp từ chuẩn với ${wordCard.hanzi}: ${collocationsText}.`,
+        `⚖️ Phân biệt chuyên sâu cho từ “${wordCard.hanzi}” (${wordCard.pinyin} — ${wordCard.meaning}) cùng Bin Bin:\n` +
+        `• Nguyên tắc cốt lõi: ${synonymDistinction.summary}`,
       chinesePhrase: examples[0].hanzi,
       pinyinPhrase: examples[0].pinyin,
       vietnamesePhrase: examples[0].meaning,
@@ -3084,11 +3150,8 @@ export function generateBinBinSmartReply(
     );
     return {
       replyText:
-        `✍️ Phân tích & Chữa câu chuẩn bản xứ (Bin Bin hỗ trợ bạn kiểm tra “${targetSentence}”):\n` +
-        `• Câu chuẩn tự nhiên: ${correction.correctedHanzi} (${correction.correctedPinyin})\n` +
-        `• Dịch nghĩa: ${correction.vietnameseTranslation}\n` +
-        `• Lý do & Quy tắc ngữ pháp: ${correction.explanation}\n` +
-        `• Kết hợp từ chuẩn (Collocations): ${collocationsText}.`,
+        `✍️ Phân tích ngữ pháp & Chữa câu chuẩn bản xứ cùng Bin Bin (Kiểm tra câu: “${targetSentence}”):\n` +
+        `• Nhận xét & Quy tắc ngữ pháp: ${correction.explanation}`,
       chinesePhrase: correction.correctedHanzi,
       pinyinPhrase: correction.correctedPinyin,
       vietnamesePhrase: correction.vietnameseTranslation,
@@ -3134,8 +3197,7 @@ export function generateBinBinSmartReply(
       replyText:
         `💡 Giải mã chiết tự & Mẹo nhớ nhanh từ “${wordCard.hanzi}” (${wordCard.pinyin} — ${wordCard.meaning}) cùng Bin Bin dành cho bạn:\n` +
         `• Bản chất & Ngữ cảnh: ${essenceAndContext}\n` +
-        `• Chiết tự bộ thủ: ${wordCard.radicalMnemonic}\n` +
-        `• Kết hợp từ chuẩn (Collocations): ${collocationsText}.`,
+        `• Chiết tự bộ thủ: ${wordCard.radicalMnemonic}`,
       chinesePhrase: examples[0].hanzi,
       pinyinPhrase: examples[0].pinyin,
       vietnamesePhrase: examples[0].meaning,
@@ -3156,10 +3218,7 @@ export function generateBinBinSmartReply(
     return {
       replyText:
         `🔍 Dịch song ngữ & Phân tích câu “${cleanInput}” (Bin Bin giải đáp cho bạn):\n` +
-        `• Câu chuẩn bản xứ: ${correction.correctedHanzi} (${correction.correctedPinyin})\n` +
-        `• Dịch nghĩa tiếng Việt: ${correction.vietnameseTranslation}\n` +
-        `• Điểm ngữ pháp cốt lõi: ${correction.explanation}\n` +
-        `• Từ vựng trọng tâm: ${wordCard.hanzi} (${wordCard.pinyin} - ${wordCard.meaning}) · Kết hợp chuẩn: ${collocationsText}.`,
+        `• Điểm ngữ pháp cốt lõi: ${correction.explanation}`,
       chinesePhrase: correction.correctedHanzi,
       pinyinPhrase: correction.correctedPinyin,
       vietnamesePhrase: correction.vietnameseTranslation,
@@ -3173,17 +3232,11 @@ export function generateBinBinSmartReply(
     };
   }
 
-  const synLine = synonymDistinction.items
-    .map((it) => `${it.word} (${it.pinyin}): ${it.nuance}`)
-    .join(' | ');
-
   return {
     replyText:
       `📌 Phân tích thực dụng từ “${wordCard.hanzi}” (${wordCard.pinyin} · Hán Việt: ${wordCard.hanViet.toUpperCase()} · ${wordCard.meaning}) — Bin Bin tổng hợp cho bạn:\n` +
-      `• 1. Bản chất & Ngữ cảnh: ${essenceAndContext}\n` +
-      `• 2. Kết hợp từ chuẩn (Collocations): ${collocationsText}\n` +
-      `• 3. Phân biệt từ dễ nhầm: ${synLine}\n` +
-      `• 4. Chiết tự nhớ nhanh: ${wordCard.radicalMnemonic}`,
+      `• Bản chất & Ngữ cảnh: ${essenceAndContext}\n` +
+      `• Chiết tự nhớ nhanh: ${wordCard.radicalMnemonic}`,
     chinesePhrase: examples[0].hanzi,
     pinyinPhrase: examples[0].pinyin,
     vietnamesePhrase: examples[0].meaning,
@@ -3613,17 +3666,22 @@ export interface ClassStudentRecord {
   writingScore: string;
   quizScore: string;
   totalPoints: number;
-  status: 'Đã chấm AI' | 'Đang nộp bài' | 'Cần kèm thêm';
+  status: 'Đã chấm tự động' | 'Đã chấm AI' | 'Đang nộp bài' | 'Cần kèm thêm';
   feedback: string;
   reviewWords?: string[];
   lastSubmittedAt?: string;
+  timeSeconds?: number;
+  streak?: number;
 }
 
 export interface StrokeEvaluationDetail {
   passed: boolean;
   accuracy: number;
+  stars: 1 | 2 | 3;
   gradeLabel: string;
   feedback: string;
+  isReversedDirection?: boolean;
+  strokeCountMatched?: boolean;
 }
 
 export function evaluateStrokeWithFeedback(
@@ -3633,35 +3691,75 @@ export function evaluateStrokeWithFeedback(
   totalStrokes = 5
 ): StrokeEvaluationDetail {
   const base = evaluateStrokeSimilarity(userPoints, targetStrokePoints);
+
   if (!base.passed) {
     return {
       passed: false,
       accuracy: base.accuracy,
+      stars: 1,
       gradeLabel: 'Cần viết rõ hơn',
       feedback: `Nét thứ ${strokeNumber}/${totalStrokes} hơi ngắn. Hãy kéo bút dứt khoát theo đường nét đứt trên ô Mễ (米字格).`,
     };
   }
+
+  // Detect reversed stroke direction (Ngược hướng bút thuận - e.g. kéo từ dưới lên hoặc từ phải sang trái)
+  let isReversedDirection = false;
+  if (userPoints && userPoints.length >= 2 && targetStrokePoints && targetStrokePoints.length >= 2) {
+    const startUser = userPoints[0];
+    const endUser = userPoints[userPoints.length - 1];
+    const dxUser = endUser[0] - startUser[0];
+    const dyUser = endUser[1] - startUser[1];
+    const lenUser = Math.hypot(dxUser, dyUser);
+
+    const startTarget = targetStrokePoints[0];
+    const endTarget = targetStrokePoints[targetStrokePoints.length - 1];
+    const dxTarget = endTarget[0] - startTarget[0];
+    const dyTarget = endTarget[1] - startTarget[1];
+    const lenTarget = Math.hypot(dxTarget, dyTarget);
+
+    if (lenUser >= 8 && lenTarget >= 8) {
+      const dot = (dxUser * dxTarget + dyUser * dyTarget) / (lenUser * lenTarget);
+      if (dot < -0.42) {
+        isReversedDirection = true;
+      }
+    }
+  }
+
+  if (isReversedDirection) {
+    return {
+      passed: false,
+      accuracy: 38,
+      stars: 1,
+      isReversedDirection: true,
+      gradeLabel: 'Ngược hướng bút thuận',
+      feedback: `Nét thứ ${strokeNumber}/${totalStrokes} bị kéo ngược chiều bút thuận! Quy tắc viết chữ Hán: Trên trước dưới sau, Trái trước phải sau. Hãy viết lại từ điểm bắt đầu.`,
+    };
+  }
+
   if (base.accuracy >= 92) {
     return {
       passed: true,
       accuracy: base.accuracy,
-      gradeLabel: 'Xuất sắc · Chuẩn thư pháp',
-      feedback: `Nét thứ ${strokeNumber}/${totalStrokes} đạt ${base.accuracy}%! Điểm đặt bút (起笔) và thu bút (收笔) rất cân đối.`,
+      stars: 3,
+      gradeLabel: 'Xuất sắc · 3 Sao thư pháp',
+      feedback: `Nét thứ ${strokeNumber}/${totalStrokes} đạt ${base.accuracy}% (⭐⭐⭐)! Điểm đặt bút (起笔) và thu bút (收笔) rất chuẩn xác.`,
     };
   }
-  if (base.accuracy >= 82) {
+  if (base.accuracy >= 80) {
     return {
       passed: true,
       accuracy: base.accuracy,
-      gradeLabel: 'Tốt · Đúng hướng bút',
-      feedback: `Nét thứ ${strokeNumber}/${totalStrokes} đạt ${base.accuracy}%. Đúng quy tắc bút thuận, chú ý giữ lực bút đều hơn ở tâm ô Mễ.`,
+      stars: 2,
+      gradeLabel: 'Tốt · 2 Sao bút thuận',
+      feedback: `Nét thứ ${strokeNumber}/${totalStrokes} đạt ${base.accuracy}% (⭐⭐). Đúng quy tắc bút thuận, chú ý giữ lực bút đều hơn ở tâm ô Mễ.`,
     };
   }
   return {
     passed: true,
     accuracy: base.accuracy,
-    gradeLabel: 'Đạt · Cần căn chỉnh tâm chữ',
-    feedback: `Nét thứ ${strokeNumber}/${totalStrokes} đạt ${base.accuracy}%. Hãy bám sát hơn trục ngang dọc của ô Mễ Tự Cách.`,
+    stars: 1,
+    gradeLabel: 'Đạt · 1 Sao căn chỉnh',
+    feedback: `Nét thứ ${strokeNumber}/${totalStrokes} đạt ${base.accuracy}% (⭐). Hãy bám sát hơn trục ngang dọc của ô Mễ Tự Cách.`,
   };
 }
 
@@ -3756,10 +3854,12 @@ export function createStudentRecord(
     writingScore: `${writingPct}% độ chuẩn nét`,
     quizScore: `${quizCorrect}/10 câu đúng`,
     totalPoints: clampedPoints,
-    status: needsSupport ? 'Cần kèm thêm' : 'Đã chấm AI',
+    status: needsSupport ? 'Cần kèm thêm' : 'Đã chấm tự động',
     reviewWords: needsSupport ? ['温暖', '咱们'] : [],
+    timeSeconds: Math.max(25, 115 - clampedPoints),
+    streak: Math.max(1, Math.round(clampedPoints / 12)),
     feedback: needsSupport
-      ? `Học viên cấp độ ${cleanLevel} cần ôn tập thêm từ vựng và thứ tự nét viết cùng trợ lý Bin Bin AI.`
+      ? `Học viên cấp độ ${cleanLevel} cần ôn tập thêm từ vựng và thứ tự nét viết cùng Trợ Giảng Gấu Trúc · 彬彬.`
       : `Học viên mới (${cleanLevel}) tham gia lớp, nắm vững kiến thức nền tảng và hoàn thành bài tập xuất sắc.`,
   };
 }
@@ -3776,19 +3876,26 @@ export function applyStudentSubmissionToRoster(
     quizCorrectCount: number;
     quizTotalCount: number;
     reviewWords: string[];
+    timeSeconds?: number;
+    streakDelta?: number;
   }
 ): ClassStudentRecord[] {
   const clampedTotal = Math.max(0, Math.min(100, Math.round(submission.totalScore)));
   const clampedWriting = Math.max(60, Math.min(100, Math.round(submission.writingAccuracy)));
   const cleanReview = Array.from(new Set(submission.reviewWords.filter(Boolean)));
   const needsSupport = clampedTotal < 90 || cleanReview.length >= 3;
-  const status: ClassStudentRecord['status'] = needsSupport ? 'Cần kèm thêm' : 'Đã chấm AI';
+  const status: ClassStudentRecord['status'] = needsSupport ? 'Cần kèm thêm' : 'Đã chấm tự động';
   const nowLabel = 'Vừa nộp bài';
+  const clampedTime =
+    typeof submission.timeSeconds === 'number' && submission.timeSeconds > 0
+      ? Math.max(5, Math.min(999, Math.round(submission.timeSeconds)))
+      : Math.max(22, 118 - clampedTotal);
+  const streakInc = typeof submission.streakDelta === 'number' ? submission.streakDelta : 1;
 
   const feedbackText =
     cleanReview.length > 0
-      ? `Vừa nộp bài đạt ${clampedTotal}/100đ · Cần ôn lại từ: ${cleanReview.join(', ')}.`
-      : `Hoàn thành xuất sắc bài tập tương tác (${clampedTotal}/100đ), nắm chắc toàn bộ từ vựng và nét viết.`;
+      ? `Vừa nộp bài đạt ${clampedTotal}/100đ (${clampedTime}s) · Cần ôn lại từ: ${cleanReview.join(', ')}.`
+      : `Hoàn thành xuất sắc bài tập tương tác (${clampedTotal}/100đ trong ${clampedTime}s), nắm chắc toàn bộ từ vựng và nét viết.`;
 
   let matched = false;
   const updated = roster.map((st) => {
@@ -3797,6 +3904,7 @@ export function applyStudentSubmissionToRoster(
       normalizeSearchText(st.name) === normalizeSearchText(submission.studentName);
     if (!isMatch) return st;
     matched = true;
+    const baseStreak = typeof st.streak === 'number' && st.streak > 0 ? st.streak : 5;
     return {
       ...st,
       vocabScore: `${submission.learnedVocabCount}/${submission.totalVocabCount} từ`,
@@ -3806,6 +3914,8 @@ export function applyStudentSubmissionToRoster(
       status,
       reviewWords: cleanReview,
       lastSubmittedAt: nowLabel,
+      timeSeconds: clampedTime,
+      streak: baseStreak + Math.max(0, streakInc),
       feedback: feedbackText,
     };
   });
@@ -3826,6 +3936,8 @@ export function applyStudentSubmissionToRoster(
         quizScore: `${submission.quizCorrectCount}/${submission.quizTotalCount} câu đúng`,
         reviewWords: cleanReview,
         lastSubmittedAt: nowLabel,
+        timeSeconds: clampedTime,
+        streak: (created.streak || 5) + Math.max(0, streakInc),
         feedback: feedbackText,
       },
       ...roster,
@@ -3853,7 +3965,7 @@ export function awardStudentBonusPoints(
     return {
       ...st,
       totalPoints: nextPoints,
-      status: needsSupport ? 'Cần kèm thêm' : 'Đã chấm AI',
+      status: needsSupport ? 'Cần kèm thêm' : 'Đã chấm tự động',
       feedback: `🎁 +${delta}đ thưởng (${reason}) · Tổng điểm mới: ${nextPoints}/100đ.`,
     };
   });
@@ -3914,7 +4026,7 @@ export function generateStudentsCsvContent(
     'Tổng điểm (100)',
     'Trạng thái',
     'Từ vựng cần ôn',
-    'Nhận xét AI',
+    'Nhận xét & Chữa lỗi chi tiết',
   ];
 
   const rows = students.map((st, idx) => {

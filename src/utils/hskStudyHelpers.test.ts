@@ -4,12 +4,25 @@ import { INITIAL_VOCAB_SLIDES } from '../data/chineseData';
 import {
   analyzeToneSandhi,
   applySrsRatingToRecords,
+  evaluateDictationAttempt,
+  evaluateSentenceBuilderOrder,
   generateAssignmentFromSlides,
+  generateClassroomDictationDeck,
   generateClassroomMiniGameQuestions,
   generateContextualDialogue,
   getInitialSrsRecords,
   getMistakeNotebookList,
+  HSK3_SENTENCE_BUILDER_CHALLENGES,
 } from './hskStudyHelpers';
+import {
+  evaluateMeasureWordAttempt,
+  generateMeasureWordChallenges,
+} from './hskMeasureWordEngine';
+import {
+  buildFullSystemBackup,
+  parseSystemBackupPayload,
+  verifyTeacherPin,
+} from './storageService';
 
 test('analyzeToneSandhi detects 3+3 -> 2+3 tone sandhi accurately', () => {
   const res = analyzeToneSandhi('你好', 'nǐ hǎo');
@@ -18,34 +31,49 @@ test('analyzeToneSandhi detects 3+3 -> 2+3 tone sandhi accurately', () => {
   assert.ok(res.ruleBadge.includes('3 + 3 → 2 + 3'));
 });
 
-test('analyzeToneSandhi detects neutral tone (轻声) and half-third tone rules', () => {
+test('analyzeToneSandhi detects neutral tone (轻声), half-third tone rules, and standard tones', () => {
   const neutralRes = analyzeToneSandhi('咱们', 'zán men');
   assert.equal(neutralRes.hasSandhi, true);
   assert.ok(neutralRes.ruleBadge.includes('Thanh nhẹ'));
 
-  const halfThirdRes = analyzeToneSandhi('温暖', 'wēn nuǎn');
-  assert.equal(halfThirdRes.hasSandhi, true);
-  assert.ok(halfThirdRes.ruleBadge.includes('Nửa thanh 3'));
+  // 首都 (shǒudū): T3 + T1 -> Half-third tone (211)
+  const shouduRes = analyzeToneSandhi('首都', 'shǒu dū');
+  assert.equal(shouduRes.hasSandhi, true);
+  assert.ok(shouduRes.ruleBadge.includes('Nửa thanh 3'));
+
+  // 温暖 (wēn nuǎn): T1 + T3 -> NO sandhi, keeps standard 214 tone
+  const wennuanRes = analyzeToneSandhi('温暖', 'wēn nuǎn');
+  assert.equal(wennuanRes.hasSandhi, false);
+  assert.ok(wennuanRes.ruleBadge.includes('Chuẩn thanh điệu HSK 3.0'));
 });
 
-test('Spaced Repetition (SRS) ratings filter difficult words into Mistake Notebook (错题本)', () => {
+test('Spaced Repetition (SRS) 4-level ratings filter difficult words into Mistake Notebook (错题本)', () => {
   const initial = getInitialSrsRecords(INITIAL_VOCAB_SLIDES);
   const sampleSlide = INITIAL_VOCAB_SLIDES[0];
 
-  // Rate 'again' (😰 Chưa nhớ - Ôn lại ngay) -> should be in mistake book
-  const afterAgain = applySrsRatingToRecords(initial, sampleSlide, 'again');
-  assert.equal(afterAgain[sampleSlide.id].inMistakeBook, true);
+  // Rate 'forgot' / 'again' (😰 Quên - Ôn lại 1p) -> should be in mistake book
+  const afterForgot = applySrsRatingToRecords(initial, sampleSlide, 'forgot');
+  assert.equal(afterForgot[sampleSlide.id].inMistakeBook, true);
+  assert.equal(afterForgot[sampleSlide.id].rating, 'forgot');
   assert.ok(
-    getMistakeNotebookList(afterAgain).some((item) => item.hanzi === sampleSlide.hanzi)
+    getMistakeNotebookList(afterForgot).some((item) => item.hanzi === sampleSlide.hanzi)
   );
 
-  // Rate 'good' (✅ Đã thuộc lòng) -> should be removed from mistake book
-  const afterGood = applySrsRatingToRecords(afterAgain, sampleSlide, 'good');
+  // Rate 'hard' (🤔 Khó - Ôn lại 10p) -> in mistake book
+  const afterHard = applySrsRatingToRecords(afterForgot, sampleSlide, 'hard');
+  assert.equal(afterHard[sampleSlide.id].inMistakeBook, true);
+  assert.equal(afterHard[sampleSlide.id].rating, 'hard');
+
+  // Rate 'good' (👍 Nhớ - 1 ngày) -> removed from mistake book
+  const afterGood = applySrsRatingToRecords(afterHard, sampleSlide, 'good');
   assert.equal(afterGood[sampleSlide.id].inMistakeBook, false);
-  assert.equal(
-    getMistakeNotebookList(afterGood).some((item) => item.hanzi === sampleSlide.hanzi),
-    false
-  );
+  assert.equal(afterGood[sampleSlide.id].rating, 'good');
+
+  // Rate 'mastered' (🌟 Thuộc làu - 4 ngày) -> not in mistake book
+  const afterMastered = applySrsRatingToRecords(afterGood, sampleSlide, 'mastered');
+  assert.equal(afterMastered[sampleSlide.id].inMistakeBook, false);
+  assert.equal(afterMastered[sampleSlide.id].rating, 'mastered');
+  assert.ok(afterMastered[sampleSlide.id].intervalLabel.includes('4 ngày'));
 });
 
 test('generateAssignmentFromSlides creates synchronized homework from teacher slides', () => {
@@ -102,4 +130,67 @@ test('analyzeToneSandhi does not falsely attribute 一 (yī) sandhi from example
   assert.equal(mingtianRes.ruleBadge.includes('一'), false);
 });
 
+test('generateClassroomDictationDeck & evaluateDictationAttempt evaluate Hanzi and Pinyin accurately', () => {
+  const deck = generateClassroomDictationDeck(INITIAL_VOCAB_SLIDES);
+  const wennuanItem = deck.find((d) => d.hanzi === '温暖') || deck[0];
+  assert.equal(wennuanItem.hanzi, '温暖');
+  assert.ok(wennuanItem.strokeHint.includes('2 chữ Hán'));
 
+  const exactRes = evaluateDictationAttempt('温暖', wennuanItem);
+  assert.equal(exactRes.isExactHanzi, true);
+  assert.equal(exactRes.accuracyPct, 100);
+
+  const partialRes = evaluateDictationAttempt('温', wennuanItem);
+  assert.equal(partialRes.isExactHanzi, false);
+  assert.equal(partialRes.accuracyPct, 50);
+  assert.deepEqual(partialRes.missingChars, ['暖']);
+
+  const pinyinRes = evaluateDictationAttempt('wen nuan', wennuanItem);
+  assert.equal(pinyinRes.isPinyinMatch, true);
+  assert.equal(pinyinRes.accuracyPct, 60);
+});
+
+test('HSK3_SENTENCE_BUILDER_CHALLENGES & evaluateSentenceBuilderOrder grade exact and partial word orders', () => {
+  assert.equal(HSK3_SENTENCE_BUILDER_CHALLENGES.length, 5);
+  const firstChallenge = HSK3_SENTENCE_BUILDER_CHALLENGES[0];
+  const correctIds = firstChallenge.tilesInCorrectOrder.map((t) => t.id);
+
+  const perfectEval = evaluateSentenceBuilderOrder(correctIds, firstChallenge);
+  assert.equal(perfectEval.isCorrect, true);
+  assert.equal(perfectEval.score, 100);
+  assert.equal(perfectEval.assembledHanzi, '咱们今天在教室里认真学习汉语。');
+
+  const wrongOrder = [...correctIds].reverse();
+  const wrongEval = evaluateSentenceBuilderOrder(wrongOrder, firstChallenge);
+  assert.equal(wrongEval.isCorrect, false);
+  assert.ok(wrongEval.score < 100);
+  assert.ok(wrongEval.grammarDiagnostic.includes('咱们今天在教室里认真学习汉语。'));
+});
+
+test('generateMeasureWordChallenges and evaluateMeasureWordAttempt grade HSK 3.0 measure words accurately', () => {
+  const challenges = generateMeasureWordChallenges(INITIAL_VOCAB_SLIDES);
+  assert.ok(challenges.length >= 6);
+  const kongtiaoChallenge = challenges.find((c) => c.nounHanzi === '空调') || challenges[0];
+  assert.equal(kongtiaoChallenge.correctMeasureWord, '台');
+
+  const correctRes = evaluateMeasureWordAttempt(kongtiaoChallenge, '台');
+  assert.equal(correctRes.isCorrect, true);
+  assert.equal(correctRes.scoreDelta, 10);
+  assert.ok(correctRes.feedbackVi.includes('一台空调'));
+
+  const wrongRes = evaluateMeasureWordAttempt(kongtiaoChallenge, '件');
+  assert.equal(wrongRes.isCorrect, false);
+  assert.equal(wrongRes.scoreDelta, 0);
+});
+
+test('storageService verifyTeacherPin and backup export/import work accurately', () => {
+  assert.equal(verifyTeacherPin('2026'), true);
+  assert.equal(verifyTeacherPin('8888'), true);
+  assert.equal(verifyTeacherPin('0000'), false);
+
+  const backup = buildFullSystemBackup(INITIAL_VOCAB_SLIDES.slice(0, 3), []);
+  assert.equal(backup.slides.length, 3);
+  const parsed = parseSystemBackupPayload(JSON.stringify(backup));
+  assert.ok(parsed);
+  assert.equal(parsed?.slides?.length, 3);
+});

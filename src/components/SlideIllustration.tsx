@@ -7,6 +7,7 @@ import {
   saveCustomVocabImage,
 } from '../utils/vocabVisualEngine';
 import { Image as ImageIcon, Palette, RefreshCw, Link2, Check, X } from 'lucide-react';
+import { SafeImage } from './SafeImage';
 
 interface SlideIllustrationProps {
   illustrationKey: IllustrationCategoryKey;
@@ -1287,17 +1288,19 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
               {renderProceduralSvgArtwork()}
             </div>
           )}
-          <img
+          <SafeImage
             src={activePhotoUrl}
-            alt={`Ảnh minh họa cho từ ${hanzi} (${pinyin}) - ${meaning}`}
-            data-testid="vocab-active-photo-img"
-            className={`w-full h-full object-cover transition-all duration-300 ease-out ${
-              imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
+            alt={`Minh họa ngữ cảnh từ vựng ${hanzi} (${pinyin}) — nghĩa tiếng Việt: ${meaning}${
+              exampleHanzi ? ` · Ví dụ: ${exampleHanzi}` : ''
             }`}
-            loading="eager"
-            onLoad={() => setImageLoaded(true)}
-            onError={() => {
-              // If current angle fails, try next angle or fallback to procedural SVG
+            hanzi={hanzi}
+            pinyin={pinyin}
+            meaning={meaning}
+            testId="vocab-active-photo-img"
+            className="w-full h-full object-cover"
+            fallbackNode={renderProceduralSvgArtwork()}
+            onImageLoaded={() => setImageLoaded(true)}
+            onImageError={() => {
               if (availablePhotos.length > 1 && photoAngleIdx < availablePhotos.length - 1) {
                 setPhotoAngleIdx((prev) => prev + 1);
               } else {
@@ -1314,13 +1317,13 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
           <div className="absolute inset-2 border border-[#DFC470]/40 rounded-xl pointer-events-none" />
 
           {/* Top-Left Word & Meaning Badge */}
-          <div className="absolute top-3 left-3 bg-[#182A21]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#DFC470]/60 shadow-lg flex items-center gap-2 max-w-[54%]">
+          <div className="absolute top-3 left-3 bg-[#182A21]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#DFC470]/60 shadow-lg flex items-center gap-2 max-w-[60%]">
             <span className="w-2 h-2 rounded-full bg-[#DFC470] animate-pulse shrink-0" />
             <div className="flex flex-col min-w-0">
               <span className="font-['Noto_Sans_SC'] text-base font-bold text-[#F7E29C] leading-tight truncate">
                 {hanzi}
               </span>
-              <span className="text-[10px] text-[#E5E9D7] font-medium leading-tight truncate">
+              <span className="text-sm text-[#E5E9D7] font-medium leading-tight truncate">
                 {pinyin} {meaning ? `· ${meaning}` : ''}
               </span>
             </div>
@@ -1330,7 +1333,7 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
           <div className="absolute bottom-2.5 right-3 flex items-center justify-end pointer-events-none">
             <span
               data-testid="vocab-photo-angle-badge"
-              className="px-2 py-0.5 rounded-md bg-[#182A21]/90 border border-[#DFC470]/50 text-[10px] font-bold text-[#E5E9D7] shrink-0 tabular-nums shadow"
+              className="px-2.5 py-0.5 rounded-md bg-[#182A21]/90 border border-[#DFC470]/50 text-sm font-bold text-[#E5E9D7] shrink-0 tabular-nums shadow"
             >
               Ảnh {safeAngleIdx + 1}/{availablePhotos.length}
             </span>
@@ -1394,17 +1397,20 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
         <form
           onSubmit={handleApplyCustomUrl}
           data-testid="custom-vocab-image-form"
-          className="absolute inset-x-2.5 bottom-2.5 z-20 p-2.5 rounded-xl bg-[#111F18]/95 backdrop-blur-md border border-[#DFC470]/70 shadow-xl flex flex-col gap-2"
+          className="absolute inset-x-2.5 bottom-2.5 z-20 p-3 rounded-xl bg-[#111F18]/95 backdrop-blur-md border border-[#DFC470]/70 shadow-xl flex flex-col gap-2"
         >
-          <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-[#F7E29C]">
-            <span>🔗 Tự cập nhật ảnh minh họa cho "{hanzi}"</span>
+          <div className="flex items-center justify-between gap-2 text-sm font-bold text-[#F7E29C]">
+            <span className="inline-flex items-center gap-1.5">
+              <Link2 className="w-4 h-4 text-[#DFC470]" />
+              <span>Tự cập nhật ảnh minh họa cho "{hanzi}"</span>
+            </span>
             <button
               type="button"
               onClick={() => setIsCustomUrlEditorOpen(false)}
               className="text-[#E5E9D7] hover:text-white p-0.5 cursor-pointer"
               aria-label="Đóng khung cập nhật ảnh"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
           <div className="flex items-center gap-1.5">
@@ -1414,14 +1420,14 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
               onChange={(e) => setCustomUrlInput(e.target.value)}
               placeholder="Dán link ảnh (https://...) hoặc để trống để tự động..."
               data-testid="custom-vocab-image-input"
-              className="flex-1 px-2.5 py-1.5 rounded-lg bg-white/95 text-[#1E3227] text-xs border border-[#DFC470]/50 focus:outline-none"
+              className="flex-1 px-2.5 py-1.5 rounded-lg bg-white/95 text-[#1E3227] text-sm border border-[#DFC470]/50 focus:outline-none"
             />
             <button
               type="submit"
               data-testid="apply-custom-vocab-image-btn"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#DFC470] hover:bg-[#e8cf7f] text-[#182A21] text-xs font-extrabold cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#DFC470] hover:bg-[#e8cf7f] text-[#182A21] text-sm font-extrabold cursor-pointer shrink-0"
             >
-              <Check className="w-3.5 h-3.5" />
+              <Check className="w-4 h-4" />
               <span>Lưu ảnh</span>
             </button>
           </div>
