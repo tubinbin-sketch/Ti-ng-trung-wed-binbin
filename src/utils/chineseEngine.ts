@@ -1448,13 +1448,20 @@ export async function hydrateSlideStrokesFromCDN(slide: VocabSlide): Promise<Voc
  * Calls server-side Gemini API (/api/hanzi/enrich) to enrich any arbitrary Chinese word
  * with accurate Pinyin, Hán Việt, Vietnamese meaning, radicals, and contextual example sentence.
  */
+export const GEMINI_API_TIMEOUT_MS = 20000;
+export const OFFLINE_FALLBACK_NOTICE = 'Đang dùng từ điển nội bộ do AI phản hồi chậm';
+
 export async function enrichVocabSlideWithAI(slide: VocabSlide): Promise<VocabSlide> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GEMINI_API_TIMEOUT_MS);
   try {
     const response = await fetch('/api/hanzi/enrich', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({ hanzi: slide.hanzi }),
     });
+    clearTimeout(timeoutId);
     if (!response.ok) {
       return hydrateSlideStrokesFromCDN(slide);
     }
@@ -1486,6 +1493,7 @@ export async function enrichVocabSlideWithAI(slide: VocabSlide): Promise<VocabSl
 
     return hydrateSlideStrokesFromCDN(updatedSlide);
   } catch {
+    clearTimeout(timeoutId);
     return hydrateSlideStrokesFromCDN(slide);
   }
 }
@@ -1956,6 +1964,8 @@ export interface BinBinReply {
   sentenceCorrection?: BinBinSentenceCorrection;
   teacherExercise?: BinBinTeacherExercise;
   slidePayload?: BinBinSlidePayload;
+  usedOfflineFallback?: boolean;
+  fallbackNotice?: string;
 }
 
 const HANZI_MNEMONIC_STORIES: Record<string, string> = {
@@ -3279,7 +3289,7 @@ export async function askBinBinPandaAI(
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3500);
+  const timeoutId = setTimeout(() => controller.abort(), GEMINI_API_TIMEOUT_MS);
 
   try {
     const res = await fetch('/api/binbin/chat', {
@@ -3306,10 +3316,20 @@ export async function askBinBinPandaAI(
     });
     clearTimeout(timeoutId);
 
-    if (!res.ok) return fallbackReply;
+    if (!res.ok) {
+      return {
+        ...fallbackReply,
+        usedOfflineFallback: true,
+        fallbackNotice: OFFLINE_FALLBACK_NOTICE,
+      };
+    }
     const data = await res.json();
     if (!data || data.fallback || !data.replyText) {
-      return fallbackReply;
+      return {
+        ...fallbackReply,
+        usedOfflineFallback: true,
+        fallbackNotice: OFFLINE_FALLBACK_NOTICE,
+      };
     }
 
     const aiCollocations =
@@ -3361,10 +3381,15 @@ export async function askBinBinPandaAI(
       sentenceCorrection: fallbackReply.sentenceCorrection,
       teacherExercise: fallbackReply.teacherExercise,
       slidePayload: customTarget,
+      usedOfflineFallback: false,
     };
   } catch {
     clearTimeout(timeoutId);
-    return fallbackReply;
+    return {
+      ...fallbackReply,
+      usedOfflineFallback: true,
+      fallbackNotice: OFFLINE_FALLBACK_NOTICE,
+    };
   }
 }
 
@@ -3607,12 +3632,17 @@ export async function fetchAIVocabSuggestions(
     return localMatches;
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GEMINI_API_TIMEOUT_MS);
+
   try {
     const res = await fetch('/api/hanzi/suggest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({ query: trimmed, topic, limit: 6 }),
     });
+    clearTimeout(timeoutId);
     if (!res.ok) {
       return localMatches;
     }
@@ -3651,6 +3681,7 @@ export async function fetchAIVocabSuggestions(
 
     return [...localMatches, ...aiItems].slice(0, limit);
   } catch {
+    clearTimeout(timeoutId);
     return localMatches;
   }
 }

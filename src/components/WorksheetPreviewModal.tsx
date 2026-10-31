@@ -61,7 +61,7 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
           {/* 1. Tiêu đề lớp học HANU × 阮文受 */}
           <div className="border-b-2 border-[#1E3227] pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-widest text-[#9B8A3E]">
+              <div className="text-xs font-bold uppercase tracking-widest text-[#9B8A3E]">
                 HANU × 阮文受 · GIÁO ÁN THỰC HÀNH HÁN TỰ CHUẨN HSK 3.0
               </div>
               <h2 className="text-xl font-bold text-[#1E3227] mt-0.5">
@@ -99,7 +99,7 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
                       <td className="py-1 px-2.5 font-semibold text-[#9B8A3E]">{s.pinyin}</td>
                       <td className="py-1 px-2.5 uppercase font-semibold text-[#3F5447]">{s.hanViet}</td>
                       <td className="py-1 px-2.5 font-semibold text-[#1E3227]">{s.meaning}</td>
-                      <td className="py-1 px-2.5 font-['Noto_Sans_SC'] text-[11px] text-[#3F5447]">{s.exampleHanzi}</td>
+                      <td className="py-1 px-2.5 font-['Noto_Sans_SC'] text-xs text-[#3F5447]">{s.exampleHanzi}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -127,10 +127,10 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
                     </span>
                     <span className="text-xs font-bold text-[#9B8A3E]">{s.pinyin}</span>
                   </div>
-                  <div className="text-[11px] text-[#3F5447] mt-0.5">
+                  <div className="text-xs text-[#3F5447] mt-0.5">
                     Hán Việt: <strong className="uppercase">{s.hanViet}</strong> · {s.meaning}
                   </div>
-                  <div className="text-[10px] text-[#5F7266] mt-0.5">
+                  <div className="text-xs text-[#5F7266] mt-0.5">
                     {s.characters.map((c) => `${c.char} (${c.strokeCount} nét)`).join(' · ')}
                   </div>
                 </div>

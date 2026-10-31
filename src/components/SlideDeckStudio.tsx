@@ -37,7 +37,7 @@ import { Toast } from './Toast';
 import { StrokeData, VocabSlide } from '../data/chineseData';
 import { SlideIllustration, VOCAB_PHOTO_MAP } from './SlideIllustration';
 import {
-  buildContextualPollinationsUrl,
+  buildSafeContextualSvgDataUrl,
   saveCustomVocabImage,
 } from '../utils/vocabVisualEngine';
 import { BinBinPandaAI, BinBinPandaMascotSVG, PandaMood } from './BinBinPandaAI';
@@ -1300,7 +1300,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
   };
 
   const handleGenerateContextualImageForEdit = () => {
-    const generatedUrl = buildContextualPollinationsUrl(
+    const generatedUrl = buildSafeContextualSvgDataUrl(
       currentSlide.hanzi,
       editMeaning || currentSlide.meaning,
       editExampleHanzi || currentSlide.exampleHanzi,
@@ -1320,8 +1320,34 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
         imageUrl: generatedUrl,
       });
     }
-    setToastMessage(`🎨 Đã tạo & đồng bộ ảnh minh họa theo đúng ngữ cảnh câu ví dụ của "${currentSlide.hanzi}"!`);
+    setToastMessage(`🎨 Đã tạo & đồng bộ thẻ SVG minh họa ngữ cảnh an toàn cho "${currentSlide.hanzi}"!`);
   };
+
+  useEffect(() => {
+    const handleEscapeModals = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isQuickEditModalOpen) setIsQuickEditModalOpen(false);
+        if (isBatchImportModalOpen) setIsBatchImportModalOpen(false);
+        if (isAddVocabModalOpen) setIsAddVocabModalOpen(false);
+        if (isWorksheetModalOpen) setIsWorksheetModalOpen(false);
+        if (isMeasureWordModalOpen) setIsMeasureWordModalOpen(false);
+        if (showSettingsPanel) setShowSettingsPanel(false);
+        if (isLessonFileMenuOpen) setIsLessonFileMenuOpen(false);
+        if (showShortcutsHint) setShowShortcutsHint(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscapeModals);
+    return () => window.removeEventListener('keydown', handleEscapeModals);
+  }, [
+    isQuickEditModalOpen,
+    isBatchImportModalOpen,
+    isAddVocabModalOpen,
+    isWorksheetModalOpen,
+    isMeasureWordModalOpen,
+    showSettingsPanel,
+    isLessonFileMenuOpen,
+    showShortcutsHint,
+  ]);
 
   const handleSaveQuickEditSlide = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1868,7 +1894,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   onClick={() => setIsCardFlipped((f) => !f)}
                   className="my-1 p-6 rounded-2xl bg-white border-2 border-dashed border-[#9B8A3E]/60 hover:border-[#1E3227] transition-all cursor-pointer text-center space-y-3 min-h-[220px] flex flex-col items-center justify-center"
                 >
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#9B8A3E]">
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E]">
                     {isCardFlipped
                       ? 'MẶT SAU: PHIÊN ÂM · HÁN VIỆT · NGHĨA & CÂU VÍ DỤ'
                       : 'MẶT TRƯỚC: NHÌN CHỮ HÁN ĐOÁN ÂM & NGHĨA (BẤM ĐỂ LẬT THẺ)'}
@@ -1901,7 +1927,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
                 {/* 4 Spaced Repetition Rating Buttons */}
                 <div className="space-y-2 pt-2 border-t border-[rgba(30,50,39,0.12)]">
-                  <div className="text-[11px] font-bold text-[#3F5447] text-center">
+                  <div className="text-xs font-bold text-[#3F5447] text-center">
                     Đánh giá mức độ ghi nhớ (Spaced Repetition — Tự động phân phối chu kỳ ôn tập):
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1949,7 +1975,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between gap-2 border-b border-[rgba(30,50,39,0.12)] pb-2.5">
                     <div>
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-[#9B8A3E]">
+                      <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E]">
                         SPACED REPETITION · CÁ NHÂN HÓA
                       </div>
                       <h4 className="text-sm sm:text-base font-bold text-[#1E3227]">
@@ -1999,7 +2025,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                 <div className="text-xs font-bold text-[#1E3227] truncate">
                                   {item.pinyin} · <span className="text-[#9B8A3E]">{item.meaning}</span>
                                 </div>
-                                <div className="text-[10px] text-[#3F5447]">
+                                <div className="text-xs text-[#3F5447]">
                                   {item.rating === 'again'
                                     ? '😰 Chưa nhớ · Cần ôn ngay'
                                     : '🤔 Hơi nhớ · Ôn củng cố'}
@@ -2014,7 +2040,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                   if (slideIdx !== -1) handleSelectSlide(slideIdx);
                                   speakChinese(item.hanzi, speechRate);
                                 }}
-                                className="px-2.5 py-1 rounded-lg bg-[#E7ECD9] hover:bg-[#dce3c8] text-[#1E3227] text-[11px] font-bold cursor-pointer"
+                                className="px-2.5 py-1 rounded-lg bg-[#E7ECD9] hover:bg-[#dce3c8] text-[#1E3227] text-xs font-bold cursor-pointer"
                               >
                                 Ôn ngay
                               </button>
@@ -2381,7 +2407,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         className="space-y-2 bg-white p-2.5 rounded-lg border border-[#9B8A3E]/40 my-1 text-left"
                       >
                         <div>
-                          <div className="text-[11px] font-bold uppercase tracking-wider text-[#9B8A3E] mb-1">
+                          <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E] mb-1">
                             Cụm từ cố định HSK (常用搭配):
                           </div>
                           <div className="space-y-1">
@@ -2417,7 +2443,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           if (!syn) return null;
                           return (
                             <div className="pt-2 border-t border-[rgba(30,50,39,0.1)]">
-                              <div className="text-[11px] font-bold uppercase tracking-wider text-[#B8292F] mb-0.5">
+                              <div className="text-xs font-bold uppercase tracking-wider text-[#B8292F] mb-0.5">
                                 {syn.title}
                               </div>
                               <div className="text-xs text-[#3F5447] leading-relaxed mb-1">
@@ -3154,9 +3180,9 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
                           {speechResult.charMatches && speechResult.charMatches.length > 0 && (
                             <div className="bg-white/90 p-2 rounded-lg border border-[rgba(30,50,39,0.12)] space-y-1">
-                              <div className="text-[11px] font-bold text-[#5F7266] flex items-center justify-between">
+                              <div className="text-xs font-bold text-[#5F7266] flex items-center justify-between">
                                 <span>Đối chiếu âm đọc từng chữ Hán:</span>
-                                <span className="text-[10px] text-[#3F5447]">
+                                <span className="text-xs text-[#3F5447]">
                                   Xanh: Chuẩn · Đỏ: Cần chỉnh
                                 </span>
                               </div>
@@ -3176,7 +3202,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                   </span>
                                 ))}
                               </div>
-                              <div className="text-[11px] text-[#5F7266] truncate pt-0.5">
+                              <div className="text-xs text-[#5F7266] truncate pt-0.5">
                                 Ghi nhận: <span className="font-mono text-[#1E3227] font-medium">{speechResult.transcript}</span>
                               </div>
                             </div>
@@ -3213,7 +3239,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           type="button"
                           data-testid="dialogue-toggle-pinyin"
                           onClick={() => setShowPinyin((v) => !v)}
-                          className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold transition-colors cursor-pointer ${
+                          className={`px-2 py-0.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
                             showPinyin
                               ? 'bg-[#E7ECD9] border-[#1E3227]/25 text-[#1E3227]'
                               : 'bg-white border-[rgba(30,50,39,0.15)] text-[#5F7266]'
@@ -3229,7 +3255,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                             setShowMeaning(nextVal);
                             setShowVietnamese(nextVal);
                           }}
-                          className={`px-2 py-0.5 rounded-lg border text-[11px] font-bold transition-colors cursor-pointer ${
+                          className={`px-2 py-0.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
                             showMeaning
                               ? 'bg-[#E7ECD9] border-[#1E3227]/25 text-[#1E3227]'
                               : 'bg-white border-[rgba(30,50,39,0.15)] text-[#5F7266]'
@@ -3263,7 +3289,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                               <div className="min-w-0 flex-1 space-y-0.5">
                                 <div className="flex items-center gap-1.5">
                                   <span
-                                    className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                                    className={`px-1.5 py-0.5 rounded text-xs font-extrabold ${
                                       turn.speaker === 'A'
                                         ? 'bg-[#1E3227] text-[#C5B358]'
                                         : 'bg-[#9B8A3E] text-white'
@@ -3274,7 +3300,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                   {isKaraokeActive && (
                                     <span
                                       data-testid="karaoke-active-badge"
-                                      className="px-1.5 py-0.5 rounded bg-[#C84B31] text-white text-[9px] font-bold uppercase tracking-wider"
+                                      className="px-1.5 py-0.5 rounded bg-[#C84B31] text-white text-xs font-bold uppercase tracking-wider"
                                     >
                                       Đang đọc
                                     </span>
@@ -3288,7 +3314,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                 {showPinyin && (
                                   <div
                                     data-testid={`dialogue-pinyin-${idx}`}
-                                    className="text-[11px] font-medium text-[#9B8A3E] leading-snug"
+                                    className="text-xs font-medium text-[#9B8A3E] leading-snug"
                                   >
                                     {turn.pinyinLine}
                                   </div>
@@ -3297,7 +3323,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                 {(showMeaning || showVietnamese) && (
                                   <div
                                     data-testid={`dialogue-meaning-${idx}`}
-                                    className="text-[11px] text-[#3F5447] italic leading-snug"
+                                    className="text-xs text-[#3F5447] italic leading-snug"
                                   >
                                     {turn.meaningLine}
                                   </div>
@@ -3414,7 +3440,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               >
                 <div className="flex items-start justify-between gap-3 pb-2.5 border-b border-[#0F5243]/15">
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#9B8A3E]">
+                    <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E]">
                       FULL LESSON AUTHORING STUDIO · CHỈNH SỬA TRỰC TIẾP
                     </div>
                     <h3 className="text-base sm:text-lg font-bold text-[#0F382E] mt-0.5">
@@ -3567,7 +3593,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               >
                 <div className="flex items-start justify-between gap-3 pb-2.5 border-b border-[#0F5243]/15">
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#9B8A3E]">
+                    <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E]">
                       BATCH VOCABULARY IMPORT · CHUẨN HÓA HSK 3.0 TỰ ĐỘNG
                     </div>
                     <h3 className="text-base sm:text-lg font-bold text-[#0F382E] mt-0.5">
@@ -3615,7 +3641,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           <span className="text-[#3A544B] uppercase">[{item.hanViet}]</span>
                           <span className="font-extrabold text-[#0F5243]">→ {item.meaning}</span>
                         </div>
-                        <div className="text-[11px] text-[#3A544B] font-['Noto_Sans_SC'] truncate max-w-xs">
+                        <div className="text-xs text-[#3A544B] font-['Noto_Sans_SC'] truncate max-w-xs">
                           VD: {item.exampleHanzi}
                         </div>
                       </div>

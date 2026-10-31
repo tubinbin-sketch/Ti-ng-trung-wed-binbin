@@ -51,6 +51,16 @@ export const StrokeWritingModal: React.FC<StrokeWritingModalProps> = ({
   }, []);
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
     let cancelled = false;
     const pinyinParts = slide.pinyin.split(/\s+/);
     slide.characters.forEach((chObj, idx) => {
@@ -324,7 +334,7 @@ export const StrokeWritingModal: React.FC<StrokeWritingModalProps> = ({
         </div>
 
         {/* Compact Stroke & Voice Speed Control Bar in Modal */}
-        <div className="mb-3 p-2.5 rounded-xl bg-[#13161B] border border-[#282E38] flex flex-wrap items-center justify-between gap-2 text-[11px]">
+        <div className="mb-3 p-2.5 rounded-xl bg-[#13161B] border border-[#282E38] flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-1.5 text-[#A7F3D0] font-semibold">
             <Sliders className="w-3.5 h-3.5 text-[#DFC470]" />
             <span>Tốc độ nét:</span>

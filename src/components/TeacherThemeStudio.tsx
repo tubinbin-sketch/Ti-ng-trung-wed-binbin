@@ -121,7 +121,7 @@ export const TeacherThemeStudio: React.FC<TeacherThemeStudioProps> = ({
           }`}
         >
           <div
-            className={`text-[11px] ${
+            className={`text-xs ${
               isDarkTheme ? 'text-[#C4B5FD]' : 'text-[#3F5447]'
             }`}
           >
@@ -143,7 +143,7 @@ export const TeacherThemeStudio: React.FC<TeacherThemeStudioProps> = ({
           }`}
         >
           <div
-            className={`text-[11px] ${
+            className={`text-xs ${
               isDarkTheme ? 'text-[#C4B5FD]' : 'text-[#3F5447]'
             }`}
           >
@@ -165,7 +165,7 @@ export const TeacherThemeStudio: React.FC<TeacherThemeStudioProps> = ({
           }`}
         >
           <div
-            className={`text-[11px] ${
+            className={`text-xs ${
               isDarkTheme ? 'text-[#C4B5FD]' : 'text-[#3F5447]'
             }`}
           >
@@ -187,7 +187,7 @@ export const TeacherThemeStudio: React.FC<TeacherThemeStudioProps> = ({
           }`}
         >
           <div
-            className={`text-[11px] ${
+            className={`text-xs ${
               isDarkTheme ? 'text-[#C4B5FD]' : 'text-[#3F5447]'
             }`}
           >
@@ -267,7 +267,7 @@ export const TeacherThemeStudio: React.FC<TeacherThemeStudioProps> = ({
                     )}
                   </div>
                   <div
-                    className={`text-[11px] mt-0.5 ${
+                    className={`text-xs mt-0.5 ${
                       isDarkTheme ? 'text-[#C4B5FD]' : 'text-[#3F5447]'
                     }`}
                   >
@@ -385,9 +385,9 @@ export const TeacherThemeStudio: React.FC<TeacherThemeStudioProps> = ({
                 className="rounded-xl p-3.5 text-white border border-white/15"
                 style={{ backgroundColor: selectedTheme.bannerTone }}
               >
-                <div className="text-[11px] text-white/80">Chứng chỉ cao cấp</div>
+                <div className="text-xs text-white/80">Chứng chỉ cao cấp</div>
                 <div className="text-xl font-bold text-white">HSK 8</div>
-                <div className="text-[11px] text-white/90">800+ Học viên HSK</div>
+                <div className="text-xs text-white/90">800+ Học viên HSK</div>
               </div>
               <div
                 className="rounded-xl p-3.5 border backdrop-blur-md"
@@ -407,7 +407,7 @@ export const TeacherThemeStudio: React.FC<TeacherThemeStudioProps> = ({
                   82.120
                 </div>
                 <div
-                  className="text-[11px]"
+                  className="text-xs"
                   style={{ color: selectedTheme.inkSecondary }}
                 >
                   Từ vựng đã học &amp; thực hành
@@ -417,7 +417,7 @@ export const TeacherThemeStudio: React.FC<TeacherThemeStudioProps> = ({
           </div>
 
           <div
-            className="text-[11px] pt-3 border-t flex items-center justify-between"
+            className="text-xs pt-3 border-t flex items-center justify-between"
             style={{
               color: selectedTheme.inkSecondary,
               borderColor: isDarkTheme

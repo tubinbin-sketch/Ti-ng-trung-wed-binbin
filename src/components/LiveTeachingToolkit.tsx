@@ -851,7 +851,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
           >
             <div className="flex items-start justify-between gap-3 border-b border-[rgba(30,50,39,0.14)] pb-3">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-[#9B8A3E]">
+                <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E]">
                   🎲 GỌI TÊN HỌC VIÊN NGẪU NHIÊN · TƯƠNG TÁC TRÊN LỚP
                 </div>
                 <h3 className="text-lg font-bold text-[#1E3227] mt-0.5">
@@ -958,7 +958,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
               <div className="flex items-center gap-2.5">
                 <Gamepad2 className="w-5 h-5 text-[#C5B358]" />
                 <div>
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#C5B358]">
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#C5B358]">
                     🎮 MINI-GAME LỚP HỌC (1-CLICK QUIZ) · THI ĐUA LẤY ĐIỂM THƯỞNG
                   </div>
                   <h3 className="text-base sm:text-lg font-bold text-white">
@@ -1028,7 +1028,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                         />
                       </div>
                       <div className="p-3 rounded-xl bg-[#E7ECD9] text-center">
-                        <div className="text-[11px] font-bold uppercase text-[#9B8A3E]">
+                        <div className="text-xs font-bold uppercase text-[#9B8A3E]">
                           Nghĩa tiếng Việt &amp; Âm Hán Việt
                         </div>
                         <div className="text-base font-extrabold text-[#1E3227] mt-0.5">
@@ -1211,7 +1211,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
           >
             <div className="flex items-start justify-between gap-3 border-b border-[rgba(30,50,39,0.14)] pb-3">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-[#9B8A3E]">
+                <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E]">
                   📤 1-CLICK ASSIGNMENT GENERATOR · ĐỒNG BỘ SANG HỌC SINH
                 </div>
                 <h3 className="text-base sm:text-lg font-bold text-[#1E3227] mt-0.5">
@@ -1253,7 +1253,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                         {s.hanzi}
                       </div>
                       <div
-                        className={`text-[10px] truncate ${
+                        className={`text-xs truncate ${
                           isChecked ? 'text-[#C5B358]' : 'text-[#3F5447]'
                         }`}
                       >
@@ -1342,7 +1342,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
               <div className="flex items-center gap-2.5">
                 <BookOpen className="w-5 h-5 text-[#C5B358]" />
                 <div>
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#C5B358]">
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#C5B358]">
                     TỰ ĐỘNG TỔNG HỢP TỪ SLIDE BÀI GIẢNG · CHUẨN KHUNG HSK 3.0 (三等九级)
                   </div>
                   <h3 className="text-sm sm:text-base font-bold text-white">
@@ -1416,7 +1416,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                           <div className="font-['Noto_Sans_SC'] text-base font-bold text-[#1E3227]">
                             {row.hanzi}
                           </div>
-                          <div className="text-[11px] font-semibold text-[#9B8A3E]">
+                          <div className="text-xs font-semibold text-[#9B8A3E]">
                             {row.pinyin} · <span className="uppercase">{row.hanViet}</span>
                           </div>
                           <div className="text-xs font-bold text-[#1E3227] mt-0.5">
@@ -1425,13 +1425,13 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                         </td>
                         <td className="py-2.5 px-3">
                           <div className="font-bold text-[#1E3227]">{row.hskLevel}</div>
-                          <div className="text-[11px] text-[#3F5447]">{row.stageLabel}</div>
-                          <div className="text-[11px] font-bold text-[#9B8A3E] mt-0.5">
+                          <div className="text-xs text-[#3F5447]">{row.stageLabel}</div>
+                          <div className="text-xs font-bold text-[#9B8A3E] mt-0.5">
                             {row.charStandard}
                           </div>
                         </td>
                         <td className="py-2.5 px-3">
-                          <div className="p-2 rounded-lg bg-[#F4F6EE] border border-[#9B8A3E]/35 font-mono text-[11px] font-bold text-[#1E3227]">
+                          <div className="p-2 rounded-lg bg-[#F4F6EE] border border-[#9B8A3E]/35 font-mono text-xs font-bold text-[#1E3227]">
                             {row.grammarFormula}
                           </div>
                         </td>
@@ -1439,7 +1439,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                           <div className="font-['Noto_Sans_SC'] font-semibold text-[#1E3227]">
                             {row.exampleSentence}
                           </div>
-                          <div className="text-[11px] text-[#3F5447] mt-1">{row.synonymNote}</div>
+                          <div className="text-xs text-[#3F5447] mt-1">{row.synonymNote}</div>
                         </td>
                       </tr>
                     ))}
@@ -1472,7 +1472,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
               <div className="flex items-center gap-2.5">
                 <Headphones className="w-5 h-5 text-[#C5B358]" />
                 <div>
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#C5B358]">
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#C5B358]">
                     🎧 PHÒNG ĐỌC CHÍNH TẢ TRÊN LỚP · 课堂听写 (TĪNGXIĚ)
                   </div>
                   <h3 className="text-sm sm:text-base font-bold text-white">
@@ -1509,7 +1509,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
                 {/* Left 5 cols: Masked / Revealed Character Stage */}
                 <div className="md:col-span-5 rounded-2xl bg-gradient-to-br from-[#0F5243] to-[#123A30] text-white p-5 border border-[#C5B358]/60 flex flex-col justify-between text-center space-y-3">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#C5B358]">
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#C5B358]">
                     {isDictationRevealed ? 'ĐÁP ÁN CHỮ HÁN CHUẨN' : 'NGHE ÂM & VIẾT CHỮ HÁN'}
                   </div>
 
@@ -1573,7 +1573,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                       <div className="text-[#3A544B] font-medium">
                         {currentDictationItem.radicalHint}
                       </div>
-                      <div className="text-[11px] text-[#3A544B] pt-1 border-t border-black/5">
+                      <div className="text-xs text-[#3A544B] pt-1 border-t border-black/5">
                         Ngữ cảnh: “{currentDictationItem.exampleVi}”
                       </div>
                     </div>

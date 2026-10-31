@@ -185,7 +185,7 @@ test('generateMeasureWordChallenges and evaluateMeasureWordAttempt grade HSK 3.0
 
 test('storageService verifyTeacherPin and backup export/import work accurately', () => {
   assert.equal(verifyTeacherPin('2026'), true);
-  assert.equal(verifyTeacherPin('8888'), true);
+  assert.equal(verifyTeacherPin('8888'), false);
   assert.equal(verifyTeacherPin('0000'), false);
 
   const backup = buildFullSystemBackup(INITIAL_VOCAB_SLIDES.slice(0, 3), []);
@@ -194,3 +194,54 @@ test('storageService verifyTeacherPin and backup export/import work accurately',
   assert.ok(parsed);
   assert.equal(parsed?.slides?.length, 3);
 });
+
+test('server AI route origin/session guard and periodic rate-limit memory cleanup work accurately', async () => {
+  const { isTrustedRequestOrigin, cleanupExpiredRateLimits } = await import('../../server');
+
+  // Valid AI Studio Preview & localhost requests pass
+  assert.equal(
+    isTrustedRequestOrigin({
+      origin: 'http://localhost:3000',
+      host: 'localhost:3000',
+      secFetchSite: 'same-origin',
+      contentType: 'application/json',
+    }),
+    true
+  );
+
+  assert.equal(
+    isTrustedRequestOrigin({
+      origin: 'https://ais-dev-pn3kppfm4fs2ypjsjrbixg-801224340907.asia-northeast1.run.app',
+      host: 'ais-dev-pn3kppfm4fs2ypjsjrbixg-801224340907.asia-northeast1.run.app',
+      secFetchSite: 'same-origin',
+      contentType: 'application/json; charset=utf-8',
+    }),
+    true
+  );
+
+  // Untrusted foreign cross-site origin or non-JSON content-type is rejected
+  assert.equal(
+    isTrustedRequestOrigin({
+      origin: 'https://evil-scraper.example.com',
+      host: 'localhost:3000',
+      secFetchSite: 'cross-site',
+      contentType: 'application/json',
+    }),
+    false
+  );
+
+  assert.equal(
+    isTrustedRequestOrigin({
+      origin: 'http://localhost:3000',
+      host: 'localhost:3000',
+      secFetchSite: 'same-origin',
+      contentType: 'application/x-www-form-urlencoded',
+    }),
+    false
+  );
+
+  const cleanupResult = cleanupExpiredRateLimits(Date.now() + 120_000);
+  assert.equal(typeof cleanupResult.removedApiEntries, 'number');
+  assert.equal(typeof cleanupResult.removedAiEntries, 'number');
+});
+

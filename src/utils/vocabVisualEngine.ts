@@ -800,28 +800,59 @@ export function buildContextualImagePrompt(
 }
 
 /**
- * Generates a live contextual image URL from Pollinations AI matching the exact vocabulary word and example sentence.
+ * Generates a school-safe, self-contained contextual HSK SVG illustration data URI
+ * synchronized with the vocabulary word, meaning, and example sentence (0 external AI image dependency).
  */
-export function buildContextualPollinationsUrl(
+export function buildSafeContextualSvgDataUrl(
   hanzi = '',
   meaning = '',
   exampleHanzi = '',
   exampleMeaning = '',
-  customPrompt = ''
+  customCaption = ''
 ): string {
-  const prompt = buildContextualImagePrompt(
-    hanzi,
-    meaning,
-    exampleHanzi,
-    exampleMeaning,
-    customPrompt
-  );
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=600&nologo=true`;
+  const cleanHanzi = (hanzi || '汉语').trim();
+  const archetype = inferSemanticArchetype(cleanHanzi, meaning);
+  const baseDef = ARCHETYPE_DEFINITIONS[archetype];
+  const categoryLabel = baseDef.categoryGroupLabel;
+  const subtitle = (
+    customCaption ||
+    exampleMeaning ||
+    meaning ||
+    baseDef.defaultCaptionVi
+  )
+    .replace(/[<>&"']/g, '')
+    .slice(0, 56);
+  const exLine = (exampleHanzi || cleanHanzi).replace(/[<>&"']/g, '').slice(0, 28);
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#11241C"/>
+        <stop offset="55%" stop-color="#1B392D"/>
+        <stop offset="100%" stop-color="#284E3E"/>
+      </linearGradient>
+      <radialGradient id="glow" cx="50%" cy="42%" r="48%">
+        <stop offset="0%" stop-color="#FDE68A" stop-opacity="0.28"/>
+        <stop offset="100%" stop-color="#0F5243" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="800" height="600" rx="24" fill="url(#bg)"/>
+    <circle cx="400" cy="250" r="240" fill="url(#glow)"/>
+    <rect x="24" y="24" width="752" height="552" rx="18" fill="none" stroke="#DFC470" stroke-opacity="0.45" stroke-width="2"/>
+    <rect x="48" y="44" width="320" height="44" rx="12" fill="#0F1D16" fill-opacity="0.78" stroke="#DFC470" stroke-width="1.2"/>
+    <text x="68" y="72" fill="#FDE68A" font-size="20" font-weight="700" font-family="Plus Jakarta Sans, Noto Sans SC, sans-serif">${categoryLabel}</text>
+    <text x="400" y="265" text-anchor="middle" fill="#FFFBEB" font-size="116" font-weight="700" font-family="Noto Sans SC, sans-serif">${cleanHanzi}</text>
+    <text x="400" y="345" text-anchor="middle" fill="#FDE68A" font-size="30" font-weight="600" font-family="Noto Sans SC, sans-serif">${exLine}</text>
+    <rect x="80" y="470" width="640" height="68" rx="16" fill="#0F1D16" fill-opacity="0.82" stroke="#DFC470" stroke-opacity="0.5" stroke-width="1.5"/>
+    <text x="400" y="512" text-anchor="middle" fill="#E5E9D7" font-size="22" font-weight="600" font-family="Plus Jakarta Sans, sans-serif">${subtitle}</text>
+  </svg>`;
+
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 /**
- * Resolves the complete visual profile for any vocabulary word, including multi-angle photos,
- * Wikipedia REST API queries, radical hints, and procedural SVG archetype.
+ * Resolves the complete visual profile for any vocabulary word, including multi-angle curated static photos,
+ * Wikipedia REST API queries, radical hints, and procedural SVG archetype (never uses pollinations.ai).
  */
 export function resolveSemanticVisualProfile(
   hanzi = '',
@@ -848,7 +879,11 @@ export function resolveSemanticVisualProfile(
 
   const basePhotos = wordOverride?.photoUrls || baseDef.photoUrls;
   const mergedPhotos: string[] = [];
-  if (customImageUrl && customImageUrl.trim()) {
+  if (
+    customImageUrl &&
+    customImageUrl.trim() &&
+    !customImageUrl.toLowerCase().includes('pollinations.ai')
+  ) {
     mergedPhotos.push(customImageUrl.trim());
   }
   for (const url of basePhotos) {
@@ -856,14 +891,14 @@ export function resolveSemanticVisualProfile(
       mergedPhotos.push(url);
     }
   }
-  const pollinationsUrl = buildContextualPollinationsUrl(
+  const safeSvgDataUrl = buildSafeContextualSvgDataUrl(
     cleanHanzi,
     meaning,
     exampleHanzi,
     exampleMeaning
   );
-  if (!mergedPhotos.includes(pollinationsUrl)) {
-    mergedPhotos.push(pollinationsUrl);
+  if (!mergedPhotos.includes(safeSvgDataUrl)) {
+    mergedPhotos.push(safeSvgDataUrl);
   }
 
   return {
@@ -890,7 +925,11 @@ export function getSavedCustomVocabImage(hanzi: string): string | undefined {
     const raw = window.localStorage.getItem(CUSTOM_VOCAB_IMAGE_STORAGE_KEY);
     if (!raw) return undefined;
     const map = JSON.parse(raw) as Record<string, string>;
-    return map[hanzi.trim()];
+    const saved = map[hanzi.trim()];
+    if (saved && saved.toLowerCase().includes('pollinations.ai')) {
+      return undefined;
+    }
+    return saved;
   } catch {
     return undefined;
   }

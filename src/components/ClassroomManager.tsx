@@ -47,6 +47,13 @@ import {
 import { ClassroomAddStudentModal } from './ClassroomAddStudentModal';
 import { ClassroomLuckyWheelModal } from './ClassroomLuckyWheelModal';
 import { WorksheetPreviewModal } from './WorksheetPreviewModal';
+import {
+  ClassroomDataMode,
+  fetchRemoteState,
+  getClassroomDataMode,
+  setClassroomDataMode,
+  syncStateToBackend,
+} from '../utils/storageService';
 
 export type ClassStudent = ClassStudentRecord;
 
@@ -225,21 +232,20 @@ export const DEFAULT_STUDENTS: ClassStudent[] = [
 
 export function getStoredStudentRoster(): ClassStudent[] {
   if (typeof window === 'undefined') return DEFAULT_STUDENTS;
+  const mode = getClassroomDataMode();
   try {
     const raw = localStorage.getItem(STORAGE_KEY_STUDENTS);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
+        if (parsed.length === 0) {
+          return mode === 'new' ? [] : DEFAULT_STUDENTS;
+        }
         const normalized: ClassStudent[] = parsed.map((item, idx) => {
-          // Migrate legacy st-1 name 'Nguyễn Minh Anh' to 'Lưu Thị Minh Thư' so all views match 100%
-          const migratedName =
-            idx === 0 && item.id === 'st-1' && item.name === 'Nguyễn Minh Anh'
-              ? 'Lưu Thị Minh Thư'
-              : item.name;
           const fallbackDefault = DEFAULT_STUDENTS[idx];
           return {
             ...item,
-            name: migratedName,
+            name: item.name,
             studentCode:
               item.studentCode || fallbackDefault?.studentCode || `HV-${String(idx + 1).padStart(3, '0')}`,
             hskLevel: item.hskLevel || fallbackDefault?.hskLevel || 'HSK 2',
@@ -261,9 +267,9 @@ export function getStoredStudentRoster(): ClassStudent[] {
       }
     }
   } catch {
-    // Fallback to DEFAULT_STUDENTS if storage is inaccessible
+    // Fallback if storage is inaccessible
   }
-  return DEFAULT_STUDENTS;
+  return mode === 'new' ? [] : DEFAULT_STUDENTS;
 }
 
 interface ClassroomManagerProps {
@@ -280,6 +286,9 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   // Load student roster from localStorage to persist added/deleted students across refreshes
   const [studentsList, setStudentsList] = useState<ClassStudent[]>(() =>
     getStoredStudentRoster()
+  );
+  const [classroomMode, setClassroomModeState] = useState<ClassroomDataMode>(() =>
+    getClassroomDataMode()
   );
 
   const studentCount = studentsList.length;
@@ -305,7 +314,9 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState(false);
 
   useEffect(() => {
+    fetchRemoteState();
     const handleExternalSync = () => {
+      setClassroomModeState(getClassroomDataMode());
       setStudentsList(getStoredStudentRoster());
     };
     const handleReadingSync = () => {
@@ -326,11 +337,15 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     };
     window.addEventListener('hanu_students_updated', handleExternalSync);
     window.addEventListener('hanu_srs_updated', handleExternalSync);
+    window.addEventListener('hanu_remote_state_synced', handleExternalSync);
+    window.addEventListener('hanu_classroom_mode_changed', handleExternalSync);
     window.addEventListener('hanu_reading_history_updated', handleReadingSync);
     window.addEventListener('hanu_handwriting_history_updated', handleHandwritingSync);
     return () => {
       window.removeEventListener('hanu_students_updated', handleExternalSync);
       window.removeEventListener('hanu_srs_updated', handleExternalSync);
+      window.removeEventListener('hanu_remote_state_synced', handleExternalSync);
+      window.removeEventListener('hanu_classroom_mode_changed', handleExternalSync);
       window.removeEventListener('hanu_reading_history_updated', handleReadingSync);
       window.removeEventListener('hanu_handwriting_history_updated', handleHandwritingSync);
     };
@@ -513,7 +528,11 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     );
   };
 
-  const persistRosterAndSync = (updated: ClassStudent[]) => {
+  const persistRosterAndSync = (
+    updated: ClassStudent[],
+    overrideMode?: ClassroomDataMode
+  ) => {
+    const targetMode = overrideMode || classroomMode;
     setStudentsList(updated);
     try {
       localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
@@ -522,6 +541,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     }
     const nextTotal = updated.length;
     onStudentCountChange?.(nextTotal);
+    syncStateToBackend({ roster: updated, classroomMode: targetMode });
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('hanu_students_updated', { detail: nextTotal })
@@ -534,6 +554,27 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         submissionsCount: s.autoGraded ? nextTotal : Math.min(s.submissionsCount, nextTotal),
       }))
     );
+  };
+
+  const handleActivateDemoClassroom = () => {
+    setClassroomDataMode('demo');
+    setClassroomModeState('demo');
+    persistRosterAndSync(DEFAULT_STUDENTS, 'demo');
+    setActionBanner(
+      `🧪 Đã bật Chế độ Demo (Dữ liệu mẫu) với ${DEFAULT_STUDENTS.length} học viên mẫu và đồng bộ lên hệ thống.`
+    );
+    playGentleChime(659.25, 0.2);
+  };
+
+  const handleCreateNewClassroom = () => {
+    setClassroomDataMode('new');
+    setClassroomModeState('new');
+    persistRosterAndSync([], 'new');
+    setActiveTab('grading');
+    setActionBanner(
+      '🆕 Đã tạo lớp học mới (0 học viên). Bấm "+ Thêm học viên mới" để cấp Mã học viên (HV-001...) cho lớp thực tế của thầy/cô!'
+    );
+    playGentleChime(587.33, 0.2);
   };
 
   const handleOpenAddStudentModal = () => {
@@ -606,7 +647,13 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     if (!studentToDelete) return;
     const removedName = studentToDelete.name;
     const updated = studentsList.filter((s) => s.id !== studentToDelete.id);
-    persistRosterAndSync(updated);
+    if (updated.length === 0) {
+      setClassroomDataMode('new');
+      setClassroomModeState('new');
+      persistRosterAndSync([], 'new');
+    } else {
+      persistRosterAndSync(updated);
+    }
     setActionBanner(
       `Đã xóa học viên "${removedName}" khỏi lớp HSK 1–3 (Sĩ số mới: ${updated.length} học viên). Dữ liệu đã lưu vĩnh viễn.`
     );
@@ -615,9 +662,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   };
 
   const handleRestoreDefaultStudents = () => {
-    persistRosterAndSync(DEFAULT_STUDENTS);
-    setActionBanner(`Đã khôi phục danh sách ${DEFAULT_STUDENTS.length} học viên ban đầu.`);
-    playGentleChime(659.25, 0.2);
+    handleActivateDemoClassroom();
   };
 
   const selectedWheelStudent = useMemo(
@@ -704,7 +749,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             <div className="flex items-center gap-2 text-xs font-bold text-[#9B8A3E] uppercase tracking-wider">
               <span>Quản lý lớp học · Tự động hóa giảng dạy</span>
               <span>·</span>
-              <span className="px-2 py-0.5 rounded-full bg-[#1E3227]/10 text-[#1E3227] text-[11px] font-semibold">
+              <span className="px-2 py-0.5 rounded-full bg-[#1E3227]/10 text-[#1E3227] text-xs font-semibold">
                 Mã: 722229
               </span>
             </div>
@@ -720,21 +765,48 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             </p>
           </div>
 
-          {/* 1-Click Batch Automation & CSV/Report Export Buttons */}
+          {/* 1-Click Batch Automation, Demo Mode vs New Class Mode & CSV/Report Export Buttons */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
+              onClick={handleActivateDemoClassroom}
+              data-testid="activate-demo-classroom-btn"
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                classroomMode === 'demo' && studentsList.length > 0
+                  ? 'bg-[#0F5243] text-[#FAF7F0] border-[#0F5243] shadow-2xs'
+                  : 'bg-[#FAFBF7] hover:bg-[#E7ECD9] text-[#1E3227] border-[#9B8A3E]/60'
+              }`}
+              title="Nạp bộ dữ liệu mẫu 12 học viên để trải nghiệm thử"
+            >
+              <span>🧪 Chế độ Demo (Dữ liệu mẫu)</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleCreateNewClassroom}
+              data-testid="create-new-classroom-btn"
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                classroomMode === 'new' && studentsList.length === 0
+                  ? 'bg-[#B8292F] text-white border-[#B8292F] shadow-2xs'
+                  : 'bg-[#FAFBF7] hover:bg-[#E7ECD9] text-[#1E3227] border-[#9B8A3E]/60'
+              }`}
+              title="Khởi tạo lớp học trống mới để thêm học viên thực tế"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Tạo lớp học mới</span>
+            </button>
+            <button
+              type="button"
               onClick={handleExportCsv}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#FAFBF7] hover:bg-[#E7ECD9] text-[#1E3227] border border-[#9B8A3E]/60 text-xs font-bold transition-all whitespace-nowrap shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#FAFBF7] hover:bg-[#E7ECD9] text-[#1E3227] border border-[#9B8A3E]/60 text-xs font-bold transition-all whitespace-nowrap shadow-2xs cursor-pointer"
               data-testid="header-export-csv-report-btn"
             >
               <Download className="w-3.5 h-3.5 text-[#9B8A3E]" />
-              <span>📊 Xuất Bảng Điểm CSV/In Báo Cáo</span>
+              <span>📊 Xuất Bảng Điểm CSV</span>
             </button>
             <button
               type="button"
               onClick={handleBatchAutoGradeAll}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] text-[#FAFBF7] border border-[#9B8A3E]/50 text-xs font-bold transition-all whitespace-nowrap shadow-sm cursor-pointer"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] text-[#FAFBF7] border border-[#9B8A3E]/50 text-xs font-bold transition-all whitespace-nowrap shadow-sm cursor-pointer"
               data-testid="batch-autograde-btn"
             >
               <Sparkles className="w-4 h-4 text-[#C5B358]" />
@@ -753,7 +825,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             <div className="text-xl sm:text-2xl font-bold text-[#1E3227] mt-1 tabular-nums">
               {totalCourseSessions}
             </div>
-            <div className="text-[10px] text-[#3F5447]/80 mt-0.5 truncate">Khóa chuẩn HSK 1–3</div>
+            <div className="text-xs text-[#3F5447]/80 mt-0.5 truncate">Khóa chuẩn HSK 1–3</div>
           </div>
 
           <div className="rounded-xl bg-[#FAFBF7] border border-[rgba(30,50,39,0.15)] p-3.5 flex flex-col justify-between shadow-2xs">
@@ -767,7 +839,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             >
               {assignedCount}/{totalCourseSessions}
             </div>
-            <div className="text-[10px] text-[#1E3227] font-semibold mt-0.5 truncate">
+            <div className="text-xs text-[#1E3227] font-semibold mt-0.5 truncate">
               Kèm Slide &amp; Đề chuẩn
             </div>
           </div>
@@ -783,7 +855,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             >
               {gradedCount}/{totalCourseSessions}
             </div>
-            <div className="text-[10px] text-[#9B8A3E] font-semibold mt-0.5 truncate">
+            <div className="text-xs text-[#9B8A3E] font-semibold mt-0.5 truncate">
               100% học viên đã chấm
             </div>
           </div>
@@ -796,7 +868,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             <div className="text-xl sm:text-2xl font-bold text-[#1E3227] mt-1 tabular-nums">
               {studentCount}
             </div>
-            <div className="text-[10px] text-[#3F5447]/80 mt-0.5 truncate">Đầy đủ tài khoản</div>
+            <div className="text-xs text-[#3F5447]/80 mt-0.5 truncate">Đầy đủ tài khoản</div>
           </div>
         </div>
 
@@ -820,7 +892,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               <button
                 type="button"
                 onClick={() => handleLoadDemoPackage(PRESET_ASSIGNMENT_BUOI_14)}
-                className="px-2.5 py-1 rounded-lg bg-white border border-[#9B8A3E]/40 hover:border-[#1E3227] text-[11px] font-bold text-[#1E3227] transition-all flex items-center gap-1 shadow-2xs"
+                className="px-2.5 py-1 rounded-lg bg-white border border-[#9B8A3E]/40 hover:border-[#1E3227] text-xs font-bold text-[#1E3227] transition-all flex items-center gap-1 shadow-2xs"
               >
                 <FileType className="w-3.5 h-3.5 text-[#9B8A3E]" />
                 <span>⚡ Đề mẫu Buổi 14</span>
@@ -828,7 +900,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               <button
                 type="button"
                 onClick={() => handleLoadDemoPackage(PRESET_ASSIGNMENT_BUOI_15)}
-                className="px-2.5 py-1 rounded-lg bg-white border border-[#9B8A3E]/40 hover:border-[#1E3227] text-[11px] font-bold text-[#1E3227] transition-all flex items-center gap-1 shadow-2xs"
+                className="px-2.5 py-1 rounded-lg bg-white border border-[#9B8A3E]/40 hover:border-[#1E3227] text-xs font-bold text-[#1E3227] transition-all flex items-center gap-1 shadow-2xs"
               >
                 <FileCode className="w-3.5 h-3.5 text-[#9B8A3E]" />
                 <span>⚡ Đề mẫu Buổi 15</span>
@@ -836,7 +908,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               <button
                 type="button"
                 onClick={() => setShowPasteArea((v) => !v)}
-                className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition-all flex items-center gap-1 shadow-2xs ${
+                className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition-all flex items-center gap-1 shadow-2xs ${
                   showPasteArea
                     ? 'bg-[#1E3227] text-white border-[#1E3227]'
                     : 'bg-white border-[rgba(30,50,39,0.2)] text-[#3F5447] hover:text-[#1E3227]'
@@ -907,7 +979,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                   </span>
                 </div>
 
-                <span className="px-2 py-0.5 rounded-lg bg-[#1E3227]/10 hover:bg-[#1E3227]/20 text-[#1E3227] text-[10px] font-bold whitespace-nowrap shrink-0 transition-colors">
+                <span className="px-2 py-0.5 rounded-lg bg-[#1E3227]/10 hover:bg-[#1E3227]/20 text-[#1E3227] text-xs font-bold whitespace-nowrap shrink-0 transition-colors">
                   {selectedFile ? 'Đổi file' : 'Duyệt file'}
                 </span>
               </div>
@@ -939,12 +1011,12 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
           {/* Conditional Direct Text Paste Area */}
           {showPasteArea && (
             <div className="pt-2 border-t border-[rgba(30,50,39,0.1)] space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-semibold text-[#1E3227]">
+              <div className="flex items-center justify-between text-xs font-semibold text-[#1E3227]">
                 <span>Dán trực tiếp câu hỏi trắc nghiệm, ghép câu hoặc tự luận tiếng Trung:</span>
                 <button
                   type="button"
                   onClick={() => setShowPasteArea(false)}
-                  className="text-[10px] text-[#3F5447] hover:underline"
+                  className="text-xs text-[#3F5447] hover:underline"
                 >
                   Đóng
                 </button>
@@ -966,7 +1038,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 <CheckCircle2 className="w-4 h-4 text-[#1E3227] shrink-0" />
                 <div className="truncate">
                   <span className="font-bold text-[#1E3227]">{successBanner}</span>
-                  <span className="text-[11px] text-[#3F5447] hidden sm:inline ml-1">
+                  <span className="text-xs text-[#3F5447] hidden sm:inline ml-1">
                     · Học sinh nhận đề &amp; hệ thống tự chấm 100 điểm
                   </span>
                 </div>
@@ -976,7 +1048,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 <button
                   type="button"
                   onClick={onSwitchToStudentView}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-[#1E3227] hover:bg-[#2B4637] text-white text-[11px] font-bold transition-all shrink-0 shadow-2xs whitespace-nowrap"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-lg bg-[#1E3227] hover:bg-[#2B4637] text-white text-xs font-bold transition-all shrink-0 shadow-2xs whitespace-nowrap"
                 >
                   <Eye className="w-3.5 h-3.5 text-[#C5B358]" />
                   <span>👁️ Xem góc nhìn Học sinh</span>
@@ -1129,7 +1201,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                     setStudentStatusFilter(f.id);
                     if (activeTab !== 'grading') setActiveTab('grading');
                   }}
-                  className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     studentStatusFilter === f.id
                       ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
                       : 'bg-white text-[#3F5447] border border-[rgba(30,50,39,0.15)] hover:border-[#9B8A3E] hover:text-[#1E3227]'
@@ -1179,7 +1251,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                       <div className="font-semibold text-[#1E3227]">
                         {session.lessonTitle}
                       </div>
-                      <div className="font-['Noto_Sans_SC'] text-[11px] text-[#6B7280]">
+                      <div className="font-['Noto_Sans_SC'] text-xs text-[#6B7280]">
                         {session.chineseTitle}
                       </div>
                     </td>
@@ -1187,7 +1259,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                       {session.instructor}
                     </td>
                     <td className="py-2.5 px-3">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-[#E7ECD9] text-[#1E3227]">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-[#E7ECD9] text-[#1E3227]">
                         <CheckCircle2 className="w-3 h-3 text-[#1E3227]" />
                         {session.slideCount} Slide
                       </span>
@@ -1196,7 +1268,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                       <button
                         type="button"
                         onClick={() => setSelectedReportSession(session)}
-                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-[#FAFBF7] hover:bg-[#E7ECD9] border border-[#9B8A3E]/40 text-[#9B8A3E] hover:text-[#1E3227] transition-all cursor-pointer shadow-2xs"
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-[#FAFBF7] hover:bg-[#E7ECD9] border border-[#9B8A3E]/40 text-[#9B8A3E] hover:text-[#1E3227] transition-all cursor-pointer shadow-2xs"
                         title="Bấm để xem báo cáo chi tiết bài làm cả lớp"
                       >
                         <Sparkles className="w-3 h-3 text-[#9B8A3E]" />
@@ -1259,7 +1331,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                   <button
                     type="button"
                     onClick={handleRestoreDefaultStudents}
-                    className="text-[11px] text-[#9B8A3E] hover:text-[#1E3227] font-semibold underline underline-offset-2 transition-colors cursor-pointer"
+                    className="text-xs text-[#9B8A3E] hover:text-[#1E3227] font-semibold underline underline-offset-2 transition-colors cursor-pointer"
                   >
                     Khôi phục {DEFAULT_STUDENTS.length} học viên ban đầu
                   </button>
@@ -1320,7 +1392,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                               {st.name}
                             </span>
                           </div>
-                          <div className="flex items-center gap-1.5 mt-0.5 text-[10px] font-semibold text-[#5F7266]">
+                          <div className="flex items-center gap-1.5 mt-0.5 text-xs font-semibold text-[#5F7266]">
                             <span className="px-1.5 py-0.5 rounded bg-[#E7ECD9] text-[#1E3227] tabular-nums">
                               {st.studentCode || 'HV-001'}
                             </span>
@@ -1334,7 +1406,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            className={`text-xs font-bold px-2 py-0.5 rounded-md ${
                               needsSupport
                                 ? 'text-amber-800 bg-amber-100 border border-amber-300/60'
                                 : 'text-[#065F46] bg-[#065F46]/10'
@@ -1347,7 +1419,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                             onClick={(e) => handleDeleteClick(st, e)}
                             title={`Xóa học viên ${st.name} khỏi lớp`}
                             aria-label={`Xóa học viên ${st.name}`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-red-500 hover:text-red-700 hover:bg-red-50 border border-red-200/60 hover:border-red-300 text-[11px] font-medium transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-red-500 hover:text-red-700 hover:bg-red-50 border border-red-200/60 hover:border-red-300 text-xs font-medium transition-colors cursor-pointer"
                           >
                             <Trash2 className="w-3 h-3" />
                             <span>Xóa</span>
@@ -1359,18 +1431,18 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                         <div>Tập viết Hán tự: <strong>{st.writingScore}</strong></div>
                         <div>Quiz ngữ pháp: <strong>{st.quizScore}</strong></div>
                         <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                          <span className="text-[11px] text-[#5F7266]">Từ vựng cần ôn:</span>
+                          <span className="text-xs text-[#5F7266]">Từ vựng cần ôn:</span>
                           {st.reviewWords && st.reviewWords.length > 0 ? (
                             st.reviewWords.map((word) => (
                               <span
                                 key={word}
-                                className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300/70 text-[11px] font-bold font-['Noto_Serif_SC']"
+                                className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300/70 text-xs font-bold font-['Noto_Serif_SC']"
                               >
                                 {word}
                               </span>
                             ))
                           ) : (
-                            <span className="text-[11px] font-semibold text-[#065F46]">
+                            <span className="text-xs font-semibold text-[#065F46]">
                               Đã thuộc hết
                             </span>
                           )}
@@ -1390,7 +1462,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                               'Phát biểu xây dựng bài trên lớp'
                             )
                           }
-                          className="px-2 py-1 rounded-lg bg-[#E7ECD9] hover:bg-[#1E3227] text-[#1E3227] hover:text-white border border-[#9B8A3E]/50 text-[10px] font-bold transition-all shrink-0 cursor-pointer"
+                          className="px-2 py-1 rounded-lg bg-[#E7ECD9] hover:bg-[#1E3227] text-[#1E3227] hover:text-white border border-[#9B8A3E]/50 text-xs font-bold transition-all shrink-0 cursor-pointer"
                           title={`Cộng nhanh +5 điểm thưởng cho ${st.name}`}
                         >
                           +5đ thưởng
@@ -1435,7 +1507,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 <div className="text-xl font-bold text-[#1E3227] mt-1 tabular-nums">
                   {readingHistory.length} lượt
                 </div>
-                <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                <div className="text-xs text-emerald-700 font-semibold mt-0.5">
                   Web Speech API zh-CN
                 </div>
               </div>
@@ -1449,7 +1521,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                       )}%`
                     : '94%'}
                 </div>
-                <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                <div className="text-xs text-emerald-700 font-semibold mt-0.5">
                   Thanh điệu chuẩn Bắc Kinh
                 </div>
               </div>
@@ -1458,7 +1530,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 <div className="text-xl font-bold text-[#1E3227] mt-1 tabular-nums">
                   {handwritingHistory.length} nét
                 </div>
-                <div className="text-[10px] text-[#3F5447] font-semibold mt-0.5">
+                <div className="text-xs text-[#3F5447] font-semibold mt-0.5">
                   Đối chiếu HanziWriter
                 </div>
               </div>
@@ -1472,7 +1544,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                       )}%`
                     : '91%'}
                 </div>
-                <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                <div className="text-xs text-emerald-700 font-semibold mt-0.5">
                   Bút thuận &amp; tọa độ nét
                 </div>
               </div>
@@ -1487,7 +1559,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                     <Mic className="w-3.5 h-3.5 text-[#C84B31]" />
                     <span>Lịch sử phát âm câu ví dụ gần đây</span>
                   </h5>
-                  <span className="text-[10px] text-[#5F7266]">
+                  <span className="text-xs text-[#5F7266]">
                     {readingHistory.length} bản ghi
                   </span>
                 </div>
@@ -1506,14 +1578,14 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                           <span className="font-['Noto_Sans_SC'] font-bold text-sm text-[#1E3227]">
                             {r.hanzi} · "{r.targetSentence}"
                           </span>
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#1E3227] text-white font-bold text-[11px] tabular-nums">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#1E3227] text-white font-bold text-xs tabular-nums">
                             {r.score}%
                           </span>
                         </div>
-                        <div className="text-[#3F5447] text-[11px]">
+                        <div className="text-[#3F5447] text-xs">
                           Nhận diện: <span className="font-mono text-[#1E3227]">{r.transcript}</span>
                         </div>
-                        <div className="text-[11px] text-emerald-800 font-medium">
+                        <div className="text-xs text-emerald-800 font-medium">
                           ✓ {r.feedback}
                         </div>
                       </div>
@@ -1529,7 +1601,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                     <Star className="w-3.5 h-3.5 text-[#9B8A3E]" />
                     <span>Lịch sử viết tay Ô Mễ Tự Cách gần đây</span>
                   </h5>
-                  <span className="text-[10px] text-[#5F7266]">
+                  <span className="text-xs text-[#5F7266]">
                     {handwritingHistory.length} bản ghi
                   </span>
                 </div>
@@ -1549,7 +1621,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                             Chữ: {h.char} ({h.hanziWord})
                           </span>
                           <div className="flex items-center gap-1">
-                            <span className="px-1.5 py-0.5 rounded bg-[#9B8A3E]/20 text-[#1E3227] font-bold text-[11px] tabular-nums">
+                            <span className="px-1.5 py-0.5 rounded bg-[#9B8A3E]/20 text-[#1E3227] font-bold text-xs tabular-nums">
                               {h.accuracy}%
                             </span>
                             <span className="text-amber-500 font-bold">
@@ -1558,11 +1630,11 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                           </div>
                         </div>
                         {h.isReversedDirection && (
-                          <div className="text-[11px] text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded">
+                          <div className="text-xs text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded">
                             ⚠️ Học sinh kéo ngược hướng bút thuận
                           </div>
                         )}
-                        <div className="text-[11px] text-[#3F5447]">
+                        <div className="text-xs text-[#3F5447]">
                           {h.feedback}
                         </div>
                       </div>
@@ -1595,7 +1667,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 <div className="flex items-center gap-2 text-xs font-bold text-[#9B8A3E] uppercase tracking-wider">
                   <span>📊 Báo Cáo Chi Tiết Bài Làm</span>
                   <span>·</span>
-                  <span className="px-2 py-0.5 rounded-full bg-[#1E3227]/10 text-[#1E3227] font-semibold text-[11px]">
+                  <span className="px-2 py-0.5 rounded-full bg-[#1E3227]/10 text-[#1E3227] font-semibold text-xs">
                     Buổi #{selectedReportSession.sessionNumber}
                   </span>
                 </div>
@@ -1618,21 +1690,21 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             {/* Quick Metrics (3 Cards) */}
             <div className="grid grid-cols-3 gap-2.5 my-4">
               <div className="p-3 rounded-2xl bg-white border border-[rgba(30,50,39,0.12)] text-center shadow-2xs">
-                <div className="text-[11px] font-semibold text-[#3F5447]">Điểm trung bình</div>
+                <div className="text-xs font-semibold text-[#3F5447]">Điểm trung bình</div>
                 <div className="text-xl font-bold text-[#1E3227] mt-1 tabular-nums">9.3 / 10</div>
-                <div className="text-[10px] text-[#065F46] font-bold mt-0.5">Xuất sắc (93%)</div>
+                <div className="text-xs text-[#065F46] font-bold mt-0.5">Xuất sắc (93%)</div>
               </div>
               <div className="p-3 rounded-2xl bg-white border border-[rgba(30,50,39,0.12)] text-center shadow-2xs">
-                <div className="text-[11px] font-semibold text-[#3F5447]">Tỷ lệ hoàn thành</div>
+                <div className="text-xs font-semibold text-[#3F5447]">Tỷ lệ hoàn thành</div>
                 <div className="text-xl font-bold text-[#9B8A3E] mt-1 tabular-nums">100%</div>
-                <div className="text-[10px] text-[#3F5447] mt-0.5 tabular-nums">
+                <div className="text-xs text-[#3F5447] mt-0.5 tabular-nums">
                   {selectedReportSession.submissionsCount}/{selectedReportSession.totalStudents} học viên
                 </div>
               </div>
               <div className="p-3 rounded-2xl bg-white border border-[rgba(30,50,39,0.12)] text-center shadow-2xs">
-                <div className="text-[11px] font-semibold text-[#3F5447]">Tự động chấm điểm</div>
+                <div className="text-xs font-semibold text-[#3F5447]">Tự động chấm điểm</div>
                 <div className="text-xl font-bold text-[#1E3227] mt-1 tabular-nums">0.3s</div>
-                <div className="text-[10px] text-[#065F46] font-bold mt-0.5">Tức thì 100%</div>
+                <div className="text-xs text-[#065F46] font-bold mt-0.5">Tức thì 100%</div>
               </div>
             </div>
 
@@ -1642,7 +1714,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 <AlertCircle className="w-4 h-4 text-[#9B8A3E]" />
                 <span>Lỗi ngữ pháp &amp; từ vựng học sinh mắc nhiều nhất trong buổi:</span>
               </div>
-              <p className="text-[#3F5447] text-[11px] leading-relaxed">
+              <p className="text-[#3F5447] text-xs leading-relaxed">
                 • <strong>3 học viên</strong> nhầm lẫn giữa đại từ khẩu ngữ <strong>咱们</strong> (bắt buộc bao gồm cả người nghe) và <strong>我们</strong>.<br />
                 • <strong>2 học viên</strong> viết nét sổ móc (竖钩) chữ <strong>刻</strong> chưa đủ góc nghiêng chuẩn theo ô 米字格.
               </p>
@@ -1652,7 +1724,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             <div className="flex-1 overflow-y-auto pr-1 space-y-2 border-t border-[rgba(30,50,39,0.12)] pt-3">
               <div className="text-xs font-bold text-[#1E3227] mb-1 flex items-center justify-between">
                 <span>Danh sách kết quả học viên ({studentsList.length} người):</span>
-                <span className="text-[11px] text-[#9B8A3E] font-semibold">Tự động đồng bộ</span>
+                <span className="text-xs text-[#9B8A3E] font-semibold">Tự động đồng bộ</span>
               </div>
               <div className="divide-y divide-[#E5E9DC] bg-white rounded-2xl border border-[rgba(30,50,39,0.12)] overflow-hidden">
                 {studentsList.map((st, idx) => (
@@ -1661,7 +1733,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                       <div className="font-bold text-[#1E3227] truncate">
                         {idx + 1}. {st.name}
                       </div>
-                      <div className="text-[11px] text-[#3F5447] truncate">
+                      <div className="text-xs text-[#3F5447] truncate">
                         {st.feedback}
                       </div>
                     </div>
@@ -1669,7 +1741,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                       <span className="px-2 py-0.5 rounded-md bg-[#E7ECD9] text-[#1E3227] font-bold text-xs tabular-nums">
                         {st.totalPoints || 95}đ
                       </span>
-                      <span className="px-2 py-0.5 rounded-full bg-[#1E3227]/10 text-[#065F46] font-semibold text-[10px]">
+                      <span className="px-2 py-0.5 rounded-full bg-[#1E3227]/10 text-[#065F46] font-semibold text-xs">
                         {st.status}
                       </span>
                       <button
@@ -1739,13 +1811,13 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               <p className="text-base font-bold text-red-700">
                 {studentToDelete.name}
               </p>
-              <div className="text-[11px] text-[#3F5447] pt-1.5 border-t border-[#F0F2EB] flex items-center justify-between">
+              <div className="text-xs text-[#3F5447] pt-1.5 border-t border-[#F0F2EB] flex items-center justify-between">
                 <span>Điểm tổng kết: <strong className="text-[#1E3227]">{studentToDelete.totalPoints || 95}đ</strong></span>
                 <span>Từ vựng: <strong className="text-[#1E3227]">{studentToDelete.vocabScore}</strong></span>
               </div>
             </div>
 
-            <p className="text-[11px] text-[#6B7280] bg-red-50/80 p-2.5 rounded-xl border border-red-100 leading-relaxed">
+            <p className="text-xs text-[#6B7280] bg-red-50/80 p-2.5 rounded-xl border border-red-100 leading-relaxed">
               ⚠️ Học viên này sẽ bị xóa khỏi danh sách lớp và sĩ số sẽ tự động giảm tương ứng. Dữ liệu xóa được cập nhật vĩnh viễn vào bộ nhớ cục bộ (localStorage).
             </p>
 

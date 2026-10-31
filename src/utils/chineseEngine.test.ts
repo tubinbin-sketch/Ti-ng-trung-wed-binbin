@@ -515,5 +515,24 @@ test('applyStudentSubmissionToRoster updates timeSeconds and increments streak, 
   }
 });
 
+test('Phase 1 Patch: verifyTeacherPin rejects backdoor 8888, GEMINI_API_TIMEOUT_MS is 20000ms, and runStorageMigrations upgrades schema cleanly', async () => {
+  const { GEMINI_API_TIMEOUT_MS } = await import('./chineseEngine');
+  const {
+    verifyTeacherPin,
+    runStorageMigrations,
+    CURRENT_SCHEMA_VERSION,
+  } = await import('./storageService');
+  const { INITIAL_VOCAB_SLIDES } = await import('../data/chineseData');
 
+  assert.equal(GEMINI_API_TIMEOUT_MS, 20000);
+  assert.equal(verifyTeacherPin('8888'), false);
+  assert.equal(verifyTeacherPin('0000'), false);
+  assert.equal(verifyTeacherPin('2026'), true);
+  assert.equal(CURRENT_SCHEMA_VERSION, '3.2.0');
 
+  const migrated = runStorageMigrations(INITIAL_VOCAB_SLIDES);
+  assert.ok(Array.isArray(migrated) && migrated.length >= 25);
+  const slide25 = migrated.find((s) => s.id === 'slide-25' || s.index === 25);
+  assert.ok(slide25);
+  assert.equal(slide25.hanzi, '既然');
+});

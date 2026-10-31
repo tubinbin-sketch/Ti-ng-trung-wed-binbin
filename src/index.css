@@ -36,19 +36,26 @@
   --theme-glass-border: rgba(255, 255, 255, 0.65);
 }
 
-/* Calligraphy / Serif Hanzi Font for Mi Zi Ge & Featured Characters */
+/* Calligraphy / Hanzi Font for Mi Zi Ge & Featured Characters */
 .font-hanzi-calligraphy {
-  font-family: 'KaiTi', 'STKaiti', 'Kaiti SC', 'Noto Serif SC', 'Noto Sans SC', serif;
+  font-family: 'KaiTi', 'STKaiti', 'Kaiti SC', 'Noto Sans SC', serif;
 }
 
 /* Modern Oriental Liquid Glass Card & Surface */
 .oriental-liquid-glass {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: var(--theme-glass-bg, rgba(255, 255, 255, 0.75));
+  border: 1px solid var(--theme-glass-border, rgba(255, 255, 255, 0.65));
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.85);
   transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html[data-theme="moon-night"] .oriental-liquid-glass {
+  background: rgba(24, 38, 32, 0.88);
+  border-color: rgba(197, 179, 88, 0.28);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #E8EFEA;
 }
 
 .oriental-liquid-glass:hover {
@@ -141,9 +148,9 @@
 
 html {
   scroll-behavior: smooth;
-  background-color: #F4EFE6;
+  background-color: var(--theme-canvas, #F4EFE6);
   color: var(--theme-ink);
-  font-family: 'Plus Jakarta Sans', 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 body {
@@ -155,6 +162,29 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+html[data-theme="moon-night"] body {
+  background: linear-gradient(135deg, #0E1713 0%, #13201B 50%, #182821 100%);
+  color: #E8EFEA;
+}
+
+/* Dark-mode surface overrides when Moon Night theme is active */
+html[data-theme="moon-night"] main section,
+html[data-theme="moon-night"] main [class*="bg-white"],
+html[data-theme="moon-night"] main [class*="bg-[#FAF7F0]"],
+html[data-theme="moon-night"] main [class*="bg-[#FAFBF7]"],
+html[data-theme="moon-night"] main [class*="bg-[#F4EFE6]"] {
+  background-color: rgba(24, 38, 32, 0.88) !important;
+  border-color: rgba(197, 179, 88, 0.25) !important;
+  color: #E8EFEA;
+}
+
+html[data-theme="moon-night"] main [class*="text-[#1E3227]"],
+html[data-theme="moon-night"] main [class*="text-[#0F382E]"],
+html[data-theme="moon-night"] main [class*="text-[#3F5447]"],
+html[data-theme="moon-night"] main [class*="text-[#3A544B]"] {
+  color: #E8EFEA !important;
+}
+
 /* Global orphan-word prevention on all headings */
 h1,
 h2,
@@ -163,9 +193,9 @@ h4 {
   text-wrap: balance;
 }
 
-/* Display geometric light font for metrics (300/400/500) */
+/* Display geometric light font for metrics (400/500/600) */
 .font-metric-display {
-  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Noto Sans SC', sans-serif;
   font-variant-numeric: tabular-nums;
 }
 
@@ -646,9 +676,9 @@ h4 {
 }
 
 .halora-card-value {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: calc(42 * var(--s));
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1;
   letter-spacing: -0.02em;
   color: #1E3227;

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { LeaderboardEntry } from '../data/chineseData';
 import { getStoredStudentRoster, ClassStudent } from './ClassroomManager';
+import { fetchRemoteState } from '../utils/storageService';
 
 export interface ClassLeaderboardItem extends LeaderboardEntry {
   studentCode?: string;
@@ -40,9 +41,14 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
       setRoster(getStoredStudentRoster());
     };
     window.addEventListener('hanu_students_updated', syncRoster);
+    window.addEventListener('hanu_remote_state_synced', syncRoster);
+    window.addEventListener('hanu_classroom_mode_changed', syncRoster);
     window.addEventListener('storage', syncRoster);
+    void fetchRemoteState();
     return () => {
       window.removeEventListener('hanu_students_updated', syncRoster);
+      window.removeEventListener('hanu_remote_state_synced', syncRoster);
+      window.removeEventListener('hanu_classroom_mode_changed', syncRoster);
       window.removeEventListener('storage', syncRoster);
     };
   }, []);
@@ -166,7 +172,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
               <h4 className="text-base sm:text-lg font-bold text-[#1E3227]">
                 Bảng Xếp Hạng Thi Đua Lớp Học
               </h4>
-              <span className="px-2 py-0.5 rounded-full bg-[#9B8A3E]/20 text-[#1E3227] text-[10px] font-bold uppercase">
+              <span className="px-2 py-0.5 rounded-full bg-[#9B8A3E]/20 text-[#1E3227] text-xs font-bold uppercase">
                 Đồng bộ {allEntries.length} Học viên · HSK 1–3
               </span>
             </div>
@@ -210,16 +216,16 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#E7ECD9] border border-[#9B8A3E]/40 font-bold text-xs sm:text-sm text-[#1E3227] flex items-center justify-center mb-1">
               {allEntries[1].avatarCode}
             </div>
-            <div className="text-[10px] font-bold text-[#9B8A3E]">
+            <div className="text-xs font-bold text-[#9B8A3E]">
               {allEntries[1].studentCode}
             </div>
             <div className="text-xs sm:text-sm font-bold text-[#1E3227] truncate w-full">
               {allEntries[1].studentName}
             </div>
-            <div className="text-[11px] font-extrabold text-[#9B8A3E] mt-0.5">
+            <div className="text-xs font-extrabold text-[#9B8A3E] mt-0.5">
               {allEntries[1].score} điểm
             </div>
-            <div className="text-[10px] text-[#3F5447] flex items-center gap-1 mt-1">
+            <div className="text-xs text-[#3F5447] flex items-center gap-1 mt-1">
               <Clock className="w-3 h-3 text-[#3F5447]/60" />
               <span>{allEntries[1].timeSeconds}s</span>
             </div>
@@ -238,7 +244,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
             <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#1E3227] text-[#FAFBF7] font-bold text-xs sm:text-sm flex items-center justify-center mb-1 border-2 border-[#C5B358]">
               {allEntries[0].avatarCode}
             </div>
-            <div className="text-[10px] font-extrabold text-[#9B8A3E]">
+            <div className="text-xs font-extrabold text-[#9B8A3E]">
               {allEntries[0].studentCode}
             </div>
             <div className="text-xs sm:text-sm font-black text-[#1E3227] truncate w-full">
@@ -247,7 +253,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
             <div className="text-xs sm:text-sm font-black text-[#9B8A3E] mt-0.5">
               {allEntries[0].score} điểm
             </div>
-            <span className="px-1.5 py-0.5 rounded-md bg-[#9B8A3E]/20 text-[#1E3227] text-[9px] font-bold uppercase mt-1">
+            <span className="px-1.5 py-0.5 rounded-md bg-[#9B8A3E]/20 text-[#1E3227] text-xs font-bold uppercase mt-1">
               {allEntries[0].badgeTitle || 'Dẫn Đầu Lớp'}
             </span>
           </div>
@@ -262,16 +268,16 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#E7ECD9] border border-[#9B8A3E]/40 font-bold text-xs sm:text-sm text-[#1E3227] flex items-center justify-center mb-1">
               {allEntries[2].avatarCode}
             </div>
-            <div className="text-[10px] font-bold text-[#9B8A3E]">
+            <div className="text-xs font-bold text-[#9B8A3E]">
               {allEntries[2].studentCode}
             </div>
             <div className="text-xs sm:text-sm font-bold text-[#1E3227] truncate w-full">
               {allEntries[2].studentName}
             </div>
-            <div className="text-[11px] font-extrabold text-[#9B8A3E] mt-0.5">
+            <div className="text-xs font-extrabold text-[#9B8A3E] mt-0.5">
               {allEntries[2].score} điểm
             </div>
-            <div className="text-[10px] text-[#3F5447] flex items-center gap-1 mt-1">
+            <div className="text-xs text-[#3F5447] flex items-center gap-1 mt-1">
               <Clock className="w-3 h-3 text-[#3F5447]/60" />
               <span>{allEntries[2].timeSeconds}s</span>
             </div>
@@ -297,11 +303,11 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
                 Vị trí của bạn: {myEntry?.studentCode ? `${myEntry.studentCode} · ` : ''}
                 {currentStudentName}
               </span>
-              <span className="px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-semibold">
+              <span className="px-1.5 py-0.5 rounded bg-white/20 text-xs font-semibold">
                 Đang chọn
               </span>
             </div>
-            <div className="text-[11px] text-white/80 mt-0.5">
+            <div className="text-xs text-white/80 mt-0.5">
               {myEntry
                 ? `Đạt ${myEntry.score}/100 điểm · Thời gian ${myEntry.timeSeconds}s · Xếp hạng #${myRank}/${allEntries.length} toàn lớp`
                 : 'Hãy hoàn thành bài tập để ghi danh lên bảng vàng!'}
@@ -322,7 +328,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
 
       {/* Detailed Full Roster List */}
       <div className="space-y-1.5" data-testid="leaderboard-full-roster-list">
-        <div className="flex items-center justify-between text-[11px] font-bold uppercase text-[#3F5447] px-3 pb-1">
+        <div className="flex items-center justify-between text-xs font-bold uppercase text-[#3F5447] px-3 pb-1">
           <span>Mã HV / Học Viên / Thứ Hạng</span>
           <div className="flex items-center gap-6">
             <span>Tốc độ</span>
@@ -367,7 +373,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {item.studentCode && (
-                      <span className="px-1.5 py-0.5 rounded bg-[#0F5243]/10 text-[#0F5243] text-[10px] font-extrabold shrink-0">
+                      <span className="px-1.5 py-0.5 rounded bg-[#0F5243]/10 text-[#0F5243] text-xs font-extrabold shrink-0">
                         {item.studentCode}
                       </span>
                     )}
@@ -375,22 +381,22 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
                       {item.studentName}
                     </span>
                     {item.hskLevel && (
-                      <span className="px-1.5 py-0.5 rounded bg-[#E7ECD9] text-[#3F5447] text-[9px] font-bold shrink-0">
+                      <span className="px-1.5 py-0.5 rounded bg-[#E7ECD9] text-[#3F5447] text-xs font-bold shrink-0">
                         {item.hskLevel}
                       </span>
                     )}
                     {isMe && (
-                      <span className="px-1.5 py-0.5 rounded bg-[#1E3227] text-white text-[9px] font-bold shrink-0">
+                      <span className="px-1.5 py-0.5 rounded bg-[#1E3227] text-white text-xs font-bold shrink-0">
                         Bạn
                       </span>
                     )}
                     {item.badgeTitle && (
-                      <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-[#9B8A3E]/15 text-[#1E3227] text-[10px] font-semibold">
+                      <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-[#9B8A3E]/15 text-[#1E3227] text-xs font-semibold">
                         {item.badgeTitle}
                       </span>
                     )}
                   </div>
-                  <div className="text-[10px] text-[#3F5447] flex flex-wrap items-center gap-2 mt-0.5">
+                  <div className="text-xs text-[#3F5447] flex flex-wrap items-center gap-2 mt-0.5">
                     <span className="font-semibold text-[#9B8A3E]">
                       🔥 Streak {item.streak} ngày
                     </span>
@@ -401,12 +407,12 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
               </div>
 
               <div className="flex items-center gap-5 sm:gap-6 shrink-0 text-right">
-                <div className="text-[11px] text-[#3F5447] tabular-nums font-semibold flex items-center gap-1">
+                <div className="text-xs text-[#3F5447] tabular-nums font-semibold flex items-center gap-1">
                   <Clock className="w-3 h-3 text-[#3F5447]/60" />
                   <span>{item.timeSeconds}s</span>
                 </div>
                 <div className="text-sm font-black text-[#1E3227] tabular-nums min-w-[54px] text-right">
-                  {item.score} <span className="text-[10px] font-semibold text-[#9B8A3E]">đ</span>
+                  {item.score} <span className="text-xs font-semibold text-[#9B8A3E]">đ</span>
                 </div>
               </div>
             </div>

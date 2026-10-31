@@ -394,7 +394,7 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                       <div className="text-sm font-medium text-white">
                         {entry.studentName}
                       </div>
-                      <div className="text-[11px] text-[#CBCFB8]">
+                      <div className="text-xs text-[#CBCFB8]">
                         Chuỗi đúng: {entry.streak} câu · {entry.timeSeconds}s
                       </div>
                     </div>

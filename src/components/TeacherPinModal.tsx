@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Lock, ShieldCheck, KeyRound, X, ArrowRight, AlertCircle } from 'lucide-react';
-import { DEFAULT_TEACHER_PIN, setTeacherSessionUnlocked, verifyTeacherPin } from '../utils/storageService';
+import { setTeacherSessionUnlocked, verifyTeacherPinRemote } from '../utils/storageService';
 
 interface TeacherPinModalProps {
   isOpen: boolean;
@@ -15,26 +15,38 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
 }) => {
   const [pinInput, setPinInput] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (verifyTeacherPin(pinInput)) {
-      setTeacherSessionUnlocked(true);
-      setErrorMsg(null);
-      setPinInput('');
-      onSuccessUnlock();
-    } else {
-      setErrorMsg('Mã PIN giảng viên chưa đúng. Vui lòng nhập mã PIN chuẩn (2026).');
+    if (isVerifying) return;
+    setIsVerifying(true);
+    try {
+      const result = await verifyTeacherPinRemote(pinInput);
+      if (result.ok) {
+        setTeacherSessionUnlocked(true);
+        setErrorMsg(null);
+        setPinInput('');
+        onSuccessUnlock();
+      } else {
+        setErrorMsg(result.error || 'Mã PIN giảng viên chưa đúng. Vui lòng kiểm tra lại.');
+      }
+    } finally {
+      setIsVerifying(false);
     }
-  };
-
-  const handleQuickDemoUnlock = () => {
-    setPinInput(DEFAULT_TEACHER_PIN);
-    setTeacherSessionUnlocked(true);
-    setErrorMsg(null);
-    onSuccessUnlock();
   };
 
   return (
@@ -72,7 +84,7 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
         </div>
 
         <p className="text-sm text-[#3A544B] leading-relaxed">
-          Nhập mã PIN giảng viên để mở khóa quyền chỉnh sửa bộ thẻ từ vựng, quản lý danh sách học viên và chấm điểm lớp học (Mã PIN mặc định: <strong className="text-[#0F382E]">2026</strong>).
+          Nhập mã PIN bảo mật của giảng viên để mở khóa quyền chỉnh sửa bộ thẻ từ vựng, quản lý danh sách học viên và chấm điểm lớp học.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -96,35 +108,31 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
                   setPinInput(e.target.value);
                   if (errorMsg) setErrorMsg(null);
                 }}
-                placeholder="Nhập mã PIN (2026)..."
+                placeholder="Nhập mã PIN bảo mật..."
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-[#0F5243]/25 text-sm font-bold text-[#0F382E] tracking-widest focus:outline-none focus:border-[#0F5243]"
               />
             </div>
           </div>
 
           {errorMsg && (
-            <div className="p-2.5 rounded-xl bg-red-50 border border-red-300 text-red-900 text-sm font-semibold flex items-center gap-2">
+            <div
+              data-testid="teacher-pin-error-msg"
+              className="p-2.5 rounded-xl bg-red-50 border border-red-300 text-red-900 text-sm font-semibold flex items-center gap-2"
+            >
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+          <div className="flex items-center pt-1">
             <button
               type="submit"
+              disabled={isVerifying}
               data-testid="confirm-teacher-pin-btn"
-              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] text-sm font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] disabled:opacity-60 text-[#FAF7F0] text-sm font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
             >
-              <span>Xác nhận PIN</span>
+              <span>{isVerifying ? 'Đang xác thực...' : 'Xác nhận PIN'}</span>
               <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              data-testid="quick-demo-pin-unlock-btn"
-              onClick={handleQuickDemoUnlock}
-              className="py-2.5 px-3.5 rounded-xl bg-white hover:bg-[#E7ECD9] text-[#0F382E] border border-[#C5B358]/60 text-sm font-bold transition-colors cursor-pointer"
-            >
-              Mở nhanh (PIN: 2026)
             </button>
           </div>
         </form>
@@ -132,3 +140,4 @@ export const TeacherPinModal: React.FC<TeacherPinModalProps> = ({
     </div>
   );
 };
+

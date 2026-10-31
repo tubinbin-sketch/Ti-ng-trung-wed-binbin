@@ -84,7 +84,7 @@ export const AddVocabModal: React.FC<AddVocabModalProps> = ({
       >
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-[rgba(30,50,39,0.14)]">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-[#9B8A3E]">
+            <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E]">
               SOẠN GIÁO ÁN HÁN NGỮ · LƯU TRỮ TỰ ĐỘNG
             </div>
             <h3 className="text-base sm:text-lg font-bold text-[#1E3227] mt-0.5">

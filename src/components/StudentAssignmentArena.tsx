@@ -51,6 +51,7 @@ import {
   SrsWordRecord,
 } from '../utils/hskStudyHelpers';
 import { Mic, Flame, Clock } from 'lucide-react';
+import { fetchRemoteState, syncStateToBackend } from '../utils/storageService';
 
 interface StudentAssignmentArenaProps {
   slides: VocabSlide[];
@@ -222,7 +223,7 @@ const SPEED_TEST_10_QUESTIONS: SpeedTestQuestion[] = [
 
 export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
   slides,
-  studentName = 'Lưu Thị Minh Thư',
+  studentName = 'Học viên HSK',
   onSelectStudentName,
   onSwitchToTeacherView,
 }) => {
@@ -237,7 +238,13 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
   useEffect(() => {
     const refreshRoster = () => setRoster(getStoredStudentRoster());
     window.addEventListener('hanu_students_updated', refreshRoster);
-    return () => window.removeEventListener('hanu_students_updated', refreshRoster);
+    window.addEventListener('hanu_remote_state_synced', refreshRoster);
+    window.addEventListener('hanu_classroom_mode_changed', refreshRoster);
+    return () => {
+      window.removeEventListener('hanu_students_updated', refreshRoster);
+      window.removeEventListener('hanu_remote_state_synced', refreshRoster);
+      window.removeEventListener('hanu_classroom_mode_changed', refreshRoster);
+    };
   }, []);
 
   // Ensure activeStudentName is always present in the dropdown options so select and labels match 100%
@@ -358,6 +365,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
 
     setSrsRecords(nextRecords);
     saveStoredSrsRecords(nextRecords);
+    syncStateToBackend({ srsRecords: nextRecords });
     window.dispatchEvent(new CustomEvent('hanu_srs_updated'));
   };
 
@@ -499,6 +507,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
 
     try {
       localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updatedRoster));
+      syncStateToBackend({ roster: updatedRoster });
     } catch {
       // ignore storage errors
     }
@@ -788,6 +797,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
 
       try {
         localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updatedRoster));
+        syncStateToBackend({ roster: updatedRoster });
       } catch {
         // ignore storage errors
       }
@@ -963,7 +973,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
           <div className="inline-flex items-center gap-1.5">
             <label
               htmlFor="student-roster-select"
-              className="text-[11px] font-bold text-[#3A544B] whitespace-nowrap"
+              className="text-xs font-bold text-[#3A544B] whitespace-nowrap"
             >
               Học viên:
             </label>
@@ -994,7 +1004,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
             type="button"
             data-testid="toggle-listening-exam-mode-btn"
             onClick={() => setIsListeningExamMode((v) => !v)}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
               isListeningExamMode
                 ? 'bg-[#B8292F] text-white border-[#C5B358] shadow-xs'
                 : 'bg-white/95 hover:bg-[#FAF7F0] text-[#0F382E] border-[#0F5243]/25'
@@ -1014,7 +1024,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
               type="button"
               data-testid="quick-fill-sample-answers-btn"
               onClick={handleQuickFillSampleAnswers}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] border border-[#C5B358]/50 text-[11px] font-bold shadow-[0_2px_10px_rgba(15,82,67,0.2)] transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] border border-[#C5B358]/50 text-xs font-bold shadow-[0_2px_10px_rgba(15,82,67,0.2)] transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap"
               title="Điền nhanh đáp án mẫu để kiểm thử luồng nộp bài và đồng bộ điểm"
             >
               <span>⚡ Demo điền mẫu</span>
@@ -1041,12 +1051,12 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                 data-testid={`hsk3-compact-pillar-${pillar.id}`}
                 className="inline-flex flex-col gap-0.5 px-2.5 py-1 rounded-xl bg-white/85 border border-[#0F5243]/15 shadow-2xs min-w-[118px]"
               >
-                <div className="flex items-center justify-between gap-1.5 text-[11px] font-bold">
+                <div className="flex items-center justify-between gap-1.5 text-xs font-bold">
                   <span className="text-[#0F382E] font-['Noto_Sans_SC']">{pillar.titleZh}</span>
                   <span className="inline-flex items-center gap-1">
                     <span className="text-[#0F5243] tabular-nums">{pillar.percent}%</span>
                     {pillar.deltaPercent && pillar.deltaPercent > 0 ? (
-                      <span className="text-[9px] px-1 rounded bg-emerald-100 text-emerald-800 font-extrabold">
+                      <span className="text-xs px-1 rounded bg-emerald-100 text-emerald-800 font-extrabold">
                         +{pillar.deltaPercent}%
                       </span>
                     ) : null}
@@ -1062,7 +1072,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
             ))}
             <span
               data-testid="srs-mistake-count-pill"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#FAF7F0] border border-[#9B8A3E]/40 text-[11px] font-bold text-[#0F382E]"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#FAF7F0] border border-[#9B8A3E]/40 text-xs font-bold text-[#0F382E]"
             >
               📓 Sổ từ khó: <span className="text-[#B8292F] tabular-nums">{srsMistakeWords.length} từ</span>
             </span>
@@ -1072,7 +1082,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
             type="button"
             data-testid="toggle-hsk3-pillars-btn"
             onClick={() => setIsPillarsExpanded((v) => !v)}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/90 hover:bg-white border border-[#9B8A3E]/45 text-[11px] font-bold text-[#0F382E] transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap shadow-2xs"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/90 hover:bg-white border border-[#9B8A3E]/45 text-xs font-bold text-[#0F382E] transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap shadow-2xs"
           >
             <span>
               {isPillarsExpanded
@@ -1093,7 +1103,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-bold text-[#1E3227]">{pillar.titleVi}</span>
-                    <span className="text-[11px] font-bold text-[#9B8A3E] font-['Noto_Sans_SC']">
+                    <span className="text-xs font-bold text-[#9B8A3E] font-['Noto_Sans_SC']">
                       {pillar.titleZh}
                     </span>
                   </div>
@@ -1114,7 +1124,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                       style={{ width: `${pillar.percent}%` }}
                     />
                   </div>
-                  <p className="text-[11px] text-[#3F5447] leading-snug">{pillar.statusNote}</p>
+                  <p className="text-xs text-[#3F5447] leading-snug">{pillar.statusNote}</p>
                 </div>
               ))}
             </div>
@@ -1141,7 +1151,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                     title="Bấm để nghe lại phát âm"
                   >
                     <span className="font-['Noto_Sans_SC'] mr-1">{item.hanzi}</span>
-                    <span className="text-[10px] text-[#9B8A3E]">({item.pinyin})</span>
+                    <span className="text-xs text-[#9B8A3E]">({item.pinyin})</span>
                   </button>
                 ))}
               </div>
@@ -1206,7 +1216,10 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
         <button
           type="button"
           data-testid="arena-subtab-leaderboard"
-          onClick={() => setActiveSection('leaderboard')}
+          onClick={() => {
+            setActiveSection('leaderboard');
+            void fetchRemoteState();
+          }}
           className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeSection === 'leaderboard'
               ? 'bg-[#1E3227] text-[#FAFBF7] shadow-sm'
@@ -1257,7 +1270,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
             {/* Scorecard Widget */}
             <div className="flex items-center gap-3 bg-white p-3.5 rounded-2xl border border-[#9B8A3E]/40 shadow-xs">
               <div className="text-right">
-                <div className="text-[11px] font-semibold text-[#3F5447]">TỔNG ĐIỂM BÀI LÀM</div>
+                <div className="text-xs font-semibold text-[#3F5447]">TỔNG ĐIỂM BÀI LÀM</div>
                 <div
                   data-testid="submitted-total-score"
                   className="text-3xl font-black text-[#1E3227] tabular-nums"
@@ -1293,19 +1306,19 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                   {syncedSubmissionSummary.rank && (
                     <span
                       data-testid="submitted-rank-pill"
-                      className="px-2 py-0.5 rounded-lg bg-[#1E3227] text-[#C5B358] font-extrabold text-[11px]"
+                      className="px-2 py-0.5 rounded-lg bg-[#1E3227] text-[#C5B358] font-extrabold text-xs"
                     >
                       🏆 Xếp hạng #{syncedSubmissionSummary.rank}/{syncedSubmissionSummary.totalStudents || 12}
                     </span>
                   )}
                   {syncedSubmissionSummary.timeSeconds && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white text-[#1E3227] font-bold text-[11px]">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white text-[#1E3227] font-bold text-xs">
                       <Clock className="w-3 h-3 text-[#9B8A3E]" />
                       {syncedSubmissionSummary.timeSeconds}s
                     </span>
                   )}
                   {syncedSubmissionSummary.streak && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-[11px]">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 font-bold text-xs">
                       <Flame className="w-3 h-3 fill-amber-600 text-amber-600" />
                       Streak {syncedSubmissionSummary.streak} ngày
                     </span>
@@ -1352,7 +1365,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                   {mcScore} / 30 điểm
                 </div>
               </div>
-              <span className="text-[11px] px-2 py-0.5 rounded-md bg-[#E7ECD9] font-bold text-[#1E3227]">
+              <span className="text-xs px-2 py-0.5 rounded-md bg-[#E7ECD9] font-bold text-[#1E3227]">
                 {Object.keys(mcAnswers).length}/{assignmentPackage.multipleChoiceList.length} câu
               </span>
             </div>
@@ -1364,7 +1377,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                   {soScore} / 40 điểm
                 </div>
               </div>
-              <span className="text-[11px] px-2 py-0.5 rounded-md bg-[#E7ECD9] font-bold text-[#1E3227]">
+              <span className="text-xs px-2 py-0.5 rounded-md bg-[#E7ECD9] font-bold text-[#1E3227]">
                 {assignmentPackage.sentenceOrderingList.length} câu
               </span>
             </div>
@@ -1376,7 +1389,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                   {esScore} / 30 điểm
                 </div>
               </div>
-              <span className="text-[11px] px-2 py-0.5 rounded-md bg-[#E7ECD9] font-bold text-[#1E3227]">
+              <span className="text-xs px-2 py-0.5 rounded-md bg-[#E7ECD9] font-bold text-[#1E3227]">
                 {reviewWords.length > 0 ? `Ôn: ${reviewWords.join(', ')}` : 'Thuộc 100%'}
               </span>
             </div>
@@ -1388,7 +1401,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                   +{listeningScore}đ · {avgWritingAccuracy}% nét
                 </div>
               </div>
-              <span className="text-[11px] px-2 py-0.5 rounded-md bg-[#E7ECD9] font-bold text-[#1E3227]">
+              <span className="text-xs px-2 py-0.5 rounded-md bg-[#E7ECD9] font-bold text-[#1E3227]">
                 {Object.keys(listeningAnswers).length}/{LISTENING_CHALLENGES.length} câu nghe
               </span>
             </div>
@@ -1540,7 +1553,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <span
-                                className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${
+                                className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${
                                   isChosen || (isSubmitted && opt.isCorrect)
                                     ? 'bg-white/20 text-white border border-white/40'
                                     : 'bg-[#0F5243]/10 text-[#0F5243]'
@@ -1598,7 +1611,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                                 q.explanation
                               )
                             }
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-[11px] font-bold border border-[#C5B358]/60 shadow-2xs cursor-pointer hover:opacity-95"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-xs font-bold border border-[#C5B358]/60 shadow-2xs cursor-pointer hover:opacity-95"
                           >
                             <span>🐼 Hỏi 彬彬 câu này</span>
                           </button>
@@ -1607,7 +1620,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                           <strong>Giải thích chuẩn xác:</strong> {q.explanation}
                         </div>
                         {q.grammarTip && (
-                          <div className="text-[11px] pt-1 border-t border-black/10 flex items-start gap-1">
+                          <div className="text-xs pt-1 border-t border-black/10 flex items-start gap-1">
                             <Sparkles className="w-3.5 h-3.5 shrink-0 text-[#9B8A3E] mt-0.5" />
                             <span>
                               <strong>Phân tích ngữ pháp:</strong> {q.grammarTip}
@@ -1675,7 +1688,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                                 [q.id]: !prev[q.id],
                               }))
                             }
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#0F5243]/10 hover:bg-[#0F5243]/15 border border-[#0F5243]/20 text-[11px] font-bold text-[#0F5243] transition-all duration-300 active:scale-95 cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#0F5243]/10 hover:bg-[#0F5243]/15 border border-[#0F5243]/20 text-xs font-bold text-[#0F5243] transition-all duration-300 active:scale-95 cursor-pointer"
                           >
                             <span>
                               {revealedPinyinHints[q.id]
@@ -1687,7 +1700,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                         <button
                           type="button"
                           onClick={() => speakChinese(q.correctTokens.join(''))}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/90 border border-[#0F5243]/15 text-[11px] font-semibold text-[#0F382E] hover:border-[#C5B358] transition-all duration-300 active:scale-95 cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/90 border border-[#0F5243]/15 text-xs font-semibold text-[#0F382E] hover:border-[#C5B358] transition-all duration-300 active:scale-95 cursor-pointer"
                           title="Nghe câu mẫu"
                         >
                           <Volume2 className="w-3.5 h-3.5 inline text-[#9B8A3E]" />
@@ -1730,7 +1743,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                     {/* Word Bank Interactive Glass Tactile Pills */}
                     {!isSubmitted && (
                       <div>
-                        <div className="text-[11px] font-semibold text-[#3A544B] uppercase tracking-wider mb-1.5">
+                        <div className="text-xs font-semibold text-[#3A544B] uppercase tracking-wider mb-1.5">
                           Ngân hàng từ vựng (Bấm để chọn):
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -1781,7 +1794,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                                 q.explanation
                               )
                             }
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-[11px] font-bold border border-[#C5B358]/60 shadow-2xs cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-xs font-bold border border-[#C5B358]/60 shadow-2xs cursor-pointer"
                           >
                             <span>🐼 Hỏi 彬彬 câu này</span>
                           </button>
@@ -1801,10 +1814,10 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                           </button>
                         </div>
 
-                        <p className="text-[11px] opacity-90 leading-relaxed">{q.explanation}</p>
+                        <p className="text-xs opacity-90 leading-relaxed">{q.explanation}</p>
 
                         {q.grammarTip && (
-                          <div className="p-2.5 rounded-lg bg-white/80 border border-black/10 text-[11px] text-[#1E3227] space-y-1">
+                          <div className="p-2.5 rounded-lg bg-white/80 border border-black/10 text-xs text-[#1E3227] space-y-1">
                             <div className="font-bold text-[#9B8A3E] flex items-center gap-1">
                               <Sparkles className="w-3.5 h-3.5" />
                               Chẩn đoán lỗi ngữ pháp thường gặp:
@@ -1846,7 +1859,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                   <div className="text-xs font-bold text-[#1E3227]">
                     📸 Tải ảnh bài viết chữ tay / File bài làm (Tùy chọn)
                   </div>
-                  <div className="text-[11px] text-[#3F5447]">
+                  <div className="text-xs text-[#3F5447]">
                     Chụp vở viết ô Mễ (米字格) hoặc giấy kiểm tra · Tự động phân tích nét bút &amp; ngữ pháp
                   </div>
                 </div>
@@ -1931,7 +1944,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                         placeholder={`Gõ câu tiếng Trung của bạn ở đây (bắt buộc có chữ "${q.targetWord}")...`}
                         className="w-full p-3 rounded-xl bg-white border border-[rgba(30,50,39,0.18)] focus:border-[#9B8A3E] focus:ring-1 focus:ring-[#9B8A3E]/30 text-sm font-['Noto_Sans_SC'] text-[#1E3227] placeholder:text-[#3F5447]/40 outline-none"
                       />
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#3F5447] mt-1.5 px-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#3F5447] mt-1.5 px-1">
                         <span>
                           {hasTarget ? (
                             <span className="text-[#1E3227] font-bold">
@@ -1957,7 +1970,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                                 [q.id]: hasTarget ? 97 : 92,
                               }));
                             }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1E3227] text-[#FAFBF7] text-[11px] font-bold hover:bg-[#2B4637] cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1E3227] text-[#FAFBF7] text-xs font-bold hover:bg-[#2B4637] cursor-pointer"
                           >
                             <Mic className="w-3 h-3 text-[#C5B358]" />
                             <span>🎙️ Luyện nói chấm phát âm</span>
@@ -1985,7 +1998,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                             <Sparkles className="w-4 h-4 text-[#C5B358]" />
                             <span>Trợ Giảng 彬彬 &amp; Thầy Nguyễn Văn Thụ Chấm Sửa:</span>
                           </div>
-                          <span className="px-2.5 py-0.5 rounded-md bg-[#1E3227] text-white font-bold text-[11px]">
+                          <span className="px-2.5 py-0.5 rounded-md bg-[#1E3227] text-white font-bold text-xs">
                             {hasTarget && isGoodLength
                               ? '+15/15 điểm (Xuất sắc)'
                               : hasTarget || isGoodLength || uploadedHomeworkFile
@@ -2002,7 +2015,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                               : '⚠️ Lưu ý chẩn đoán: Cần đảm bảo có đầy đủ thành phần Chủ ngữ + Vị ngữ và đặt trạng từ thời gian/địa điểm trước động từ.'}
                           </div>
                           {q.grammarFocus && (
-                            <div className="text-[11px] text-[#3F5447]">
+                            <div className="text-xs text-[#3F5447]">
                               <strong>Trọng điểm bài giảng:</strong> {q.grammarFocus}
                             </div>
                           )}
@@ -2010,7 +2023,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
 
                         {/* Teacher's Model Answer (范句) */}
                         <div className="p-3 rounded-lg bg-[#E7ECD9]/70 border border-[#9B8A3E]/30 text-[#1E3227] space-y-1">
-                          <div className="flex items-center justify-between text-[11px] text-[#9B8A3E] font-bold uppercase tracking-wider">
+                          <div className="flex items-center justify-between text-xs text-[#9B8A3E] font-bold uppercase tracking-wider">
                             <span>Câu Mẫu Chuẩn Của Giáo Viên (范句):</span>
                             <button
                               type="button"
@@ -2024,8 +2037,8 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                           <p className="font-['Noto_Sans_SC'] font-bold text-sm text-[#1E3227]">
                             {q.sampleSentence}
                           </p>
-                          <p className="text-[11px] text-[#9B8A3E] font-medium">{q.samplePinyin}</p>
-                          <p className="text-[11px] text-[#3F5447] italic">
+                          <p className="text-xs text-[#9B8A3E] font-medium">{q.samplePinyin}</p>
+                          <p className="text-xs text-[#3F5447] italic">
                             Dịch nghĩa: {q.sampleTranslation}
                           </p>
                         </div>
@@ -2135,7 +2148,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                             Pinyin: {lc.pinyin}
                           </span>
                         </div>
-                        <p className="text-[11px] text-[#3F5447] leading-relaxed">
+                        <p className="text-xs text-[#3F5447] leading-relaxed">
                           {lc.explanation}
                         </p>
                       </div>
@@ -2152,7 +2165,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                   <Edit3 className="w-3.5 h-3.5 text-[#9B8A3E]" />
                   <span>Kiểm tra nhanh nét viết chữ trọng tâm trên ô Mễ (米字格):</span>
                 </div>
-                <p className="text-[11px] text-[#3A544B] mt-0.5">
+                <p className="text-xs text-[#3A544B] mt-0.5">
                   Bấm vào từng chữ để luyện nét bút và ghi nhận độ chuẩn xác ({avgWritingAccuracy}% độ chuẩn nét)
                 </p>
               </div>
@@ -2199,7 +2212,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                   <h4 className="text-sm sm:text-base font-bold text-[#0F382E]">
                     Phần E · Luyện Dịch &amp; Đặt Câu Chuẩn HSK 3.0 (翻译与造句)
                   </h4>
-                  <p className="text-[11px] text-[#3A544B]">
+                  <p className="text-xs text-[#3A544B]">
                     Kỹ năng thứ 5 của HSK 3.0: Dịch câu tiếng Việt sang tiếng Trung có chứa từ trọng tâm &amp; nhận chấm điểm ngữ pháp tức thì
                   </p>
                 </div>
@@ -2259,7 +2272,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
 
                     {/* Word Bank Interactive Glass Tactile Pills for 1-Click Assembly */}
                     <div className="space-y-1.5">
-                      <div className="text-[11px] font-semibold text-[#3A544B]">
+                      <div className="text-xs font-semibold text-[#3A544B]">
                         Thẻ từ gợi ý (Bấm để ghép nhanh vào ô dịch hoặc tự gõ chữ Hán):
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -2295,7 +2308,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                             }));
                             playGentleChime(783.99, 0.2);
                           }}
-                          className="px-2.5 py-1 rounded-xl bg-[#0F5243]/10 hover:bg-[#0F5243]/15 border border-[#0F5243]/20 text-[11px] font-bold text-[#0F5243] transition-all duration-300 active:scale-95 cursor-pointer"
+                          className="px-2.5 py-1 rounded-xl bg-[#0F5243]/10 hover:bg-[#0F5243]/15 border border-[#0F5243]/20 text-xs font-bold text-[#0F5243] transition-all duration-300 active:scale-95 cursor-pointer"
                         >
                           ⚡ Điền &amp; Chấm thử câu mẫu
                         </button>
@@ -2350,14 +2363,14 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                             <strong className="tabular-nums">{evalResult.score}/100đ</strong> ·{' '}
                             {evalResult.gradeBadge}
                           </span>
-                          <span className="px-2 py-0.5 rounded-md bg-white/80 text-[11px] font-bold text-[#1E3227]">
+                          <span className="px-2 py-0.5 rounded-md bg-white/80 text-xs font-bold text-[#1E3227]">
                             {evalResult.hasKeyword
                               ? `✓ Đã có từ khóa “${tr.targetKeyword}”`
                               : `⚠️ Thiếu từ khóa “${tr.targetKeyword}”`}
                           </span>
                         </div>
                         <p className="leading-relaxed font-medium">{evalResult.feedbackVi}</p>
-                        <div className="pt-1.5 border-t border-black/10 text-[11px] text-[#3F5447]">
+                        <div className="pt-1.5 border-t border-black/10 text-xs text-[#3F5447]">
                           <strong className="text-[#1E3227]">💡 Gợi ý diễn đạt chuẩn bản xứ:</strong>{' '}
                           <span className="font-['Noto_Sans_SC'] font-bold text-[#1E3227]">
                             {evalResult.naturalSuggestion}
@@ -2422,7 +2435,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
           {/* Top Header & Quick Actions */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[rgba(30,50,39,0.14)]">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-[#0F5243]">
+              <div className="text-xs font-bold uppercase tracking-wider text-[#0F5243]">
                 PHÒNG LUYỆN CẤU TRÚC CÂU &amp; TRẬT TỰ TỪ HSK 3.0 · 连词成句
               </div>
               <h3 className="text-lg sm:text-xl font-bold text-[#0F382E] mt-0.5">
@@ -2489,6 +2502,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                   });
                   try {
                     localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updatedRoster));
+                    syncStateToBackend({ roster: updatedRoster });
                   } catch {
                     // ignore storage errors
                   }
@@ -2597,7 +2611,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                       </span>
                       <strong className="text-[#0F382E]">“{challenge.vietnamesePrompt}”</strong>
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-[#F4EFE6] text-[#0F5243] font-mono text-[11px] font-bold">
+                    <span className="px-2.5 py-1 rounded-lg bg-[#F4EFE6] text-[#0F5243] font-mono text-xs font-bold">
                       📐 {challenge.grammarFormula}
                     </span>
                   </div>
@@ -2632,7 +2646,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                               {tile.hanzi}
                             </div>
                             {showTilePinyin && (
-                              <div className="text-[10px] text-[#C5B358] font-semibold">
+                              <div className="text-xs text-[#C5B358] font-semibold">
                                 {tile.pinyin} · {tile.posTag}
                               </div>
                             )}
@@ -2674,7 +2688,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                           {tile.hanzi}
                         </div>
                         {showTilePinyin && (
-                          <div className="text-[10px] font-semibold text-[#9B8A3E] mt-0.5">
+                          <div className="text-xs font-semibold text-[#9B8A3E] mt-0.5">
                             {tile.pinyin} · <span className="text-[#0F5243]">{tile.posTag}</span> ({tile.meaningHint})
                           </div>
                         )}
@@ -2713,14 +2727,14 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                                 evalItem.grammarDiagnostic
                               )
                             }
-                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#0F5243] text-[#FAF7F0] text-[11px] font-bold cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#0F5243] text-[#FAF7F0] text-xs font-bold cursor-pointer"
                           >
                             <span>🐼 Hỏi 彬彬 câu này</span>
                           </button>
                         </div>
                       </div>
                       <p className="font-semibold">{evalItem.feedbackVi}</p>
-                      <p className="text-[11px] opacity-90">{evalItem.grammarDiagnostic}</p>
+                      <p className="text-xs opacity-90">{evalItem.grammarDiagnostic}</p>
                     </div>
                   )}
                 </div>
@@ -2741,7 +2755,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
           {/* Top Timer & Action Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[rgba(30,50,39,0.14)]">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-[#B8292F]">
+              <div className="text-xs font-bold uppercase tracking-wider text-[#B8292F]">
                 CHẾ ĐỘ THI THỬ TỐC ĐỘ 15 PHÚT · ĐÁNH GIÁ CHUẨN HSK 3.0
               </div>
               <h3 className="text-lg sm:text-xl font-bold text-[#1E3227] mt-0.5">
@@ -2797,7 +2811,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                     证
                   </div>
                   <div>
-                    <div className="text-[11px] font-extrabold uppercase tracking-widest text-[#9B8A3E]">
+                    <div className="text-xs font-extrabold uppercase tracking-widest text-[#9B8A3E]">
                       HANU × 阮文受 · CHỨNG NHẬN NĂNG LỰC HÁN NGỮ QUỐC TẾ
                     </div>
                     <h4 className="text-lg sm:text-xl font-black text-[#0F382E] mt-0.5">
@@ -2810,7 +2824,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                 </div>
 
                 <div className="px-4 py-2.5 rounded-2xl bg-[#0F5243] text-[#FAF7F0] text-right border border-[#C5B358] shrink-0">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#C5B358]">
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#C5B358]">
                     ĐIỂM KIỂM TRA 10 CÂU
                   </div>
                   <div
@@ -2834,7 +2848,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                     key={skill.label}
                     className="p-2.5 rounded-xl bg-white border border-[#C5B358]/45 shadow-2xs"
                   >
-                    <div className="text-[11px] text-[#3A544B] font-semibold">{skill.label}</div>
+                    <div className="text-xs text-[#3A544B] font-semibold">{skill.label}</div>
                     <div className="text-sm font-black text-[#0F5243] tabular-nums mt-0.5">
                       {skill.score}
                     </div>
@@ -2873,14 +2887,14 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                 >
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="px-2 py-0.5 rounded-md bg-[#0F5243]/10 text-[#0F5243] text-[10px] font-bold">
+                      <span className="px-2 py-0.5 rounded-md bg-[#0F5243]/10 text-[#0F5243] text-xs font-bold">
                         {q.skillLabel}
                       </span>
                       <button
                         type="button"
                         data-testid={`speed-test-listen-btn-${q.id}`}
                         onClick={() => speakChinese(q.targetWord)}
-                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#0F5243] text-white border border-[#C5B358]/50 text-[11px] font-bold cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#0F5243] text-white border border-[#C5B358]/50 text-xs font-bold cursor-pointer"
                       >
                         <Volume2 className="w-3 h-3 text-[#C5B358]" />
                         <span className="font-['Noto_Sans_SC']">
@@ -2902,7 +2916,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                         <button
                           type="button"
                           onClick={() => speakChinese(q.prompt)}
-                          className="px-2 py-1 rounded-lg bg-[#E7ECD9] text-[#1E3227] text-[11px] font-bold cursor-pointer shrink-0"
+                          className="px-2 py-1 rounded-lg bg-[#E7ECD9] text-[#1E3227] text-xs font-bold cursor-pointer shrink-0"
                         >
                           🔊 Nghe cả câu
                         </button>
@@ -2952,7 +2966,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
 
                   {isSpeedTestSubmitted && (
                     <div
-                      className={`p-2.5 rounded-xl text-[11px] space-y-1.5 ${
+                      className={`p-2.5 rounded-xl text-xs space-y-1.5 ${
                         isAnsweredWrong
                           ? 'bg-red-50 text-red-900 border border-red-200'
                           : 'bg-[#E7ECD9]/80 text-[#1E3227]'
@@ -2972,13 +2986,13 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
                               q.explanation
                             )
                           }
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#0F5243] text-[#FAF7F0] text-[10px] font-bold cursor-pointer shrink-0"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#0F5243] text-[#FAF7F0] text-xs font-bold cursor-pointer shrink-0"
                         >
                           <span>🐼 Hỏi 彬彬 câu này</span>
                         </button>
                       </div>
                       {isAnsweredWrong && (
-                        <div className="text-[10px] font-bold text-[#B8292F]">
+                        <div className="text-xs font-bold text-[#B8292F]">
                           📓 Đã tự động thêm từ “{q.targetWord}” vào Sổ từ khó để ôn lại!
                         </div>
                       )}

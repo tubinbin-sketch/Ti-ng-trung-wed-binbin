@@ -115,7 +115,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
         {/* Header */}
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-[rgba(30,50,39,0.15)]">
           <div>
-            <div className="text-[11px] font-bold text-[#9B8A3E] uppercase tracking-wider">
+            <div className="text-xs font-bold text-[#9B8A3E] uppercase tracking-wider">
               Mini-Game Tương Tác Lớp Học · Kết nối trực tiếp Sổ Điểm ({studentsList.length} Học viên)
             </div>
             <h3 className="text-lg sm:text-xl font-bold text-[#1E3227] mt-0.5">
@@ -267,7 +267,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                   className="p-4 rounded-2xl bg-white border-2 border-[#9B8A3E]/70 shadow-xs space-y-3"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#1E3227] text-[#C5B358] text-[10px] font-bold uppercase">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#1E3227] text-[#C5B358] text-xs font-bold uppercase">
                       Học viên được gọi tên
                     </span>
                     <span className="text-xs font-mono font-bold text-[#5F7266]">
@@ -398,7 +398,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                     }`}
                   >
                     <div className="text-2xl font-bold font-['Noto_Serif_SC']">{item.hanzi}</div>
-                    <div className="text-[10px] mt-1 opacity-75">Thẻ Chữ Hán</div>
+                    <div className="text-xs mt-1 opacity-75">Thẻ Chữ Hán</div>
                   </button>
                 );
               })}

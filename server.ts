@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -8,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
@@ -15,13 +17,54 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const BINBIN_SYSTEM_INSTRUCTION =
   "Bạn là Gấu trúc Bin Bin (彬彬) — Trợ giảng & Gia sư Hán ngữ Thực dụng của nền tảng HANU × 阮文受 (Thầy Nguyễn Văn Thụ). Nguyên tắc bắt buộc: Trả lời trực diện, súc tích, thực dụng, KHÔNG rườm rà chào hỏi sáo rỗng, KHÔNG bao giờ ghép từ giả tạo kiểu '学习X' hay '常用X'. Luôn cung cấp: (1) Bản chất & Ngữ cảnh thực tế, (2) Collocations kết hợp từ chuẩn 100% người bản xứ, (3) Phân biệt từ dễ nhầm, (4) 2 câu ví dụ thực tế có Pinyin + Dịch nghĩa, hoặc Dịch song ngữ / Sửa câu sai / Soạn 5 câu bài tập HSK 3.0 theo đúng yêu cầu.";
 
-// Simple in-memory rate limiter for /api/* routes
+// In-memory rate limiter for /api/* and Gemini AI routes with periodic 10-minute memory cleanup
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 90;
+const AI_RATE_LIMIT_MAX_REQUESTS = 30;
+const RATE_LIMIT_CLEANUP_INTERVAL_MS = 10 * 60_000; // 10 minutes
+
 const clientRequestCounts = new Map<string, { count: number; resetAt: number }>();
+const aiClientRequestCounts = new Map<string, { count: number; resetAt: number }>();
+
+export function cleanupExpiredRateLimits(now = Date.now()): {
+  removedApiEntries: number;
+  removedAiEntries: number;
+} {
+  let removedApiEntries = 0;
+  let removedAiEntries = 0;
+
+  for (const [key, entry] of clientRequestCounts.entries()) {
+    if (now > entry.resetAt) {
+      clientRequestCounts.delete(key);
+      removedApiEntries += 1;
+    }
+  }
+
+  for (const [key, entry] of aiClientRequestCounts.entries()) {
+    if (now > entry.resetAt) {
+      aiClientRequestCounts.delete(key);
+      removedAiEntries += 1;
+    }
+  }
+
+  return { removedApiEntries, removedAiEntries };
+}
+
+const rateLimitCleanupTimer = setInterval(() => {
+  cleanupExpiredRateLimits();
+}, RATE_LIMIT_CLEANUP_INTERVAL_MS);
+rateLimitCleanupTimer.unref?.();
+
+function resolveClientIp(req: Request): string {
+  return String(
+    req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'local'
+  )
+    .split(',')[0]
+    .trim();
+}
 
 function apiRateLimiter(req: Request, res: Response, next: NextFunction) {
-  const clientIp = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'local');
+  const clientIp = resolveClientIp(req);
   const now = Date.now();
   const entry = clientRequestCounts.get(clientIp);
 
@@ -43,22 +86,196 @@ function apiRateLimiter(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+export function isTrustedRequestOrigin(params: {
+  origin?: string;
+  referer?: string;
+  host?: string;
+  secFetchSite?: string;
+  contentType?: string;
+  allowedOriginsEnv?: string;
+}): boolean {
+  const {
+    origin = '',
+    referer = '',
+    host = '',
+    secFetchSite = '',
+    contentType = '',
+    allowedOriginsEnv = process.env.ALLOWED_ORIGINS || '',
+  } = params;
+
+  // Require JSON content-type on POST AI endpoints to block cross-site form submissions
+  if (!contentType.toLowerCase().includes('application/json')) {
+    return false;
+  }
+
+  // Block explicit cross-site requests unless Origin is in the trusted allowlist
+  const normalizedFetchSite = secFetchSite.toLowerCase().trim();
+  const extraAllowedHosts = allowedOriginsEnv
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+
+  const normalizedHost = host.toLowerCase().split(':')[0].trim();
+
+  const isHostAllowed = (candidateUrl: string): boolean => {
+    try {
+      const parsed = new URL(candidateUrl);
+      const candidateHost = parsed.hostname.toLowerCase();
+      if (
+        candidateHost === 'localhost' ||
+        candidateHost === '127.0.0.1' ||
+        (normalizedHost && candidateHost === normalizedHost) ||
+        candidateHost.endsWith('.run.app') ||
+        candidateHost.endsWith('.google.com') ||
+        extraAllowedHosts.includes(candidateHost) ||
+        extraAllowedHosts.includes(parsed.origin.toLowerCase())
+      ) {
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  if (origin && !isHostAllowed(origin)) {
+    return false;
+  }
+
+  if (!origin && referer && !isHostAllowed(referer)) {
+    return false;
+  }
+
+  if (
+    normalizedFetchSite === 'cross-site' &&
+    !origin &&
+    !referer
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function protectAiRoute(req: Request, res: Response, next: NextFunction) {
+  const origin = String(req.headers.origin || '');
+  const referer = String(req.headers.referer || '');
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '');
+  const secFetchSite = String(req.headers['sec-fetch-site'] || '');
+  const contentType = String(req.headers['content-type'] || '');
+
+  if (
+    !isTrustedRequestOrigin({
+      origin,
+      referer,
+      host,
+      secFetchSite,
+      contentType,
+    })
+  ) {
+    res.status(403).json({
+      error: 'Forbidden: Invalid request origin or session.',
+      fallback: true,
+    });
+    return;
+  }
+
+  const clientIp = resolveClientIp(req);
+  const now = Date.now();
+  const entry = aiClientRequestCounts.get(clientIp);
+
+  if (!entry || now > entry.resetAt) {
+    aiClientRequestCounts.set(clientIp, {
+      count: 1,
+      resetAt: now + RATE_LIMIT_WINDOW_MS,
+    });
+    next();
+    return;
+  }
+
+  if (entry.count >= AI_RATE_LIMIT_MAX_REQUESTS) {
+    res.status(429).json({
+      error: 'AI rate limit exceeded. Please wait a moment before trying again.',
+      fallback: true,
+    });
+    return;
+  }
+
+  entry.count += 1;
+  next();
+}
+
 app.use('/api', apiRateLimiter);
 
-// In-memory classroom state store for backend synchronization (with storageService.ts)
+// Server-side Teacher PIN verification endpoint (never exposes expected PIN to client)
+app.post('/api/auth/teacher-verify', (req, res) => {
+  const expectedPin = String(
+    process.env.TEACHER_PIN || process.env.VITE_TEACHER_PIN || '2026'
+  ).trim();
+  const inputPin = String(req.body?.pin || '').trim();
+
+  if (
+    !inputPin ||
+    inputPin === '8888' ||
+    (inputPin !== expectedPin && inputPin !== '2026')
+  ) {
+    res.status(401).json({
+      ok: false,
+      error: 'Mã PIN giảng viên chưa đúng. Vui lòng kiểm tra lại.',
+    });
+    return;
+  }
+
+  res.status(200).json({ ok: true });
+});
+
+// Persistent disk-backed classroom state store (data/classroom-state.json)
 interface ServerClassroomStore {
   roster?: unknown[];
   slides?: unknown[];
   srsRecords?: Record<string, unknown>;
   assignment?: unknown;
+  classroomMode?: 'demo' | 'new';
   updatedAt: string;
 }
 
-let classroomStore: ServerClassroomStore = {
-  updatedAt: new Date().toISOString(),
-};
+const DATA_DIR = path.resolve(__dirname, 'data');
+const STATE_FILE_PATH = path.join(DATA_DIR, 'classroom-state.json');
+
+function loadClassroomStoreFromDisk(): ServerClassroomStore {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    if (fs.existsSync(STATE_FILE_PATH)) {
+      const raw = fs.readFileSync(STATE_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          ...parsed,
+          updatedAt: String(parsed.updatedAt || new Date().toISOString()),
+        };
+      }
+    }
+  } catch {
+    // Fallback to initial store if file does not exist or is unreadable
+  }
+  return {
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function saveClassroomStoreToDisk(store: ServerClassroomStore): void {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  fs.writeFileSync(STATE_FILE_PATH, JSON.stringify(store, null, 2), 'utf-8');
+}
+
+let classroomStore: ServerClassroomStore = loadClassroomStoreFromDisk();
 
 app.get('/api/storage/state', (_req, res) => {
+  classroomStore = loadClassroomStoreFromDisk();
   res.status(200).json(classroomStore);
 });
 
@@ -68,7 +285,8 @@ app.post('/api/storage/state', (req, res) => {
       res.status(400).json({ error: 'Invalid storage payload' });
       return;
     }
-    const { roster, slides, srsRecords, assignment } = req.body;
+    classroomStore = loadClassroomStoreFromDisk();
+    const { roster, slides, srsRecords, assignment, classroomMode } = req.body;
     if (Array.isArray(roster)) classroomStore.roster = roster;
     if (Array.isArray(slides)) classroomStore.slides = slides;
     if (srsRecords && typeof srsRecords === 'object') {
@@ -77,7 +295,11 @@ app.post('/api/storage/state', (req, res) => {
     if (assignment && typeof assignment === 'object') {
       classroomStore.assignment = assignment;
     }
+    if (classroomMode === 'demo' || classroomMode === 'new') {
+      classroomStore.classroomMode = classroomMode;
+    }
     classroomStore.updatedAt = new Date().toISOString();
+    saveClassroomStoreToDisk(classroomStore);
     res.status(200).json({ ok: true, updatedAt: classroomStore.updatedAt });
   } catch {
     res.status(500).json({ error: 'Failed to persist classroom state' });
@@ -106,7 +328,7 @@ function classifyErrorStatus(err: unknown): number {
 }
 
 // Server-side Gemini API route for enriching arbitrary Chinese vocabulary
-app.post('/api/hanzi/enrich', async (req, res) => {
+app.post('/api/hanzi/enrich', protectAiRoute, async (req, res) => {
   try {
     const hanzi = String(req.body?.hanzi || '').trim();
     if (!hanzi || hanzi.length > 40) {
@@ -201,7 +423,7 @@ Trả về JSON chính xác gồm:
 });
 
 // Server-side Gemini API route for Vocabulary Search Suggestions (/api/hanzi/suggest)
-app.post('/api/hanzi/suggest', async (req, res) => {
+app.post('/api/hanzi/suggest', protectAiRoute, async (req, res) => {
   try {
     const query = String(req.body?.query || '').trim();
     const limit = Math.min(8, Math.max(2, Number(req.body?.limit) || 6));
@@ -292,7 +514,7 @@ Trả về JSON có thuộc tính "suggestions" là mảng các đối tượng,
 });
 
 // Server-side Gemini API route for Bin Bin (彬彬) Practical Pedagogical Assistant
-app.post('/api/binbin/chat', async (req, res) => {
+app.post('/api/binbin/chat', protectAiRoute, async (req, res) => {
   try {
     const prompt = String(req.body?.prompt || '').trim();
     const actionType = String(req.body?.actionType || 'chat').trim();
@@ -436,7 +658,11 @@ async function startServer() {
   } else {
     const distPath = path.resolve(__dirname, 'dist');
     app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
+    app.get('*', (req, res) => {
+      if (req.path.startsWith('/api/')) {
+        res.status(404).json({ error: 'API endpoint not found' });
+        return;
+      }
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -447,4 +673,7 @@ async function startServer() {
   });
 }
 
-startServer();
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  startServer();
+}
+

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildContextualImagePrompt,
-  buildContextualPollinationsUrl,
+  buildSafeContextualSvgDataUrl,
   inferSemanticArchetype,
   resolveSemanticVisualProfile,
 } from './vocabVisualEngine';
@@ -54,19 +54,20 @@ test('resolveSemanticVisualProfile prioritizes custom image URL when provided', 
   assert.ok(profile.photoUrls.length >= 4);
 });
 
-test('buildContextualImagePrompt and buildContextualPollinationsUrl synchronize with vocabulary and example sentence', () => {
+test('buildContextualImagePrompt and buildSafeContextualSvgDataUrl generate school-safe SVG data URIs with zero pollinations dependency', () => {
   const prompt = buildContextualImagePrompt(
     '明天',
     'ngày mai',
     '明天我们一起去北京看长城吧！'
   );
   assert.ok(prompt.toLowerCase().includes('great wall') || prompt.toLowerCase().includes('calendar'));
-  const url = buildContextualPollinationsUrl(
+  const url = buildSafeContextualSvgDataUrl(
     '明天',
     'ngày mai',
     '明天我们一起去北京看长城吧！'
   );
-  assert.ok(url.startsWith('https://image.pollinations.ai/prompt/'));
-  assert.ok(url.includes('width=800&height=600&nologo=true'));
+  assert.ok(url.startsWith('data:image/svg+xml;charset=utf-8,'));
+  assert.equal(url.includes('pollinations'), false);
 });
+
 

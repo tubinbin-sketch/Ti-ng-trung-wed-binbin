@@ -8,5 +8,7 @@ coverage/
 !.env.example
 .aistudio/
 .playwright-cli/
+data/
 /*.png
 *.mp4
+

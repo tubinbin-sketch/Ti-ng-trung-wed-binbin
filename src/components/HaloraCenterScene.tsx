@@ -1613,10 +1613,10 @@ export const HaloraCenterScene: React.FC = () => {
                           {isSelected && <Check className="w-4 h-4 text-[#ECC869]" />}
                         </div>
                         <div className="font-semibold text-xs text-[#FFF4D0]">{meta.label}</div>
-                        <div className="text-[11px] font-['Noto_Serif_SC'] text-[#ECC869]">
+                        <div className="text-xs font-['Noto_Serif_SC'] text-[#ECC869]">
                           {meta.chineseTitle}
                         </div>
-                        <div className="text-[11px] text-[#A8BFAE] leading-relaxed">
+                        <div className="text-xs text-[#A8BFAE] leading-relaxed">
                           {meta.subtitle}
                         </div>
                       </button>
@@ -1638,7 +1638,7 @@ export const HaloraCenterScene: React.FC = () => {
                         setCustomImage(null);
                         handleSelectMode('dragon');
                       }}
-                      className="text-[11px] text-[#FA5B50] hover:underline flex items-center gap-1"
+                      className="text-xs text-[#FA5B50] hover:underline flex items-center gap-1"
                     >
                       <RotateCcw className="w-3 h-3" />
                       Xóa ảnh riêng
@@ -1672,7 +1672,7 @@ export const HaloraCenterScene: React.FC = () => {
                         <div className="text-xs font-semibold text-[#FFF4D0]">
                           Đã nạp ảnh linh vật tùy chỉnh
                         </div>
-                        <div className="text-[11px] text-[#A8BFAE]">
+                        <div className="text-xs text-[#A8BFAE]">
                           Bấm để chọn file khác (PNG, JPG, SVG)
                         </div>
                       </div>
@@ -1685,7 +1685,7 @@ export const HaloraCenterScene: React.FC = () => {
                       <div className="text-xs font-semibold text-[#FFF4D0]">
                         Bấm để tải ảnh linh vật lên
                       </div>
-                      <div className="text-[11px] text-[#A8BFAE]">
+                      <div className="text-xs text-[#A8BFAE]">
                         Tự động cắt lồng vào khung Nguyệt Môn tròn chuẩn cung đình
                       </div>
                     </div>
@@ -1694,7 +1694,7 @@ export const HaloraCenterScene: React.FC = () => {
 
                 {customImage && (
                   <div className="mt-3 flex flex-wrap items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10 text-xs">
-                    <span className="text-[#A8BFAE] text-[11px]">Chế độ hòa trộn:</span>
+                    <span className="text-[#A8BFAE] text-xs">Chế độ hòa trộn:</span>
                     <button
                       type="button"
                       onClick={() => setCustomBlendMode('normal')}
@@ -1738,7 +1738,7 @@ export const HaloraCenterScene: React.FC = () => {
                   <div className="font-semibold text-[#FFF4D0]">
                     Đại tự thư pháp trung tâm
                   </div>
-                  <div className="text-[11px] text-[#A8BFAE]">
+                  <div className="text-xs text-[#A8BFAE]">
                     Chữ Hán 3D ánh kim đúc nổi ở tâm Nguyệt Môn
                   </div>
                 </div>
@@ -1789,7 +1789,7 @@ export const HaloraCenterScene: React.FC = () => {
 
             {/* Footer */}
             <div className="p-4 sm:p-5 border-t border-[#D4AF37]/20 bg-[#0E1A13] flex items-center justify-between">
-              <span className="text-[11px] text-[#A8BFAE]">
+              <span className="text-xs text-[#A8BFAE]">
                 {currentThemeMeta.chineseTitle} · HANU × 阮文受
               </span>
               <button
