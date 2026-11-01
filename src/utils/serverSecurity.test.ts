@@ -36,6 +36,8 @@ async function startEphemeralServer(): Promise<{
 }
 
 test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota & App Check)', async (t) => {
+  const prevAllowlist = process.env.TEACHER_EMAIL_ALLOWLIST;
+  process.env.TEACHER_EMAIL_ALLOWLIST = 'dondon.win10@gmail.com,teacher@hanu.edu.vn';
   const store = createInMemoryServerStoreAdapter();
   setServerStoreAdapterForTest(store);
   resetAllRateLimitersForTest();
@@ -82,6 +84,11 @@ test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota 
   const { baseUrl, close } = await startEphemeralServer();
 
   t.after(async () => {
+    if (prevAllowlist === undefined) {
+      delete process.env.TEACHER_EMAIL_ALLOWLIST;
+    } else {
+      process.env.TEACHER_EMAIL_ALLOWLIST = prevAllowlist;
+    }
     setFirebaseTokenVerifierForTest(null);
     setAppCheckVerifierForTest(null);
     setServerStoreAdapterForTest(null);

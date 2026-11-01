@@ -79,7 +79,7 @@ export const ClassroomAddStudentModal: React.FC<ClassroomAddStudentModalProps> =
       >
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-canvas shrink-0 shadow-2xs">
+            <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-on-primary shrink-0 shadow-2xs">
               <UserPlus className="w-5 h-5" />
             </div>
             <div>
@@ -224,7 +224,7 @@ export const ClassroomAddStudentModal: React.FC<ClassroomAddStudentModalProps> =
           <button
             type="submit"
             data-testid="confirm-add-student-btn"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:opacity-95 text-canvas text-xs font-bold shadow-xs transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:opacity-95 text-on-primary text-xs font-bold shadow-xs transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             <UserPlus className="w-3.5 h-3.5" />
             <span>Thêm vào danh sách</span>

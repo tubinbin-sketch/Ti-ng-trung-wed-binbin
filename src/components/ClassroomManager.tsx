@@ -387,11 +387,10 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     <div className="space-y-6">
       <div className="rounded-3xl bg-surface/90 backdrop-blur-md border border-border text-ink p-5 md:p-7 shadow-xs space-y-6">
         {/* Top Class Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-border">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-bold text-gold uppercase tracking-wider">
-              <span>Bảng điều khiển Giáo viên · Cloud Firestore</span>
-              <span>·</span>
+        <div className="flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-4 pb-5 border-b border-border">
+          <div className="min-w-0 2xl:max-w-[50%]">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-ink-muted">
+              <span>Bảng điều khiển giáo viên</span>
               <span
                 data-testid="active-class-join-code-badge"
                 className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold"
@@ -408,7 +407,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               ref={legacyBackupInputRef}
               type="file"
@@ -421,10 +420,10 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               type="button"
               onClick={() => legacyBackupInputRef.current?.click()}
               data-testid="import-legacy-json-backup-btn"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-canvas hover:bg-primary/10 text-ink border border-gold/60 text-xs font-bold transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-canvas hover:bg-primary/10 text-ink border border-border-strong text-xs font-bold transition-all cursor-pointer"
             >
               <UploadCloud className="w-3.5 h-3.5 text-primary" />
-              <span>📂 Chuyển JSON cũ lên Firestore</span>
+              <span>Chuyển JSON cũ lên Firestore</span>
             </button>
             <button
               type="button"
@@ -432,8 +431,8 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               data-testid="activate-demo-classroom-btn"
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                 classroomMode === 'demo' && studentsList.length > 0
-                  ? 'bg-primary text-white border-primary'
-                  : 'bg-canvas hover:bg-primary/10 text-ink border-gold/60'
+                  ? 'bg-primary text-on-primary border-primary'
+                  : 'bg-canvas hover:bg-primary/10 text-ink border-transparent'
               }`}
             >
               <span>🧪 Xem bản demo</span>
@@ -444,8 +443,8 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               data-testid="create-new-classroom-btn"
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                 classroomMode === 'new' && studentsList.length === 0
-                  ? 'bg-accent text-white border-accent'
-                  : 'bg-canvas hover:bg-primary/10 text-ink border-gold/60'
+                  ? 'bg-accent text-on-primary border-accent'
+                  : 'bg-canvas hover:bg-primary/10 text-ink border-transparent'
               }`}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -455,10 +454,10 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               type="button"
               onClick={handleExportCsv}
               data-testid="header-export-csv-report-btn"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-canvas hover:bg-primary/10 text-ink border border-gold/60 text-xs font-bold transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-canvas hover:bg-primary/10 text-ink border border-border-strong text-xs font-bold transition-all cursor-pointer"
             >
               <Download className="w-3.5 h-3.5 text-gold" />
-              <span>📊 Xuất Bảng Điểm CSV</span>
+              <span>Xuất Bảng Điểm CSV</span>
             </button>
             <button
               type="button"
@@ -468,9 +467,9 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 setActionBanner('Hoàn tất tự động: Đã giao bài và chấm điểm toàn bộ 19/19 buổi học!');
               }}
               data-testid="batch-autograde-btn"
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all cursor-pointer"
             >
-              <Sparkles className="w-4 h-4 text-gold" />
+              <Sparkles className="w-4 h-4" />
               <span>Giao &amp; Tự chấm toàn khóa</span>
             </button>
           </div>
@@ -549,7 +548,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 onClick={() => setActiveTab('schedule')}
                 className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                   activeTab === 'schedule'
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-on-primary'
                     : 'bg-canvas text-ink-muted border border-border hover:text-ink'
                 }`}
               >
@@ -562,7 +561,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 onClick={() => setActiveTab('grading')}
                 className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                   activeTab === 'grading'
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-on-primary'
                     : 'bg-canvas text-ink-muted border border-border hover:text-ink'
                 }`}
               >
@@ -575,7 +574,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 onClick={() => setActiveTab('analytics')}
                 className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                   activeTab === 'analytics'
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-on-primary'
                     : 'bg-canvas text-ink-muted border border-border hover:text-ink'
                 }`}
               >
@@ -589,7 +588,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 type="button"
                 data-testid="open-lucky-wheel-btn"
                 onClick={() => setIsLuckyWheelOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 text-ink border border-gold text-xs font-bold transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 text-ink border border-border-strong text-xs font-bold transition-all cursor-pointer"
               >
                 <span>🎡 Gọi tên ngẫu nhiên (Lucky Wheel) &amp; Ghép Thẻ</span>
               </button>
@@ -597,28 +596,28 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 type="button"
                 data-testid="open-add-student-modal-btn"
                 onClick={() => setIsAddStudentModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5 text-gold" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>+ Thêm học viên mới</span>
               </button>
               <button
                 type="button"
                 data-testid="export-students-csv-btn"
                 onClick={handleExportCsv}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-canvas hover:bg-primary/10 text-ink border border-gold/60 text-xs font-bold transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-canvas hover:bg-primary/10 text-ink border border-border-strong text-xs font-bold transition-all cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5 text-gold" />
-                <span>📊 Xuất Bảng Điểm CSV/In Báo Cáo</span>
+                <span>Xuất Bảng Điểm CSV/In Báo Cáo</span>
               </button>
               <button
                 type="button"
                 data-testid="classroom-print-worksheet-btn"
                 onClick={() => setIsWorksheetModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface hover:bg-primary/10 text-ink border border-gold/60 text-xs font-bold transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface hover:bg-primary/10 text-ink border border-border-strong text-xs font-bold transition-all cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5 text-gold" />
-                <span>🖨️ In Phiếu Viết A4 (PDF)</span>
+                <span>In Phiếu Viết A4 (PDF)</span>
               </button>
             </div>
           </div>
@@ -668,7 +667,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                   }}
                   className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     studentStatusFilter === f.id
-                      ? 'bg-primary text-white'
+                      ? 'bg-primary text-on-primary'
                       : 'bg-surface text-ink-muted border border-border hover:text-ink'
                   }`}
                 >
@@ -679,7 +678,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
           </div>
         </div>
 
-        <div className="px-3.5 py-2 rounded-xl bg-canvas border border-gold/45 text-xs font-medium text-ink flex items-center gap-2" data-testid="classroom-status-banner">
+        <div className="px-3.5 py-2 rounded-xl bg-canvas border border-border-strong text-xs font-medium text-ink flex items-center gap-2" data-testid="classroom-status-banner">
           <CheckCircle2 className="w-4 h-4 text-gold shrink-0" />
           <span className="truncate">{actionBanner}</span>
         </div>

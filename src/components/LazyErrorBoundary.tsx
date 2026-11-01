@@ -40,9 +40,9 @@ export class LazyErrorBoundary extends Component<
             type="button"
             onClick={this.handleRetry}
             data-testid="lazy-error-retry-btn"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/50 text-xs font-bold cursor-pointer transition-all"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border-strong/50 text-xs font-bold cursor-pointer transition-all"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-[#9B8A3E]" />
+            <RefreshCw className="w-3.5 h-3.5 text-gold" />
             <span>Thử tải lại</span>
           </button>
         );
@@ -51,18 +51,18 @@ export class LazyErrorBoundary extends Component<
       return (
         <div
           data-testid="lazy-error-boundary-fallback"
-          className="my-4 p-4 rounded-2xl bg-[#FAF7F0] border border-[#9B8A3E]/45 text-center space-y-2.5 shadow-2xs"
+          className="my-4 p-4 rounded-2xl bg-surface-2 border border-border-strong/45 text-center space-y-2.5 shadow-2xs"
         >
-          <p className="text-xs sm:text-sm font-semibold text-[#0F382E]">
+          <p className="text-xs sm:text-sm font-semibold text-ink">
             {this.props.fallbackLabel || 'Không thể tải phân hệ do kết nối mạng tạm gián đoạn.'}
           </p>
           <button
             type="button"
             onClick={this.handleRetry}
             data-testid="lazy-error-retry-btn"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#0F5243] hover:bg-[#166E5B] text-[#FAF7F0] text-xs sm:text-sm font-bold cursor-pointer transition-all"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-xs sm:text-sm font-bold cursor-pointer transition-all"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-[#C5B358]" />
+            <RefreshCw className="w-3.5 h-3.5" />
             <span>Thử tải lại</span>
           </button>
         </div>

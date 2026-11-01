@@ -85,7 +85,7 @@ export const MeasureWordDrillModal: React.FC<MeasureWordDrillModalProps> = ({
             </h3>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-primary text-canvas text-sm font-bold tabular-nums">
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-primary text-on-primary text-sm font-bold tabular-nums">
               <Award className="w-4 h-4" />
               <span>{score} điểm</span>
             </span>
@@ -109,7 +109,7 @@ export const MeasureWordDrillModal: React.FC<MeasureWordDrillModalProps> = ({
             <button
               type="button"
               onClick={() => speakChinese(currentItem.fullSentenceHanzi, 0.9)}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-primary text-canvas text-sm font-bold cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-primary text-on-primary text-sm font-bold cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >
               <Volume2 className="w-4 h-4" />
               <span>Nghe câu mẫu</span>
@@ -217,7 +217,7 @@ export const MeasureWordDrillModal: React.FC<MeasureWordDrillModalProps> = ({
             type="button"
             data-testid="mw-next-question-btn"
             onClick={handleNextQuestion}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-canvas text-sm font-bold shadow-xs cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary text-sm font-bold shadow-xs cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             <span>Câu tiếp theo</span>
             <ArrowRight className="w-4 h-4" />

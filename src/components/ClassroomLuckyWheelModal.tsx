@@ -107,11 +107,11 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
       maxWidthClass="max-w-3xl"
       testId="lucky-wheel-modal"
     >
-      <div className="w-full bg-canvas border-2 border-gold rounded-3xl shadow-2xl p-5 sm:p-6 flex flex-col max-h-[90vh] overflow-y-auto text-ink space-y-4">
+      <div className="w-full bg-canvas border-2 border-border-strong rounded-3xl shadow-2xl p-5 sm:p-6 flex flex-col max-h-[90vh] overflow-y-auto text-ink space-y-4">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
           <div>
-            <div className="text-xs font-bold text-gold uppercase tracking-wider">
+            <div className="text-xs font-bold text-gold">
               Mini-Game Tương Tác Lớp Học · Kết nối trực tiếp Sổ Điểm ({studentsList.length} Học viên)
             </div>
             <h3 id="lucky-wheel-modal-title" className="text-lg sm:text-xl font-bold text-ink mt-0.5">
@@ -138,7 +138,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
               onClick={() => setWheelModeTab('wheel')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 wheelModeTab === 'wheel'
-                  ? 'bg-primary text-canvas shadow-xs'
+                  ? 'bg-primary text-on-primary shadow-xs'
                   : 'bg-surface text-ink hover:bg-canvas'
               }`}
             >
@@ -150,7 +150,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
               onClick={() => setWheelModeTab('match')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 wheelModeTab === 'match'
-                  ? 'bg-primary text-canvas shadow-xs'
+                  ? 'bg-primary text-on-primary shadow-xs'
                   : 'bg-surface text-ink hover:bg-canvas'
               }`}
             >
@@ -197,7 +197,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                 <div className="absolute -top-2 z-20 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[18px] border-t-accent drop-shadow" />
                 <svg
                   viewBox="0 0 200 200"
-                  className="w-full h-full rounded-full border-4 border-gold shadow-md transition-transform duration-700 ease-out"
+                  className="w-full h-full rounded-full border-4 border-border-strong shadow-md transition-transform duration-700 ease-out"
                   style={{ transform: `rotate(${wheelRotation}deg)` }}
                 >
                   <circle cx="100" cy="100" r="96" fill="#0F5243" />
@@ -252,7 +252,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                 data-testid="spin-lucky-wheel-btn"
                 disabled={isSpinningWheel || studentsList.length === 0}
                 onClick={handleSpinWheel}
-                className="mt-4 px-5 py-2.5 rounded-xl bg-primary hover:opacity-95 text-canvas text-xs font-bold border border-gold shadow-xs transition-all cursor-pointer disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                className="mt-4 px-5 py-2.5 rounded-xl bg-primary hover:opacity-95 text-on-primary text-xs font-bold border border-transparent shadow-xs transition-all cursor-pointer disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
                 {isSpinningWheel ? '🎡 Đang quay chọn học viên...' : '🎡 Quay gọi tên ngẫu nhiên'}
               </button>
@@ -262,10 +262,10 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
               {selectedWheelStudent ? (
                 <div
                   data-testid="selected-wheel-student-card"
-                  className="p-4 rounded-2xl bg-surface border-2 border-gold shadow-xs space-y-3"
+                  className="p-4 rounded-2xl bg-surface border-2 border-border-strong shadow-xs space-y-3"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-full bg-primary text-canvas text-xs font-bold uppercase">
+                    <span className="px-2.5 py-0.5 rounded-full bg-primary text-on-primary text-xs font-bold uppercase">
                       Học viên được gọi tên
                     </span>
                     <span className="text-xs font-mono font-bold text-ink-muted">
@@ -310,7 +310,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                             'Trả lời đúng câu hỏi Vòng quay trên lớp'
                           )
                         }
-                        className="py-2 px-3 rounded-xl bg-primary/10 hover:bg-primary text-ink hover:text-canvas border border-border text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                        className="py-2 px-3 rounded-xl bg-primary/10 hover:bg-primary text-ink hover:text-on-primary border border-border text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                       >
                         ⭐ +5 điểm thưởng
                       </button>
@@ -324,7 +324,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                             'Phản xạ xuất sắc Vòng quay & Ghép thẻ'
                           )
                         }
-                        className="py-2 px-3 rounded-xl bg-primary hover:opacity-95 text-canvas border border-gold text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                        className="py-2 px-3 rounded-xl bg-primary hover:opacity-95 text-on-primary border border-transparent text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                       >
                         🏆 +10 điểm thưởng
                       </button>
@@ -366,7 +366,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                         'Chiến thắng Mini-Game Ghép Thẻ Từ Vựng'
                       )
                     }
-                    className="px-3 py-1 rounded-lg bg-primary text-canvas text-xs font-bold cursor-pointer"
+                    className="px-3 py-1 rounded-lg bg-primary text-on-primary text-xs font-bold cursor-pointer"
                   >
                     🏆 Thưởng +10đ cho {selectedWheelStudent.name}
                   </button>
@@ -390,7 +390,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                       isMatched
                         ? 'bg-success/10 border-success text-success opacity-75'
                         : isSelected
-                        ? 'bg-primary text-canvas border-gold shadow-xs'
+                        ? 'bg-primary text-on-primary border-transparent shadow-xs'
                         : 'bg-surface hover:bg-canvas border-border text-ink'
                     }`}
                   >
@@ -415,7 +415,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                       isMatched
                         ? 'bg-success/10 border-success text-success opacity-75'
                         : isSelected
-                        ? 'bg-primary text-canvas border-gold shadow-xs'
+                        ? 'bg-primary text-on-primary border-transparent shadow-xs'
                         : 'bg-surface hover:bg-canvas border-border text-ink'
                     }`}
                   >

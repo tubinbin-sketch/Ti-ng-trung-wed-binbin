@@ -39,11 +39,11 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
   return (
     <div
       data-testid="speed-test-10-arena"
-      className="rounded-3xl bg-surface/90 border-2 border-gold/60 p-5 sm:p-6 shadow-md space-y-5"
+      className="rounded-3xl bg-surface/90 border-2 border-border-strong p-5 sm:p-6 shadow-md space-y-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-border">
         <div>
-          <div className="text-xs font-bold uppercase tracking-wider text-accent">
+          <div className="text-xs font-bold text-accent">
             CHẾ ĐỘ THI THỬ TỐC ĐỘ 15 PHÚT · ĐÁNH GIÁ CHUẨN HSK 3.0
           </div>
           <h3 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
@@ -54,7 +54,7 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           <div
             data-testid="speed-test-timer-badge"
-            className="px-3.5 py-1.5 rounded-xl bg-primary text-gold font-mono text-sm font-extrabold tabular-nums flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-xl bg-primary text-gold font-mono text-sm font-semibold tabular-nums flex items-center gap-1.5"
           >
             <span>⏱️ Thời gian:</span>
             <span>{formatTimerMmSs(speedTestSecondsLeft)}</span>
@@ -65,7 +65,7 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
               type="button"
               data-testid="speed-test-quick-fill-btn"
               onClick={onQuickFillSpeedTest}
-              className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-ink border border-gold/50 text-xs font-bold cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-ink border border-border-strong text-xs font-bold cursor-pointer"
             >
               ⚡ Điền nhanh 10 câu mẫu
             </button>
@@ -85,21 +85,21 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
       {isSpeedTestSubmitted && (
         <div
           data-testid="hsk3-completion-certificate"
-          className="p-6 rounded-3xl bg-canvas border-2 border-gold shadow-xl space-y-4 relative overflow-hidden"
+          className="p-6 rounded-3xl bg-canvas border-2 border-border-strong shadow-xl space-y-4 relative overflow-hidden"
         >
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-gold/50 pb-4">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-border-strong pb-4">
             <div className="flex items-center gap-3.5">
               <div
                 lang="zh-CN"
-                className="w-14 h-14 rounded-2xl bg-primary text-gold flex items-center justify-center font-['Noto_Serif_SC'] text-2xl font-bold border border-gold shrink-0"
+                className="w-14 h-14 rounded-2xl bg-primary text-gold flex items-center justify-center font-['Noto_Serif_SC'] text-2xl font-bold border border-transparent shrink-0"
               >
                 证
               </div>
               <div>
-                <div className="text-xs font-extrabold uppercase tracking-widest text-gold">
+                <div className="text-xs font-semibold text-gold">
                   HANU × 阮文受 · CHỨNG NHẬN NĂNG LỰC HÁN NGỮ QUỐC TẾ
                 </div>
-                <h4 className="text-lg sm:text-xl font-black text-ink mt-0.5">
+                <h4 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
                   📜 PHIẾU CHỨNG NHẬN HOÀN THÀNH BÀI HỌC CHUẨN HSK 3.0
                 </h4>
                 <p className="text-xs text-ink-muted mt-0.5">
@@ -108,13 +108,13 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
               </div>
             </div>
 
-            <div className="px-4 py-2.5 rounded-2xl bg-primary text-white text-right border border-gold shrink-0">
-              <div className="text-xs font-bold uppercase tracking-wider text-gold">
+            <div className="px-4 py-2.5 rounded-2xl bg-primary text-on-primary text-right border border-transparent shrink-0">
+              <div className="text-xs font-bold text-gold">
                 ĐIỂM KIỂM TRA 10 CÂU
               </div>
               <div
                 data-testid="speed-test-final-score"
-                className="text-2xl sm:text-3xl font-black tabular-nums"
+                className="text-2xl sm:text-3xl font-bold tabular-nums"
               >
                 {speedTestScore} <span className="text-xs font-bold text-gold">/ 100đ</span>
               </div>
@@ -131,10 +131,10 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
             ].map((skill) => (
               <div
                 key={skill.label}
-                className="p-2.5 rounded-xl bg-surface border border-gold/45"
+                className="p-2.5 rounded-xl bg-surface border border-border-strong"
               >
                 <div className="text-xs text-ink-muted font-semibold">{skill.label}</div>
-                <div className="text-sm font-black text-primary tabular-nums mt-0.5">
+                <div className="text-sm font-bold text-primary tabular-nums mt-0.5">
                   {skill.score}
                 </div>
               </div>
@@ -168,9 +168,9 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
                     type="button"
                     data-testid={`speed-test-listen-btn-${q.id}`}
                     onClick={() => speakChinese(q.targetWord)}
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-primary text-white border border-gold/50 text-xs font-bold cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-primary text-on-primary border border-transparent text-xs font-bold cursor-pointer"
                   >
-                    <Volume2 className="w-3 h-3 text-gold" />
+                    <Volume2 className="w-3 h-3" />
                     <span lang="zh-CN" className="font-['Noto_Sans_SC']">
                       {isListeningExamMode && !isSpeedTestSubmitted
                         ? `🔊 Nghe câu #${qIdx + 1}`
@@ -216,7 +216,7 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
                             ? 'bg-danger/10 border-danger text-ink'
                             : 'bg-surface/60 border-border text-ink-muted'
                           : isPicked
-                          ? 'bg-primary border-primary text-white font-bold'
+                          ? 'bg-primary border-primary text-on-primary font-bold'
                           : 'bg-surface hover:bg-canvas border-border text-ink'
                       }`}
                     >
@@ -247,7 +247,7 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
                       onClick={() =>
                         onAskBinBinAboutQuestion(q.targetWord, q.prompt, q.explanation)
                       }
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary text-white text-xs font-bold cursor-pointer shrink-0"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary text-on-primary text-xs font-bold cursor-pointer shrink-0"
                     >
                       <span>🐼 Hỏi 彬彬 câu này</span>
                     </button>
@@ -273,9 +273,9 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
             type="button"
             data-testid="submit-speed-test-btn"
             onClick={onSubmitSpeedTest}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white text-xs sm:text-sm font-bold shadow-md cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-on-primary text-xs sm:text-sm font-bold shadow-md cursor-pointer"
           >
-            <Send className="w-4 h-4 text-gold" />
+            <Send className="w-4 h-4" />
             <span>Nộp Đề 10 Câu &amp; Nhận Chứng Nhận HSK 3.0</span>
           </button>
         </div>

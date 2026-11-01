@@ -32,9 +32,9 @@ export const ClassroomAnalyticsPanel: React.FC<ClassroomAnalyticsPanelProps> = (
             type="button"
             data-testid="analytics-open-worksheet-btn"
             onClick={onOpenWorksheetModal}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer"
           >
-            <Printer className="w-3.5 h-3.5 text-gold" />
+            <Printer className="w-3.5 h-3.5" />
             <span>In Phiếu Luyện Viết A4 (PDF)</span>
           </button>
         </div>
@@ -95,7 +95,7 @@ export const ClassroomAnalyticsPanel: React.FC<ClassroomAnalyticsPanelProps> = (
         {/* Left Column: Recent Reading Drills */}
         <div className="rounded-xl border border-border bg-canvas p-3.5 space-y-2.5">
           <div className="flex items-center justify-between pb-2 border-b border-border">
-            <h5 className="text-xs font-bold text-ink uppercase tracking-wide flex items-center gap-1.5">
+            <h5 className="text-xs font-bold text-ink flex items-center gap-1.5">
               <Mic className="w-3.5 h-3.5 text-accent" />
               <span>Lịch sử phát âm câu ví dụ gần đây</span>
             </h5>
@@ -118,7 +118,7 @@ export const ClassroomAnalyticsPanel: React.FC<ClassroomAnalyticsPanelProps> = (
                     <span lang="zh-CN" className="font-['Noto_Sans_SC'] font-bold text-sm text-ink">
                       {r.hanzi} · &ldquo;{r.targetSentence}&rdquo;
                     </span>
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary text-white font-bold text-xs tabular-nums">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary text-on-primary font-bold text-xs tabular-nums">
                       {r.score}%
                     </span>
                   </div>
@@ -137,7 +137,7 @@ export const ClassroomAnalyticsPanel: React.FC<ClassroomAnalyticsPanelProps> = (
         {/* Right Column: Recent Handwriting Drills */}
         <div className="rounded-xl border border-border bg-canvas p-3.5 space-y-2.5">
           <div className="flex items-center justify-between pb-2 border-b border-border">
-            <h5 className="text-xs font-bold text-ink uppercase tracking-wide flex items-center gap-1.5">
+            <h5 className="text-xs font-bold text-ink flex items-center gap-1.5">
               <Star className="w-3.5 h-3.5 text-gold" />
               <span>Lịch sử viết tay Ô Mễ Tự Cách gần đây</span>
             </h5>

@@ -459,7 +459,7 @@ export async function verifyRequestAppCheck(req: Request): Promise<boolean> {
 
 export function getTeacherEmailAllowlist(): string[] {
   const raw =
-    process.env.TEACHER_EMAIL_ALLOWLIST ??
+    process.env.TEACHER_EMAIL_ALLOWLIST?.trim() ||
     'dondon.win10@gmail.com,teacher@hanu.edu.vn';
   return raw
     .split(',')

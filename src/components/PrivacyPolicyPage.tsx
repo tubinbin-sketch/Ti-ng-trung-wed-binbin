@@ -11,11 +11,11 @@ export const PrivacyPolicyPage: React.FC = () => {
     >
       <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-border">
         <div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-extrabold uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
             <ShieldCheck className="w-4 h-4" />
             <span>TUÂN THỦ NGHỊ ĐỊNH 13/2023/NĐ-CP · BẢO VỆ DỮ LIỆU CÁ NHÂN</span>
           </span>
-          <h2 id="privacy-policy-heading" className="text-2xl sm:text-3xl font-extrabold text-ink mt-2">
+          <h2 id="privacy-policy-heading" className="text-2xl sm:text-3xl font-semibold text-ink mt-2">
             Chính Sách Quyền Riêng Tư &amp; Bảo Vệ Dữ Liệu Học Viên
           </h2>
           <p className="text-sm text-ink-muted mt-1">
@@ -26,7 +26,7 @@ export const PrivacyPolicyPage: React.FC = () => {
         <Link
           to="/hoc"
           data-testid="privacy-back-home-btn"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-canvas text-sm font-bold shadow-xs hover:opacity-95 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-on-primary text-sm font-bold shadow-xs hover:opacity-95 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Quay về trang Học tập</span>

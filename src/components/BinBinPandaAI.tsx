@@ -675,7 +675,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
             type="button"
             data-testid="binbin-inline-open-btn"
             onClick={() => setIsOpen(true)}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] text-xs font-bold border border-[#C5B358]/60 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-xs font-bold border border-highlight/60 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
           >
             <span className="text-sm">🐼</span>
             <span>Trợ Giảng Gấu Trúc · 彬彬</span>
@@ -699,10 +699,10 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
           title="Hỏi Trợ Giảng Gấu Trúc · 彬彬"
           aria-label="Mở Trợ Giảng Gấu Trúc · 彬彬"
           data-testid="binbin-floating-toggle"
-          className="group relative w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] border-2 border-[#C5B358] shadow-[0_4px_14px_rgba(15,82,67,0.3)] hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer"
+          className="group relative w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-primary text-on-primary border-2 border-highlight hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer"
         >
           <span className="text-base sm:text-lg leading-none select-none">🐼</span>
-          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#10B981] border border-[#0F5243] animate-pulse" />
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#10B981] border border-primary animate-pulse" />
         </button>
       </div>
     );
@@ -711,8 +711,8 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
   // Determine container layout classes based on displayMode ('docked' 360px right sidebar vs 'compact' popover)
   const containerClassName =
     displayMode === 'docked'
-      ? 'fixed top-0 right-0 z-50 w-full sm:w-[360px] h-screen flex flex-col bg-[#FAF7F0] border-l-2 border-[#C5B358] shadow-[-12px_0_40px_rgb(15,56,46,0.22)]'
-      : 'fixed bottom-3 right-3 sm:bottom-4 sm:right-5 z-50 w-[94vw] sm:w-[415px] h-[510px] max-h-[82vh] rounded-2xl flex flex-col overflow-hidden bg-[#FAF7F0] border-2 border-[#C5B358]/80 shadow-[0_20px_50px_rgb(15,56,46,0.25)]';
+      ? 'fixed top-0 right-0 z-50 w-full sm:w-[360px] h-dvh flex flex-col bg-surface border-l border-border shadow-xl'
+      : 'fixed bottom-[calc(68px+env(safe-area-inset-bottom))] right-3 lg:bottom-5 lg:right-5 z-50 w-[calc(100vw-24px)] sm:w-[400px] h-[520px] max-h-[78dvh] rounded-3xl flex flex-col overflow-hidden bg-surface border border-border shadow-2xl animate-fade-in';
 
   return (
     <div
@@ -726,56 +726,42 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
       {/* =====================================================================
           1. COMPACT HEADER (Dock Right / Floating Mode Switcher + Clear + Close)
           ===================================================================== */}
-      <div className="px-3 py-2 bg-[#0F5243] text-[#FAF7F0] flex items-center justify-between gap-1.5 shrink-0 border-b border-[#C5B358]/50">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-[#FAF7F0] p-0.5 shrink-0 shadow-2xs">
+      <div className="px-3 py-2.5 bg-surface text-ink flex items-center justify-between gap-2 shrink-0 border-b border-border">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-primary-soft p-0.5 shrink-0">
             <PandaMascotSVG mood={mood} className="w-full h-full" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs font-extrabold tracking-tight text-[#FAF7F0] whitespace-nowrap">
-              {title || '🐼 Trợ Giảng Gấu Trúc · 彬彬'}
+            <div className="text-sm font-semibold text-ink whitespace-nowrap">
+              {title || 'Trợ giảng 彬彬'}
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-[#E6EFEA]/90 truncate">
-              <span className="text-[#FDE68A] font-bold">
-                {isSpeakingTts ? '🔊 Đang phát âm chuẩn...' : 'Gia Sư Hán Ngữ Trực Tuyến'}
-              </span>
-              <span>·</span>
-              <strong className="text-[#FDE68A] font-['Noto_Sans_SC']">
-                {activeSlide?.hanzi || '温暖'}
-              </strong>
+            <div className="flex items-center gap-1.5 text-xs text-ink-muted truncate">
+              <span>{isSpeakingTts ? 'Đang phát âm…' : 'Đang xem từ'}</span>
+              <strong className="font-hanzi text-primary">{activeSlide?.hanzi || '温暖'}</strong>
             </div>
           </div>
         </div>
 
-        {/* Right Header Controls: [Neo phải / Cửa sổ nổi] + [🗑️ Xóa] + [Thu nhỏ ✕] */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-0.5 shrink-0">
           <button
             type="button"
             data-testid="binbin-toggle-dock-mode"
             onClick={() =>
               setDisplayMode((prev) => (prev === 'compact' ? 'docked' : 'compact'))
             }
-            title={
-              displayMode === 'compact'
-                ? 'Neo sang phải (Dock right) để không che khuất thẻ từ vựng & Ô Mễ Tự Cách'
-                : 'Chuyển về cửa sổ nổi (Floating)'
-            }
-            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+            title={displayMode === 'compact' ? 'Ghim sang cạnh phải' : 'Chuyển về cửa sổ nổi'}
+            aria-label={displayMode === 'compact' ? 'Ghim sang cạnh phải' : 'Chuyển về cửa sổ nổi'}
+            aria-pressed={displayMode === 'docked'}
+            className={`w-8 h-8 inline-flex items-center justify-center rounded-lg transition-colors cursor-pointer ${
               displayMode === 'docked'
-                ? 'bg-[#C5B358] text-[#0F382E] border-[#FDE68A]'
-                : 'bg-white/12 hover:bg-white/22 text-[#FAF7F0] border-white/15'
+                ? 'bg-primary-soft text-primary'
+                : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
             }`}
           >
             {displayMode === 'compact' ? (
-              <>
-                <PanelRight className="w-3 h-3 text-[#FDE68A]" />
-                <span>Neo phải</span>
-              </>
+              <PanelRight className="w-4 h-4" />
             ) : (
-              <>
-                <PanelRightClose className="w-3 h-3 text-[#0F382E]" />
-                <span>Đang neo</span>
-              </>
+              <PanelRightClose className="w-4 h-4" />
             )}
           </button>
 
@@ -783,22 +769,22 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
             type="button"
             data-testid="binbin-clear-chat"
             onClick={handleClearChat}
-            title="Xóa lịch sử trò chuyện"
-            className="inline-flex items-center gap-1 px-1.5 py-1 rounded-lg bg-white/12 hover:bg-white/22 text-xs font-bold text-[#FAF7F0] border border-white/15 transition-colors cursor-pointer"
+            title="Xóa cuộc trò chuyện"
+            aria-label="Xóa cuộc trò chuyện"
+            className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-ink-muted hover:bg-surface-2 hover:text-accent transition-colors cursor-pointer"
           >
-            <Trash2 className="w-3 h-3 text-[#FCA5A5]" />
-            <span>Xóa</span>
+            <Trash2 className="w-4 h-4" />
           </button>
 
           <button
             type="button"
             data-testid="binbin-close-btn"
             onClick={() => setIsOpen(false)}
-            title="Thu nhỏ cửa sổ Trợ Giảng Gấu Trúc · 彬彬"
-            className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg bg-[#C84B31] hover:bg-[#B03E26] text-xs font-bold text-white shadow-2xs transition-colors cursor-pointer"
+            title="Đóng"
+            aria-label="Đóng trợ giảng"
+            className="w-8 h-8 inline-flex items-center justify-center rounded-lg text-ink-muted hover:bg-surface-2 hover:text-ink transition-colors cursor-pointer"
           >
-            <span>Thu nhỏ</span>
-            <X className="w-3 h-3" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -809,13 +795,13 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
       <div
         ref={messageStreamRef}
         data-testid="binbin-message-stream"
-        className="flex-1 min-h-0 overflow-y-auto px-3 py-2.5 space-y-3 bg-gradient-to-b from-[#FAF7F0] to-[#F4EFE6]"
+        className="flex-1 min-h-0 overflow-y-auto px-3 py-2.5 space-y-3 bg-surface-2"
       >
         {messages.map((msg) => {
           if (msg.sender === 'user') {
             return (
               <div key={msg.id} className="flex justify-end">
-                <div className="max-w-[85%] rounded-2xl rounded-tr-xs px-3 py-2 bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-xs font-medium shadow-xs">
+                <div className="max-w-[85%] rounded-2xl rounded-tr-xs px-3 py-2 bg-primary text-on-primary text-xs font-medium shadow-xs">
                   {msg.text}
                 </div>
               </div>
@@ -871,7 +857,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
 
           return (
             <div key={msg.id} className="flex justify-start">
-              <div className="w-full rounded-2xl rounded-tl-xs bg-white/95 border border-[#0F5243]/15 p-3 shadow-xs space-y-2.5 text-[#0F382E]">
+              <div className="w-full rounded-2xl rounded-tl-xs bg-surface/95 border border-primary/15 p-3 shadow-xs space-y-2.5 text-ink">
                 {msg.aiError && (
                   <div
                     role="alert"
@@ -894,7 +880,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                             msg.retryPayload!.queryText
                           )
                         }
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0F5243] hover:bg-[#166E5B] text-[#FAF7F0] text-xs font-bold cursor-pointer shrink-0 disabled:opacity-50"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary hover:bg-primary-hover text-on-primary text-xs font-bold cursor-pointer shrink-0 disabled:opacity-50"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         <span>Thử lại</span>
@@ -904,23 +890,23 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                 )}
                 {/* Top Word Summary Header (when wordCard is available) */}
                 {msg.wordCard && (
-                  <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-[#0F5243]/10">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-primary/10">
                     <div className="flex items-baseline gap-2">
-                      <span className="font-['Noto_Sans_SC'] text-xl font-extrabold text-[#0F382E]">
+                      <span className="font-['Noto_Sans_SC'] text-xl font-semibold text-ink">
                         {msg.wordCard.hanzi}
                       </span>
-                      <span className="text-xs font-bold text-[#9B8A3E]">
+                      <span className="text-xs font-bold text-gold">
                         {msg.wordCard.pinyin}
                       </span>
-                      <span className="text-xs font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#F4EFE6] text-[#5C4D3C] border border-[#C5B358]/30">
+                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-surface-2 text-[#5C4D3C] border border-highlight/30">
                         {msg.wordCard.hanViet}
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="px-1.5 py-0.5 rounded bg-[#0F5243] text-[#FAF7F0] text-xs font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-primary text-on-primary text-xs font-bold">
                         {msg.wordCard.hskLevel}
                       </span>
-                      <span className="px-1.5 py-0.5 rounded bg-[#E6EFEA] text-[#0F5243] text-xs font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-primary-soft text-primary text-xs font-bold">
                         {msg.wordCard.partOfSpeech}
                       </span>
                     </div>
@@ -928,7 +914,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                 )}
 
                 {/* Main Structured Explanation (Non-duplicated Bullet Lines) */}
-                <div className="space-y-1 text-xs leading-relaxed text-[#1E3227]">
+                <div className="space-y-1 text-xs leading-relaxed text-ink">
                   {nonDuplicateLines.map((trimmedLine, lIdx) => {
                     const isBullet =
                       trimmedLine.startsWith('•') || /^\d+\./.test(trimmedLine);
@@ -937,8 +923,8 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                         key={`${msg.id}-line-${lIdx}`}
                         className={
                           isBullet
-                            ? 'pl-2 border-l-2 border-[#C5B358]/70 py-0.5 text-xs'
-                            : 'font-bold text-[#0F382E] text-xs'
+                            ? 'pl-2 border-l-2 border-highlight/70 py-0.5 text-xs'
+                            : 'font-bold text-ink text-xs'
                         }
                       >
                         {trimmedLine}
@@ -951,9 +937,9 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                 {msg.sentenceCorrection && (
                   <div
                     data-testid="binbin-sentence-correction-box"
-                    className="rounded-xl bg-[#FDFBF7] border border-[#C84B31]/35 p-2.5 space-y-1.5"
+                    className="rounded-xl bg-surface-2 border border-accent/35 p-2.5 space-y-1.5"
                   >
-                    <div className="text-xs font-extrabold uppercase tracking-wider text-[#C84B31]">
+                    <div className="text-xs font-semibold text-accent">
                       ✍️ Sửa câu &amp; Diễn đạt chuẩn bản xứ
                     </div>
                     {!msg.sentenceCorrection.isAlreadyCorrect && (
@@ -962,7 +948,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                       </div>
                     )}
                     <div className="flex items-center justify-between gap-2">
-                      <div className="font-['Noto_Sans_SC'] text-sm font-bold text-[#0F5243]">
+                      <div className="font-['Noto_Sans_SC'] text-sm font-bold text-primary">
                         ✅ {msg.sentenceCorrection.correctedHanzi}
                       </div>
                       <button
@@ -970,16 +956,16 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                         onClick={() =>
                           handleSpeakPhrase(msg.sentenceCorrection!.correctedHanzi)
                         }
-                        className="px-2 py-0.5 rounded-lg bg-[#0F5243] text-white text-xs font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer"
+                        className="px-2 py-0.5 rounded-lg bg-primary text-on-primary text-xs font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer"
                       >
                         <Volume2 className="w-3 h-3 text-[#FDE68A]" />
                         <span>Đọc</span>
                       </button>
                     </div>
-                    <div className="text-xs font-medium text-[#9B8A3E]">
+                    <div className="text-xs font-medium text-gold">
                       {msg.sentenceCorrection.correctedPinyin}
                     </div>
-                    <div className="text-xs text-[#3F5447] italic">
+                    <div className="text-xs text-ink-muted italic">
                       → {msg.sentenceCorrection.vietnameseTranslation}
                     </div>
                   </div>
@@ -989,9 +975,9 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                 {msg.collocations && msg.collocations.length > 0 && (
                   <div
                     data-testid="binbin-collocations-box"
-                    className="rounded-xl bg-[#F4F6EE] border border-[#0F5243]/12 p-2 space-y-1.5"
+                    className="rounded-xl bg-surface-2 border border-primary/12 p-2 space-y-1.5"
                   >
-                    <div className="text-xs font-extrabold uppercase tracking-wider text-[#0F5243]">
+                    <div className="text-xs font-semibold text-primary">
                       🔗 Cấu trúc kết hợp từ chuẩn (Collocations):
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -1000,17 +986,17 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                           key={`${msg.id}-col-${cIdx}`}
                           type="button"
                           onClick={() => handleSpeakPhrase(col.hanzi)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white hover:bg-[#E6EFEA] border border-[#0F5243]/15 text-xs transition-colors cursor-pointer text-left"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface hover:bg-primary-soft border border-primary/15 text-xs transition-colors cursor-pointer text-left"
                           title="Bấm để nghe phát âm cụm từ"
                         >
-                          <Volume2 className="w-2.5 h-2.5 text-[#0F5243] shrink-0" />
-                          <span className="font-['Noto_Sans_SC'] font-bold text-[#0F382E]">
+                          <Volume2 className="w-2.5 h-2.5 text-primary shrink-0" />
+                          <span className="font-['Noto_Sans_SC'] font-bold text-ink">
                             {col.hanzi}
                           </span>
-                          <span className="text-xs text-[#9B8A3E]">
+                          <span className="text-xs text-gold">
                             ({col.pinyin})
                           </span>
-                          <span className="text-xs text-[#3F5447]">
+                          <span className="text-xs text-ink-muted">
                             : {col.meaning}
                           </span>
                         </button>
@@ -1024,21 +1010,21 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                   msg.synonymDistinction.items.length > 1 && (
                     <div
                       data-testid="binbin-synonym-box"
-                      className="rounded-xl bg-[#FFFDF7] border border-[#C5B358]/45 p-2 space-y-1"
+                      className="rounded-xl bg-surface-2 border border-highlight/45 p-2 space-y-1"
                     >
-                      <div className="text-xs font-extrabold uppercase tracking-wider text-[#8A7630]">
+                      <div className="text-xs font-semibold text-gold">
                         ⚖️ {msg.synonymDistinction.title}
                       </div>
                       <div className="space-y-1">
                         {msg.synonymDistinction.items.map((item, sIdx) => (
                           <div
                             key={`${msg.id}-syn-${sIdx}`}
-                            className="text-xs leading-snug text-[#1E3227]"
+                            className="text-xs leading-snug text-ink"
                           >
-                            <strong className="font-['Noto_Sans_SC'] text-[#0F5243]">
+                            <strong className="font-['Noto_Sans_SC'] text-primary">
                               • {item.word}
                             </strong>{' '}
-                            <span className="text-[#9B8A3E]">({item.pinyin})</span>:{' '}
+                            <span className="text-gold">({item.pinyin})</span>:{' '}
                             {item.nuance}
                           </div>
                         ))}
@@ -1050,24 +1036,24 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                 {msg.teacherExercise && (
                   <div
                     data-testid="binbin-teacher-exercise-box"
-                    className="rounded-xl bg-[#F4F6EE] border border-[#0F5243]/20 p-2.5 space-y-1.5"
+                    className="rounded-xl bg-surface-2 border border-primary/20 p-2.5 space-y-1.5"
                   >
-                    <div className="text-xs font-extrabold uppercase tracking-wider text-[#0F5243]">
+                    <div className="text-xs font-semibold text-primary">
                       🎯 {msg.teacherExercise.title}
                     </div>
                     <div className="space-y-1.5">
                       {msg.teacherExercise.items.map((qItem, qIdx) => (
                         <div
                           key={`${msg.id}-q-${qIdx}`}
-                          className="p-2 rounded-lg bg-white border border-[#0F5243]/10 text-xs space-y-0.5"
+                          className="p-2 rounded-lg bg-surface border border-primary/10 text-xs space-y-0.5"
                         >
-                          <div lang="zh-CN" className="font-bold text-[#0F382E] font-['Noto_Sans_SC']">
+                          <div lang="zh-CN" className="font-bold text-ink font-['Noto_Sans_SC']">
                             {qItem.question}
                           </div>
-                          <div className="text-xs text-[#0F5243] font-semibold">
+                          <div className="text-xs text-primary font-semibold">
                             ✓ Đáp án: {qItem.answer}
                           </div>
-                          <div className="text-xs text-[#5F7266]">
+                          <div className="text-xs text-ink-muted">
                             {qItem.explanation}
                           </div>
                         </div>
@@ -1082,22 +1068,22 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                     data-testid="binbin-examples-list"
                     className="space-y-1.5 pt-0.5"
                   >
-                    <div className="text-xs font-extrabold uppercase tracking-wider text-[#3F5447]">
+                    <div className="text-xs font-semibold text-ink-muted">
                       📝 2 Câu ví dụ thực tế (Bấm [🔊 Đọc] từng câu):
                     </div>
                     {msg.examples.map((ex, exIdx) => (
                       <div
                         key={`${msg.id}-ex-${exIdx}`}
-                        className="rounded-xl bg-[#FAF7F0] border border-[#C5B358]/40 p-2 flex items-start justify-between gap-2"
+                        className="rounded-xl bg-surface-2 border border-highlight/40 p-2 flex items-start justify-between gap-2"
                       >
                         <div className="min-w-0 flex-1 space-y-0.5">
-                          <div lang="zh-CN" className="font-['Noto_Sans_SC'] text-xs font-bold text-[#0F382E]">
+                          <div lang="zh-CN" className="font-['Noto_Sans_SC'] text-xs font-bold text-ink">
                             {exIdx + 1}. {ex.hanzi}
                           </div>
-                          <div className="text-xs font-medium text-[#9B8A3E]">
+                          <div className="text-xs font-medium text-gold">
                             {ex.pinyin}
                           </div>
-                          <div className="text-xs text-[#3F5447] italic">
+                          <div className="text-xs text-ink-muted italic">
                             “{ex.meaning}”
                           </div>
                         </div>
@@ -1105,7 +1091,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                           type="button"
                           data-testid={`binbin-read-example-${exIdx}`}
                           onClick={() => handleSpeakPhrase(ex.hanzi)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#0F5243] hover:bg-[#166E5B] text-[#FAF7F0] text-xs font-bold shrink-0 transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-primary hover:bg-primary-hover text-on-primary text-xs font-bold shrink-0 transition-colors cursor-pointer"
                         >
                           <Volume2 className="w-3 h-3 text-[#FDE68A]" />
                           <span>Đọc</span>
@@ -1120,7 +1106,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                     ============================================================= */}
                 <div
                   data-testid="binbin-actionable-bar"
-                  className="pt-2 border-t border-[#0F5243]/10 flex flex-wrap items-center gap-1.5"
+                  className="pt-2 border-t border-primary/10 flex flex-wrap items-center gap-1.5"
                 >
                   <button
                     type="button"
@@ -1128,8 +1114,8 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                     onClick={() => handleApplyMessageToSlide(msg)}
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       isSlideApplied
-                        ? 'bg-[#065F46] text-white'
-                        : 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] shadow-2xs'
+                        ? 'bg-success text-on-primary'
+                        : 'bg-primary hover:bg-primary-hover text-on-primary shadow-2xs'
                     }`}
                   >
                     {isSlideApplied ? (
@@ -1140,7 +1126,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                     ) : (
                       <>
                         <PlusCircle className="w-3 h-3 text-[#FDE68A]" />
-                        <span>➕ Thêm từ/câu này vào Slide bài giảng</span>
+                        <span>Thêm từ/câu này vào Slide bài giảng</span>
                       </>
                     )}
                   </button>
@@ -1149,17 +1135,17 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                     type="button"
                     data-testid="binbin-copy-reply-btn"
                     onClick={() => handleCopyMessage(msg)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F4F6EE] hover:bg-[#E6EFEA] text-[#0F382E] border border-[#0F5243]/15 text-xs font-bold transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-2 hover:bg-primary-soft text-ink border border-primary/15 text-xs font-bold transition-colors cursor-pointer"
                   >
                     {isCopied ? (
                       <>
-                        <Check className="w-3 h-3 text-[#059669]" />
-                        <span className="text-[#059669]">Đã copy</span>
+                        <Check className="w-3 h-3 text-success" />
+                        <span className="text-success">Đã copy</span>
                       </>
                     ) : (
                       <>
-                        <Copy className="w-3 h-3 text-[#0F5243]" />
-                        <span>📋 Copy nhanh</span>
+                        <Copy className="w-3 h-3 text-primary" />
+                        <span>Copy nhanh</span>
                       </>
                     )}
                   </button>
@@ -1169,10 +1155,10 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                       type="button"
                       data-testid="binbin-speak-reply-btn"
                       onClick={() => handleSpeakPhrase(msg.chinesePhrase!)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F4F6EE] hover:bg-[#E6EFEA] text-[#0F382E] border border-[#0F5243]/15 text-xs font-bold transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-surface-2 hover:bg-primary-soft text-ink border border-primary/15 text-xs font-bold transition-colors cursor-pointer"
                     >
-                      <Volume2 className="w-3 h-3 text-[#C84B31]" />
-                      <span>🔊 Nghe phát âm</span>
+                      <Volume2 className="w-3 h-3 text-accent" />
+                      <span>Nghe phát âm</span>
                     </button>
                   )}
                 </div>
@@ -1185,21 +1171,21 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
         {activeInteractivePanel === 'sentence-builder' && (
           <div
             data-testid="binbin-interactive-sentence-builder"
-            className="rounded-2xl bg-[#FFFDF7] border-2 border-[#C84B31]/45 p-3 shadow-xs space-y-2 text-[#0F382E]"
+            className="rounded-2xl bg-surface-2 border-2 border-accent/45 p-3 shadow-xs space-y-2 text-ink"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-[#C84B31]">
+              <span className="text-xs font-semibold text-accent">
                 ✍️ Thử thách Tự đặt câu với “{currentFocusWord}” ({currentFocusPinyin})
               </span>
               <button
                 type="button"
                 onClick={() => setActiveInteractivePanel('none')}
-                className="text-xs font-bold text-[#5F7266] hover:text-[#0F382E] cursor-pointer"
+                className="text-xs font-bold text-ink-muted hover:text-ink cursor-pointer"
               >
                 Đóng ✕
               </button>
             </div>
-            <p className="text-xs text-[#3F5447] leading-snug">
+            <p className="text-xs text-ink-muted leading-snug">
               Hãy gõ 1 câu tiếng Trung có chứa từ <strong>“{currentFocusWord}”</strong> ({currentFocusMeaning}) vào ô bên dưới để 彬彬 kiểm tra ngữ pháp, hoặc bấm thử các câu mẫu hay nhầm:
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -1213,7 +1199,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                       : `我非常${currentFocusWord}今天`;
                   triggerAction('grammar-fix', s, s);
                 }}
-                className="px-2 py-1 rounded-lg bg-[#FDF2F2] hover:bg-[#FCE8E8] border border-[#C84B31]/30 text-xs font-bold text-[#7F1D1D] cursor-pointer"
+                className="px-2 py-1 rounded-lg bg-accent-soft hover:bg-accent-soft border border-accent/30 text-xs font-bold text-[#7F1D1D] cursor-pointer"
               >
                 Thử câu dễ nhầm: “
                 {currentFocusWord === '温暖'
@@ -1228,7 +1214,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                   const s = `今天天气是${currentFocusWord}`;
                   triggerAction('grammar-fix', s, s);
                 }}
-                className="px-2 py-1 rounded-lg bg-[#FDF2F2] hover:bg-[#FCE8E8] border border-[#C84B31]/30 text-xs font-bold text-[#7F1D1D] cursor-pointer"
+                className="px-2 py-1 rounded-lg bg-accent-soft hover:bg-accent-soft border border-accent/30 text-xs font-bold text-[#7F1D1D] cursor-pointer"
               >
                 Thử lỗi dùng 是: “今天天气是{currentFocusWord}”
               </button>
@@ -1240,29 +1226,29 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
         {activeInteractivePanel === 'roleplay' && (
           <div
             data-testid="binbin-interactive-roleplay-card"
-            className="rounded-2xl bg-[#F4F6EE] border-2 border-[#0F5243]/30 p-3 shadow-xs space-y-2 text-[#0F382E]"
+            className="rounded-2xl bg-surface-2 border-2 border-primary/30 p-3 shadow-xs space-y-2 text-ink"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-[#0F5243]">
+              <span className="text-xs font-semibold text-primary">
                 🗣️ Đóng vai Hội thoại Tương tác A / B · Từ khóa “{currentFocusWord}”
               </span>
               <button
                 type="button"
                 onClick={() => setActiveInteractivePanel('none')}
-                className="text-xs font-bold text-[#5F7266] hover:text-[#0F382E] cursor-pointer"
+                className="text-xs font-bold text-ink-muted hover:text-ink cursor-pointer"
               >
                 Đóng ✕
               </button>
             </div>
 
             <div className="space-y-1.5 text-xs">
-              <div className="p-2 rounded-xl bg-white border border-[#0F5243]/15 flex items-center justify-between gap-2">
+              <div className="p-2 rounded-xl bg-surface border border-primary/15 flex items-center justify-between gap-2">
                 <div>
-                  <span className="font-bold text-[#0F5243]">🐼 彬彬 (Vai A): </span>
+                  <span className="font-bold text-primary">🐼 彬彬 (Vai A): </span>
                   <span lang="zh-CN" className="font-['Noto_Sans_SC'] font-bold">
                     你能用“{currentFocusWord}”说一句话吗？
                   </span>
-                  <div className="text-xs text-[#5F7266]">
+                  <div className="text-xs text-ink-muted">
                     (Bạn có thể dùng từ “{currentFocusWord}” đặt một câu trong giao tiếp không?)
                   </div>
                 </div>
@@ -1271,14 +1257,14 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                   onClick={() =>
                     handleSpeakPhrase(`你能用${currentFocusWord}说一句话吗？`)
                   }
-                  className="px-2 py-1 rounded-lg bg-[#0F5243] text-white text-xs font-bold shrink-0 cursor-pointer"
+                  className="px-2 py-1 rounded-lg bg-primary text-on-primary text-xs font-bold shrink-0 cursor-pointer"
                 >
                   🔊 Nghe A
                 </button>
               </div>
 
-              <div className="p-2 rounded-xl bg-[#FAF7F0] border border-[#C5B358]/50 space-y-1.5">
-                <div className="text-xs font-bold text-[#8A7630]">
+              <div className="p-2 rounded-xl bg-surface-2 border border-highlight/50 space-y-1.5">
+                <div className="text-xs font-bold text-gold">
                   🎓 Lượt của bạn (Vai B) — Chọn câu trả lời hoặc bấm 🎙️ để nói:
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -1291,7 +1277,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                       setRoleplayStep(1);
                       handleSpeakPhrase(replyLine);
                     }}
-                    className="px-2.5 py-1 rounded-lg bg-[#0F5243] hover:bg-[#166E5B] text-[#FAF7F0] text-xs font-bold cursor-pointer text-left"
+                    className="px-2.5 py-1 rounded-lg bg-primary hover:bg-primary-hover text-on-primary text-xs font-bold cursor-pointer text-left"
                   >
                     🗣️ Đáp mẫu 1: “{activeSlide?.exampleHanzi || `春天的阳光非常${currentFocusWord}。`}”
                   </button>
@@ -1303,13 +1289,13 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                       setRoleplayStep(2);
                       handleSpeakPhrase(replyLine);
                     }}
-                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-[#E6EFEA] text-[#0F382E] border border-[#0F5243]/25 text-xs font-bold cursor-pointer text-left"
+                    className="px-2.5 py-1 rounded-lg bg-surface hover:bg-primary-soft text-ink border border-primary/25 text-xs font-bold cursor-pointer text-left"
                   >
                     🗣️ Đáp mẫu 2: “这个词“{currentFocusWord}”在生活里很常用！”
                   </button>
                 </div>
                 {roleplayStep > 0 && (
-                  <div className="pt-1 text-xs font-bold text-[#059669]">
+                  <div className="pt-1 text-xs font-bold text-success">
                     🌟 彬彬 khen: 说得太棒了！ Phát âm và ngữ điệu rất tự nhiên chuẩn HSK!
                   </div>
                 )}
@@ -1319,8 +1305,8 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
         )}
 
         {isLoading && (
-          <div className="flex items-center gap-2 text-xs text-[#3F5447] italic px-2">
-            <Sparkles className="w-3.5 h-3.5 text-[#9B8A3E] animate-spin" />
+          <div className="flex items-center gap-2 text-xs text-ink-muted italic px-2">
+            <Sparkles className="w-3.5 h-3.5 text-gold animate-spin" />
             <span>Gia Sư Hán Ngữ Trực Tuyến · 彬彬 đang phân tích chuyên sâu...</span>
           </div>
         )}
@@ -1329,7 +1315,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
       {/* =====================================================================
           3. FLEX-WRAP QUICK-ACTION CHIPS + INPUT BOX + FOOTER LABEL
           ===================================================================== */}
-      <div className="px-3 py-2 bg-white/95 border-t border-[#0F5243]/12 space-y-1.5 shrink-0">
+      <div className="px-3 py-2 bg-surface/95 border-t border-primary/12 space-y-1.5 shrink-0">
         {/* Flex-Wrap Quick-Action Chips (All 5 buttons visible without clipping) */}
         <div
           data-testid="binbin-quick-chips-bar"
@@ -1349,8 +1335,8 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                 onClick={() => handleQuickChipClick(chip)}
                 className={`px-2.5 py-1 rounded-full border text-xs font-bold transition-colors shrink-0 cursor-pointer ${
                   isChipActive
-                    ? 'bg-[#0F5243] text-[#FAF7F0] border-[#C5B358]'
-                    : 'bg-[#F4F6EE] hover:bg-[#0F5243] text-[#0F382E] hover:text-[#FAF7F0] border-[#0F5243]/18'
+                    ? 'bg-primary text-on-primary border-highlight'
+                    : 'bg-surface-2 hover:bg-primary text-ink hover:text-on-primary border-primary/18'
                 }`}
               >
                 {chip.label}
@@ -1374,7 +1360,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                 ? `Gõ câu có chứa từ “${currentFocusWord}” để 彬彬 chấm & sửa lỗi...`
                 : `Hỏi từ (${currentFocusWord}), tự đặt câu, tạo bài tập...`
             }
-            className="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-[#FAF7F0] border border-[#0F5243]/20 text-xs text-[#0F382E] placeholder:text-[#5F7266] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-surface-2 border border-primary/20 text-xs text-ink placeholder:text-ink-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           />
           <button
             type="button"
@@ -1386,21 +1372,21 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
             }
             className={`inline-flex items-center justify-center w-8 h-8 rounded-xl text-xs font-bold transition-colors shrink-0 cursor-pointer ${
               isListeningMic
-                ? 'bg-[#C84B31] text-white animate-pulse'
-                : 'bg-[#F4F6EE] hover:bg-[#E6EFEA] text-[#0F382E] border border-[#0F5243]/18'
+                ? 'bg-accent text-on-primary animate-pulse'
+                : 'bg-surface-2 hover:bg-primary-soft text-ink border border-primary/18'
             }`}
           >
             {isListeningMic ? (
               <MicOff className="w-3.5 h-3.5" />
             ) : (
-              <Mic className="w-3.5 h-3.5 text-[#C84B31]" />
+              <Mic className="w-3.5 h-3.5 text-accent" />
             )}
           </button>
           <button
             type="submit"
             data-testid="binbin-send-btn"
             disabled={isLoading || !userInput.trim()}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] disabled:opacity-50 text-[#FAF7F0] text-xs font-bold transition-all shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover disabled:opacity-50 text-on-primary text-xs font-bold transition-all shrink-0 cursor-pointer"
           >
             <Send className="w-3.5 h-3.5 text-[#FDE68A]" />
             <span>{activeInteractivePanel === 'sentence-builder' ? 'Chấm câu' : 'Gửi'}</span>
@@ -1410,10 +1396,10 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
         {/* Footer System Signature Label */}
         <div
           data-testid="binbin-footer-label"
-          className="pt-0.5 flex items-center justify-between text-xs font-semibold text-[#5F7266]"
+          className="pt-0.5 flex items-center justify-between text-xs font-semibold text-ink-muted"
         >
           <span>Hệ Thống Trợ Giảng Hán Ngữ Thông Minh · 彬彬</span>
-          <span className="text-[#9B8A3E] font-bold">Gia Sư Hán Ngữ Trực Tuyến</span>
+          <span className="text-gold font-bold">Gia Sư Hán Ngữ Trực Tuyến</span>
         </div>
       </div>
     </div>

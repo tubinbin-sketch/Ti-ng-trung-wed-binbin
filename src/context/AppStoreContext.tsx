@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useSyncExternalStore } from 'react';
+import React, { createContext, useCallback, useContext, useRef, useSyncExternalStore } from 'react';
 import type { BinBinSlidePayload } from '../utils/chineseEngine';
 import type { UploadedAssignmentPackage } from '../utils/assignmentParser';
 import type { ActiveClassroomSession, ClassroomDataMode, SyncStatus } from '../utils/storageService';
@@ -54,6 +54,41 @@ function emitChange() {
   listeners.forEach((listener) => listener());
 }
 
+function shallowEqual<T>(a: T, b: T): boolean {
+  if (Object.is(a, b)) {
+    return true;
+  }
+  if (
+    typeof a !== 'object' ||
+    a === null ||
+    typeof b !== 'object' ||
+    b === null
+  ) {
+    return false;
+  }
+  if (Array.isArray(a) !== Array.isArray(b)) {
+    return false;
+  }
+  const keysA = Object.keys(a as Record<string, unknown>);
+  const keysB = Object.keys(b as Record<string, unknown>);
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+  for (let i = 0; i < keysA.length; i++) {
+    const key = keysA[i];
+    if (
+      !Object.prototype.hasOwnProperty.call(b, key) ||
+      !Object.is(
+        (a as Record<string, unknown>)[key],
+        (b as Record<string, unknown>)[key]
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export const appStore = {
   getState(): AppBusState {
     return currentState;
@@ -104,14 +139,17 @@ export const appStore = {
     emitChange();
   },
   setClassroomMode(classroomMode: ClassroomDataMode) {
+    if (currentState.classroomMode === classroomMode) return;
     currentState = { ...currentState, classroomMode };
     emitChange();
   },
   setClassroomSession(classroomSession: ActiveClassroomSession | null) {
+    if (shallowEqual(currentState.classroomSession, classroomSession)) return;
     currentState = { ...currentState, classroomSession };
     emitChange();
   },
   notifyAssignmentUpdated(latestAssignment: UploadedAssignmentPackage) {
+    if (currentState.latestAssignment === latestAssignment) return;
     currentState = { ...currentState, latestAssignment };
     emitChange();
   },
@@ -179,11 +217,42 @@ export const AppStoreProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
 export function useAppStoreSelector<T>(selector: (state: AppBusState) => T): T {
   const store = useContext(AppStoreContext);
-  return useSyncExternalStore(
-    store.subscribe,
-    () => selector(store.getState()),
-    () => selector(store.getState())
-  );
+  const selectorRef = useRef(selector);
+  selectorRef.current = selector;
+
+  const cacheRef = useRef<{
+    hasValue: boolean;
+    state: AppBusState | null;
+    selection: T | undefined;
+  }>({
+    hasValue: false,
+    state: null,
+    selection: undefined,
+  });
+
+  const getSnapshot = useCallback((): T => {
+    const nextState = store.getState();
+    const cache = cacheRef.current;
+
+    if (cache.hasValue && cache.state === nextState) {
+      return cache.selection as T;
+    }
+
+    const nextSelection = selectorRef.current(nextState);
+    if (cache.hasValue && shallowEqual(cache.selection as T, nextSelection)) {
+      cache.state = nextState;
+      return cache.selection as T;
+    }
+
+    cacheRef.current = {
+      hasValue: true,
+      state: nextState,
+      selection: nextSelection,
+    };
+    return nextSelection;
+  }, [store]);
+
+  return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
 }
 
 export function useAppStoreActions() {

@@ -14,21 +14,23 @@ import {
   Link,
 } from 'react-router-dom';
 import {
-  BookOpen,
-  Sparkles,
-  Users,
-  Presentation,
-  GraduationCap,
-  Palette,
-  Edit3,
-  ChevronUp,
-  ChevronDown,
-  Layers,
-  PenTool,
-  Lock,
-  Download,
-  Settings,
   AlertTriangle,
+  BookOpen,
+  Check,
+  Cloud,
+  CloudOff,
+  Download,
+  FlaskConical,
+  GraduationCap,
+  Home,
+  Layers,
+  Lock,
+  LogIn,
+  PenTool,
+  Presentation,
+  RefreshCw,
+  Trophy,
+  Users,
 } from 'lucide-react';
 import {
   INITIAL_VOCAB_SLIDES,
@@ -44,10 +46,17 @@ import {
 } from './components/classroom/classroomRosterData';
 import { AuthModal, UserProfile, UserRole } from './components/AuthModal';
 import { LazyErrorBoundary } from './components/LazyErrorBoundary';
+import { HomeDashboard } from './components/HomeDashboard';
+import { appStore, useAppStoreSelector } from './context/AppStoreContext';
+import {
+  AppSidebar,
+  AppTabBar,
+  Avatar,
+  NavItem,
+  NavSection,
+  ThemePicker,
+} from './components/layout/AppShell';
 
-const HaloraCenterScene = React.lazy(() =>
-  import('./components/HaloraCenterScene').then((m) => ({ default: m.HaloraCenterScene }))
-);
 const StrokeWritingModal = React.lazy(() =>
   import('./components/StrokeWritingModal').then((m) => ({ default: m.StrokeWritingModal }))
 );
@@ -58,9 +67,6 @@ const StudentAssignmentArena = React.lazy(() =>
 );
 const ClassroomManager = React.lazy(() =>
   import('./components/ClassroomManager').then((m) => ({ default: m.ClassroomManager }))
-);
-const TeacherThemeStudio = React.lazy(() =>
-  import('./components/TeacherThemeStudio').then((m) => ({ default: m.TeacherThemeStudio }))
 );
 const BinBinPandaAI = React.lazy(() =>
   import('./components/BinBinPandaAI').then((m) => ({ default: m.BinBinPandaAI }))
@@ -97,6 +103,8 @@ import {
   subscribeToClassroom,
   subscribeToStudentSrs,
 } from './firebase';
+
+const STORAGE_KEY_UI_THEME = 'hanu_ui_theme';
 
 type TeacherTab = 'lesson-builder' | 'class-manager';
 type StudentTab = 'today-lesson' | 'flashcard-srs' | 'quiz-leaderboard';
@@ -187,11 +195,9 @@ export default function App() {
   });
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [isHeroCollapsed, setIsHeroCollapsed] = useState(true);
 
   const [teacherTab, setTeacherTab] = useState<TeacherTab>('lesson-builder');
   const [studentTab, setStudentTab] = useState<StudentTab>('today-lesson');
-  const [showThemeDrawer, setShowThemeDrawer] = useState(false);
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -200,13 +206,22 @@ export default function App() {
   );
   const [activeSlideIndex, setActiveSlideIndex] = useState(10); // Default to 温暖 (wēn nuǎn)
   const [writingModalSlide, setWritingModalSlide] = useState<VocabSlide | null>(null);
-  const [selectedTheme, setSelectedTheme] = useState<TeacherThemePreset>(
-    TEACHER_THEME_PRESETS[0]
-  );
+  const [selectedTheme, setSelectedTheme] = useState<TeacherThemePreset>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_UI_THEME);
+      const match = TEACHER_THEME_PRESETS.find((t) => t.id === stored);
+      if (match) return match;
+      if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+        return TEACHER_THEME_PRESETS.find((t) => t.id === 'moon-night') || TEACHER_THEME_PRESETS[0];
+      }
+    } catch {
+      // storage unavailable: fall back to default theme
+    }
+    return TEACHER_THEME_PRESETS[0];
+  });
   const [classroomStudentCount, setClassroomStudentCount] = useState<number>(
     () => getStoredStudentRoster().length
   );
-  const [isBinBinDockedOpen, setIsBinBinDockedOpen] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => getCurrentSyncStatus());
   const [isDemoMode, setIsDemoMode] = useState<boolean>(
     () => getClassroomDataMode() === 'demo'
@@ -230,7 +245,6 @@ export default function App() {
         setUserProfile((prev) => ({ ...prev, role: 'student' }));
       }
       setStudentTab('quiz-leaderboard');
-      setIsHeroCollapsed(true);
     } else if (path === '/giao-vien/soan-bai') {
       if (userProfile.role !== 'teacher') {
         setUserProfile((prev) => ({ ...prev, role: 'teacher' }));
@@ -357,18 +371,28 @@ export default function App() {
     return uniqueSet.size;
   }, [slides]);
 
+  // App bus (AppStoreContext): BinBin panel, sync status and data mode live there.
+  const binbinDock = useAppStoreSelector((st) => ({
+    isOpen: st.binbinIsOpen,
+    mode: st.binbinDisplayMode,
+  }));
+  const isBinBinDockedOpen = binbinDock.isOpen && binbinDock.mode === 'docked';
+  const storeSyncStatus = useAppStoreSelector((st) => st.syncStatus);
+  const storeClassroomMode = useAppStoreSelector((st) => st.classroomMode);
+  const binbinApplyPayload = useAppStoreSelector((st) => st.binbinApplySlidePayload);
+  const isFirstStoreSync = useRef(true);
+
   useEffect(() => {
-    const handleDockState = (e: Event) => {
-      const custom = e as CustomEvent<{ isOpen: boolean; displayMode: string }>;
-      if (custom.detail) {
-        setIsBinBinDockedOpen(
-          Boolean(custom.detail.isOpen && custom.detail.displayMode === 'docked')
-        );
-      }
-    };
-    window.addEventListener('binbin:dock-state', handleDockState);
-    return () => window.removeEventListener('binbin:dock-state', handleDockState);
-  }, []);
+    if (isFirstStoreSync.current) {
+      isFirstStoreSync.current = false;
+      return;
+    }
+    setSyncStatus(storeSyncStatus);
+  }, [storeSyncStatus]);
+
+  useEffect(() => {
+    setIsDemoMode(getClassroomDataMode() === 'demo');
+  }, [storeClassroomMode]);
 
   useEffect(() => {
     const handleRosterUpdate = (e: Event) => {
@@ -379,29 +403,12 @@ export default function App() {
         setClassroomStudentCount(getStoredStudentRoster().length);
       }
     };
-    const handleModeUpdate = () => {
-      setIsDemoMode(getClassroomDataMode() === 'demo');
-    };
     window.addEventListener('hanu_students_updated', handleRosterUpdate);
-    window.addEventListener('hanu_classroom_mode_changed', handleModeUpdate);
     return () => {
       window.removeEventListener('hanu_students_updated', handleRosterUpdate);
-      window.removeEventListener('hanu_classroom_mode_changed', handleModeUpdate);
     };
   }, []);
 
-  useEffect(() => {
-    const handleSyncStatusChange = (e: Event) => {
-      const custom = e as CustomEvent<SyncStatus>;
-      if (custom.detail) {
-        setSyncStatus(custom.detail);
-      }
-    };
-    window.addEventListener('hanu_sync_status_changed', handleSyncStatusChange);
-    return () => {
-      window.removeEventListener('hanu_sync_status_changed', handleSyncStatusChange);
-    };
-  }, []);
 
   useEffect(() => {
     const roster = getStoredStudentRoster();
@@ -415,48 +422,21 @@ export default function App() {
     window.dispatchEvent(new CustomEvent('hanu_srs_updated'));
   }, [selectedStudentName, userProfile.studentCode]);
 
-  const kickerDotRef = useRef<HTMLSpanElement | null>(null);
-  const kickerLabelRef = useRef<HTMLSpanElement | null>(null);
-  const headlineLine1Ref = useRef<HTMLSpanElement | null>(null);
-  const headlineLine2Ref = useRef<HTMLSpanElement | null>(null);
-  const bodyCopyRef = useRef<HTMLParagraphElement | null>(null);
-  const ctaGroupRef = useRef<HTMLDivElement | null>(null);
-  const glassCardsRef = useRef<(HTMLButtonElement | null)[]>([]);
   const studioSectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    const root = document.documentElement;
-    const isDark = selectedTheme.id === 'moon-night';
-    root.setAttribute('data-theme', selectedTheme.id);
-    root.style.setProperty('--theme-canvas', selectedTheme.bgCanvas);
-    root.style.setProperty('--theme-surface', selectedTheme.bgSurface);
-    root.style.setProperty('--theme-ink', selectedTheme.inkPrimary);
-    root.style.setProperty('--theme-ink-muted', selectedTheme.inkSecondary);
-    root.style.setProperty('--theme-accent', selectedTheme.accentColor);
-    root.style.setProperty('--theme-banner', selectedTheme.bannerTone);
-    root.style.setProperty(
-      '--theme-tab-bar-bg',
-      isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(30, 50, 39, 0.09)'
-    );
-    root.style.setProperty(
-      '--theme-tab-bar-border',
-      isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(30, 50, 39, 0.18)'
-    );
-    root.style.setProperty(
-      '--theme-glass-bg',
-      isDark ? 'rgba(24, 38, 32, 0.88)' : 'rgba(255, 255, 255, 0.78)'
-    );
-    root.style.setProperty(
-      '--theme-glass-border',
-      isDark ? 'rgba(197, 179, 88, 0.28)' : 'rgba(255, 255, 255, 0.65)'
-    );
+    document.documentElement.setAttribute('data-theme', selectedTheme.id);
+    try {
+      localStorage.setItem(STORAGE_KEY_UI_THEME, selectedTheme.id);
+    } catch {
+      // ignore storage errors
+    }
   }, [selectedTheme]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSettingsMenuOpen(false);
-        setShowThemeDrawer(false);
         setWritingModalSlide(null);
         setAuthModalOpen(false);
       }
@@ -478,7 +458,7 @@ export default function App() {
   }, []);
 
   const scrollToStudio = () => {
-    studioSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleActivateInMemoryDemo = (targetRole: UserRole = 'student') => {
@@ -607,7 +587,7 @@ export default function App() {
     } else if (target === 'class') {
       handleQuickSwitchRole('teacher', 'class-manager');
     }
-    studioSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToStudio();
   };
 
   const persistCustomSlides = (allSlides: VocabSlide[]) => {
@@ -747,15 +727,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    const onBinBinApply = (e: Event) => {
-      const customEvt = e as CustomEvent<BinBinSlidePayload>;
-      if (customEvt.detail) {
-        handleApplyBinBinSlidePayload(customEvt.detail);
-      }
-    };
-    window.addEventListener('binbin:apply-slide', onBinBinApply);
-    return () => window.removeEventListener('binbin:apply-slide', onBinBinApply);
-  }, []);
+    if (!binbinApplyPayload) return;
+    handleApplyBinBinSlidePayload(binbinApplyPayload);
+    appStore.clearBinBinSlidePayload();
+  }, [binbinApplyPayload]);
 
   // Preload secondary React.lazy modules in the background 1.5s after mount for 0ms tab/modal switching
   useEffect(() => {
@@ -764,613 +739,414 @@ export default function App() {
       void import('./components/ClassroomManager');
       void import('./components/BinBinPandaAI');
       void import('./components/StrokeWritingModal');
-      void import('./components/TeacherThemeStudio');
-      void import('./components/HaloraCenterScene');
     }, 1500);
     return () => window.clearTimeout(timer);
   }, []);
 
   const isDarkTheme = selectedTheme.id === 'moon-night';
-
-  const studentTabActiveIdx =
-    studentTab === 'today-lesson' ? 0 : studentTab === 'flashcard-srs' ? 1 : 2;
-
   const activeClassIdForUrl = userProfile.classId || 'demo-class-722229';
+  const displayName = userProfile.name.replace(/\s*\(.*?\)\s*/g, '').trim() || 'Học viên';
+  const teacherLocked =
+    userProfile.role !== 'teacher' &&
+    !isTeacherSessionUnlocked() &&
+    !auth.currentUser &&
+    !isDemoMode;
+
+  const goStudent = (path: string) => {
+    if (path === '/flashcard') setStudentTab('flashcard-srs');
+    else if (path.startsWith('/bai-tap')) setStudentTab('quiz-leaderboard');
+    else if (path === '/hoc') setStudentTab('today-lesson');
+    navigate(path);
+    scrollToStudio();
+  };
+
+  const path = location.pathname;
+  const activeNavId =
+    path === '/'
+      ? 'home'
+      : path === '/hoc'
+      ? 'lesson'
+      : path === '/flashcard'
+      ? 'flashcard'
+      : path === '/bai-tap/leaderboard' || path === '/bai-tap/xep-hang'
+      ? 'leaderboard'
+      : path.startsWith('/bai-tap')
+      ? 'homework'
+      : path === '/giao-vien/soan-bai'
+      ? 'builder'
+      : path.startsWith('/giao-vien')
+      ? 'classroom'
+      : '';
+
+  const PAGE_TITLES: Record<string, string> = {
+    home: 'Tổng quan',
+    lesson: 'Bài học',
+    flashcard: 'Flashcard',
+    homework: 'Bài tập',
+    leaderboard: 'Bảng xếp hạng',
+    builder: 'Soạn bài giảng',
+    classroom: 'Quản lý lớp',
+  };
+  const pageTitle =
+    PAGE_TITLES[activeNavId] || (path === '/dang-nhap' ? 'Đăng nhập' : 'Không tìm thấy trang');
+
+  const navHome: NavItem = {
+    id: 'home',
+    label: 'Tổng quan',
+    icon: Home,
+    onSelect: () => {
+      navigate('/');
+      scrollToStudio();
+    },
+    testId: 'nav-home',
+  };
+  const navLesson: NavItem = {
+    id: 'lesson',
+    label: 'Bài học & viết chữ',
+    shortLabel: 'Bài học',
+    icon: BookOpen,
+    onSelect: () => goStudent('/hoc'),
+    testId: 'student-tab-lesson',
+  };
+  const navFlashcard: NavItem = {
+    id: 'flashcard',
+    label: 'Flashcard',
+    icon: Layers,
+    onSelect: () => goStudent('/flashcard'),
+    testId: 'student-tab-flashcard',
+  };
+  const navHomework: NavItem = {
+    id: 'homework',
+    label: 'Bài tập HSK',
+    shortLabel: 'Bài tập',
+    icon: PenTool,
+    onSelect: () => goStudent('/bai-tap'),
+    testId: 'student-tab-quiz',
+  };
+  const navLeaderboard: NavItem = {
+    id: 'leaderboard',
+    label: 'Bảng xếp hạng',
+    shortLabel: 'Xếp hạng',
+    icon: Trophy,
+    onSelect: () => goStudent('/bai-tap/leaderboard'),
+    testId: 'nav-leaderboard',
+  };
+  const navBuilder: NavItem = {
+    id: 'builder',
+    label: 'Soạn bài giảng',
+    shortLabel: 'Soạn bài',
+    icon: Presentation,
+    onSelect: () => handleQuickSwitchRole('teacher', 'lesson-builder'),
+    testId: 'teacher-tab-lesson',
+    locked: teacherLocked,
+  };
+  const navClassroom: NavItem = {
+    id: 'classroom',
+    label: 'Quản lý lớp',
+    shortLabel: 'Lớp học',
+    icon: GraduationCap,
+    onSelect: () => handleQuickSwitchRole('teacher', 'class-manager'),
+    testId: 'teacher-tab-classroom',
+    locked: teacherLocked,
+    badge: classroomStudentCount,
+  };
+
+  const navSections: NavSection[] = [
+    { id: 'main', label: '', items: [navHome] },
+    { id: 'learn', label: 'Học tập', items: [navLesson, navFlashcard, navHomework, navLeaderboard] },
+    { id: 'teach', label: 'Giảng dạy', items: [navBuilder, navClassroom] },
+  ];
+
+  const tabBarItems: NavItem[] =
+    userProfile.role === 'teacher'
+      ? [navHome, navBuilder, navClassroom, navLesson, navHomework]
+      : [navHome, navLesson, navFlashcard, navHomework, navLeaderboard];
+
+  const syncLabel = isDemoMode
+    ? 'Bản demo — dữ liệu không được lưu'
+    : syncStatus === 'syncing'
+    ? 'Đang đồng bộ…'
+    : syncStatus === 'offline'
+    ? 'Ngoại tuyến — sẽ đồng bộ khi có mạng'
+    : 'Đã đồng bộ';
+  const SyncIcon = isDemoMode
+    ? FlaskConical
+    : syncStatus === 'syncing'
+    ? RefreshCw
+    : syncStatus === 'offline'
+    ? CloudOff
+    : Cloud;
+
+  const roleLabel = userProfile.role === 'teacher' ? 'Giáo viên' : 'Học viên';
 
   return (
     <div
       id="top"
-      className={`w-full max-w-full box-border overflow-x-hidden min-h-screen transition-colors duration-300 ${
-        isDarkTheme
-          ? ''
-          : 'bg-gradient-to-br from-[#FAF7F0] via-[#F4EFE6] to-[#EAE3D5]'
-      }`}
-      style={{
-        backgroundColor: isDarkTheme ? selectedTheme.bgCanvas : undefined,
-        color: selectedTheme.inkPrimary,
-      }}
+      className="min-h-dvh w-full bg-canvas text-ink lg:pl-64"
+      data-theme-dark={isDarkTheme ? 'true' : undefined}
     >
-      {/* =====================================================================
-          TIER 1: STREAMLINED TOP NAVBAR (BRAND/ROLE + TABS + 🐼 BINBIN + SETTINGS MENU)
-          ===================================================================== */}
-      <header
-        data-testid="floating-glass-dock"
-        className={`sticky top-0 z-30 w-full max-w-full box-border backdrop-blur-xl border-b shadow-[0_4px_20px_rgb(0,0,0,0.04)] px-4 py-1 transition-all duration-300 ${
-          isDarkTheme
-            ? 'bg-[#121E18]/90 border-white/15 text-[#E8EFEA]'
-            : 'bg-white/90 border-white/70 text-[#0F382E]'
-        }`}
-      >
-        <div className="w-full max-w-[1380px] box-border mx-auto flex flex-wrap items-center justify-between gap-1 sm:gap-2">
-          {/* Left: Brand HANU × 阮文受 + Active User Profile */}
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
-            <Link
-              to="/hoc"
-              className={`inline-flex items-center gap-1.5 font-bold text-xs sm:text-sm shrink-0 ${
-                isDarkTheme ? 'text-[#E8EFEA]' : 'text-[#1E3227]'
-              }`}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 32 32"
-                fill="none"
-                aria-hidden="true"
-                className="shrink-0"
-              >
-                <circle cx="16" cy="5" r="2.6" fill={isDarkTheme ? '#E8EFEA' : '#1E3227'} />
-                <circle cx="25.5" cy="10.5" r="2.6" fill={isDarkTheme ? '#E8EFEA' : '#1E3227'} />
-                <circle cx="25.5" cy="21.5" r="2.6" fill={isDarkTheme ? '#E8EFEA' : '#1E3227'} />
-                <circle cx="16" cy="27" r="2.6" fill={isDarkTheme ? '#E8EFEA' : '#1E3227'} />
-                <circle cx="6.5" cy="21.5" r="2.6" fill={isDarkTheme ? '#E8EFEA' : '#1E3227'} />
-                <circle cx="6.5" cy="10.5" r="2.6" fill={isDarkTheme ? '#E8EFEA' : '#1E3227'} />
-                <circle cx="16" cy="16" r="3.2" fill="#9B8A3E" />
-              </svg>
-              <span className="whitespace-nowrap">
-                HANU<span className="hidden sm:inline"> × </span>
-                <span className="hidden sm:inline font-['Noto_Sans_SC']">阮文受</span>
+      <AppSidebar
+        sections={navSections}
+        activeId={activeNavId}
+        onHome={navHome.onSelect}
+        footer={
+          <button
+            type="button"
+            data-testid="header-auth-btn"
+            onClick={() => setAuthModalOpen(true)}
+            className="w-full flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-surface-2 transition-colors text-left cursor-pointer"
+            title="Tài khoản & đăng nhập"
+          >
+            <Avatar name={userProfile.name} size={36} />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-ink truncate">{displayName}</span>
+              <span className="block text-xs text-ink-muted truncate">
+                {roleLabel}
+                {userProfile.classCode ? ` · Lớp ${userProfile.classCode}` : ''}
               </span>
-            </Link>
+            </span>
+            <LogIn className="w-4 h-4 text-ink-subtle shrink-0" aria-hidden="true" />
+          </button>
+        }
+      />
 
-            <span className="text-[#9B8A3E]/40 hidden md:inline">|</span>
+      <div className="min-w-0 flex flex-col min-h-dvh">
+        {/* Top bar */}
+        <header
+          data-testid="floating-glass-dock"
+          className="sticky top-0 z-20 h-14 lg:h-16 border-b border-border bg-surface/90 backdrop-blur-md"
+        >
+          <div className="h-full max-w-[1320px] mx-auto px-4 sm:px-6 flex items-center gap-3">
+            <div className="lg:hidden shrink-0">
+              <button
+                type="button"
+                onClick={navHome.onSelect}
+                className="app-seal cursor-pointer"
+                aria-label="HANU HSK — về trang tổng quan"
+              >
+                汉
+              </button>
+            </div>
+            <h1 className="flex-1 min-w-0 text-base lg:text-lg font-semibold text-ink truncate">
+              {pageTitle}
+            </h1>
+
+            {isDemoMode && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-highlight/15 text-gold text-xs font-medium">
+                <FlaskConical className="w-3.5 h-3.5" aria-hidden="true" />
+                Bản demo
+              </span>
+            )}
 
             <button
               type="button"
-              data-testid="header-auth-btn"
-              onClick={() => setAuthModalOpen(true)}
-              className="inline-flex items-center gap-1.5 shrink-0 text-left cursor-pointer hover:opacity-85 transition-opacity"
-              title="Bấm để mở Cổng Đăng Nhập Firebase & Hồ Sơ"
-            >
-              <span
-                className={`px-2 py-0.5 rounded-md font-bold text-xs uppercase tracking-wide shrink-0 ${
-                  userProfile.role === 'teacher'
-                    ? 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] shadow-2xs'
-                    : 'bg-gradient-to-r from-[#B8292F] to-[#961C21] text-[#FAF7F0] shadow-2xs'
-                }`}
-              >
-                <span className="sm:hidden">{userProfile.role === 'teacher' ? 'GV' : 'HV'}</span>
-                <span className="hidden sm:inline">
-                  {userProfile.role === 'teacher' ? 'Giảng viên' : 'Học viên'}
-                </span>
-              </span>
-              <span
-                className={`text-xs font-bold hidden lg:inline whitespace-nowrap ${
-                  isDarkTheme ? 'text-[#E8EFEA]' : 'text-[#0F382E]'
-                }`}
-              >
-                {userProfile.name.replace(/\s*\(.*?\)\s*/g, '')}
-              </span>
-            </button>
-          </div>
-
-          {/* Center: Mode-Specific Main Tabs (Teacher 2 Tabs OR Student 3 Tabs) */}
-          {userProfile.role === 'teacher' ? (
-            <div
-              className="relative inline-grid grid-cols-2 items-center p-0.5 rounded-lg bg-[#0F5243]/10 border border-[#0F5243]/20 shrink-0"
-              role="tablist"
-              aria-label="Không gian Giáo viên (2 mục)"
-            >
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute top-0.5 bottom-0.5 left-0.5 w-[calc(50%-2px)] rounded-md bg-gradient-to-r from-[#0F5243] to-[#166E5B] shadow-[0_2px_8px_rgba(15,82,67,0.25)] transition-transform duration-300 ease-out"
-                style={{
-                  transform:
-                    teacherTab === 'lesson-builder' ? 'translateX(0%)' : 'translateX(100%)',
-                }}
-              />
-              <button
-                type="button"
-                role="tab"
-                data-testid="teacher-tab-lesson"
-                aria-selected={teacherTab === 'lesson-builder'}
-                onClick={() => {
-                  setTeacherTab('lesson-builder');
-                  navigate('/giao-vien/soan-bai');
-                }}
-                className={`relative z-10 inline-flex items-center justify-center gap-1 px-2.5 sm:px-3 py-1 rounded-md text-xs font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer ${
-                  teacherTab === 'lesson-builder'
-                    ? 'text-white'
-                    : isDarkTheme
-                    ? 'text-[#E5E7EB] hover:text-white'
-                    : 'text-[#3A544B] hover:text-[#0F5243]'
-                }`}
-              >
-                <Presentation className="w-3.5 h-3.5 shrink-0" />
-                <span>1. Soạn Bài</span>
-              </button>
-
-              <button
-                type="button"
-                role="tab"
-                data-testid="teacher-tab-classroom"
-                aria-selected={teacherTab === 'class-manager'}
-                onClick={() => {
-                  setTeacherTab('class-manager');
-                  navigate(`/giao-vien/lop/${activeClassIdForUrl}`);
-                }}
-                className={`relative z-10 inline-flex items-center justify-center gap-1 px-2.5 sm:px-3 py-1 rounded-md text-xs font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer ${
-                  teacherTab === 'class-manager'
-                    ? 'text-white'
-                    : isDarkTheme
-                    ? 'text-[#E5E7EB] hover:text-white'
-                    : 'text-[#3A544B] hover:text-[#0F5243]'
-                }`}
-              >
-                <GraduationCap className="w-3.5 h-3.5 shrink-0" />
-                <span>2. Quản Lý Lớp ({classroomStudentCount})</span>
-              </button>
-            </div>
-          ) : (
-            <div
-              className="relative inline-grid grid-cols-3 p-0.5 rounded-lg bg-[#0F5243]/10 border border-[#0F5243]/20 items-center overflow-hidden shrink-0"
-              role="tablist"
-              aria-label="Chế độ Tự Học & Ôn Tập Thông Minh (3 mục)"
-            >
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute top-0.5 bottom-0.5 left-0.5 w-[calc((100%-4px)/3)] rounded-md bg-gradient-to-r from-[#0F5243] to-[#166E5B] shadow-[0_2px_8px_rgba(15,82,67,0.25)] transition-transform duration-300 ease-out"
-                style={{
-                  transform: `translateX(${studentTabActiveIdx * 100}%)`,
-                }}
-              />
-
-              <button
-                type="button"
-                role="tab"
-                data-testid="student-tab-lesson"
-                aria-selected={studentTab === 'today-lesson'}
-                onClick={() => {
-                  setStudentTab('today-lesson');
-                  navigate('/hoc');
-                }}
-                className={`relative z-10 flex items-center justify-center gap-1 px-2 sm:px-3 py-1 rounded-md text-xs font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer ${
-                  studentTab === 'today-lesson'
-                    ? 'text-white'
-                    : isDarkTheme
-                    ? 'text-[#E5E7EB] hover:text-white'
-                    : 'text-[#0F382E]/85 hover:text-[#0F5243]'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5 shrink-0" />
-                <span className="hidden sm:inline">Học &amp; Viết nét</span>
-                <span className="sm:hidden">Học nét</span>
-              </button>
-
-              <button
-                type="button"
-                role="tab"
-                data-testid="student-tab-flashcard"
-                aria-selected={studentTab === 'flashcard-srs'}
-                onClick={() => {
-                  setStudentTab('flashcard-srs');
-                  navigate('/flashcard');
-                }}
-                className={`relative z-10 flex items-center justify-center gap-1 px-2 sm:px-3 py-1 rounded-md text-xs font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer ${
-                  studentTab === 'flashcard-srs'
-                    ? 'text-white'
-                    : isDarkTheme
-                    ? 'text-[#E5E7EB] hover:text-white'
-                    : 'text-[#0F382E]/85 hover:text-[#0F5243]'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5 shrink-0" />
-                <span>Flashcard</span>
-              </button>
-
-              <button
-                type="button"
-                role="tab"
-                data-testid="student-tab-quiz"
-                aria-selected={studentTab === 'quiz-leaderboard'}
-                onClick={() => {
-                  setStudentTab('quiz-leaderboard');
-                  navigate('/bai-tap');
-                }}
-                className={`relative z-10 flex items-center justify-center gap-1 px-2 sm:px-3 py-1 rounded-md text-xs font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer ${
-                  studentTab === 'quiz-leaderboard'
-                    ? 'text-white'
-                    : isDarkTheme
-                    ? 'text-[#E5E7EB] hover:text-white'
-                    : 'text-[#0F382E]/85 hover:text-[#0F5243]'
-                }`}
-              >
-                <PenTool className="w-3.5 h-3.5 shrink-0" />
-                <span className="hidden md:inline">Bài tập HSK</span>
-                <span className="md:hidden">Bài tập</span>
-              </button>
-            </div>
-          )}
-
-          {/* Right: 🐼 Hỏi 彬彬 + 1 Settings/Utilities Menu */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0" ref={settingsMenuRef}>
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('binbin:open-assistant'))}
+              onClick={() => appStore.openBinBinAssistant()}
               data-testid="navbar-open-binbin-btn"
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold transition-all duration-300 active:scale-95 cursor-pointer shrink-0 ${
-                isDarkTheme
-                  ? 'bg-[#0F5243]/40 hover:bg-[#0F5243]/60 text-[#FAF7F0] border-[#C5B358]/40'
-                  : 'bg-gradient-to-r from-[#0F5243]/15 to-[#166E5B]/15 hover:from-[#0F5243]/25 hover:to-[#166E5B]/25 text-[#0F382E] border-[#0F5243]/30'
-              }`}
-              title="Hỏi Trợ Giảng Gấu Trúc · 彬彬"
+              className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border border-border bg-surface hover:bg-surface-2 text-sm font-medium text-ink transition-colors cursor-pointer"
+              title="Hỏi trợ giảng 彬彬"
             >
-              <span className="text-sm leading-none">🐼</span>
-              <span>Hỏi 彬彬</span>
+              <span aria-hidden="true">🐼</span>
+              <span className="hidden sm:inline">Hỏi 彬彬</span>
+              <span className="sm:hidden sr-only">Hỏi trợ giảng</span>
             </button>
 
-            <div className="relative">
+            {/* Account menu */}
+            <div className="relative" ref={settingsMenuRef}>
               <button
                 type="button"
                 data-testid="navbar-settings-menu-btn"
                 aria-expanded={settingsMenuOpen}
                 aria-haspopup="menu"
-                aria-label="Mở menu cài đặt và tiện ích"
+                aria-label="Tài khoản, giao diện và tiện ích"
                 onClick={() => setSettingsMenuOpen((v) => !v)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold transition-all duration-300 active:scale-95 cursor-pointer shrink-0 ${
-                  isDarkTheme
-                    ? 'bg-[#182821] hover:bg-[#1E3227] text-[#E8EFEA] border-white/20'
-                    : 'bg-white hover:bg-[#FAF7F0] text-[#0F382E] border-[#0F5243]/20'
-                }`}
-                title="Cài đặt, Đổi vai trò, Xem bản demo, Giao diện & Sao lưu dữ liệu"
+                className="relative inline-flex items-center rounded-full cursor-pointer ring-offset-2 ring-offset-surface hover:ring-2 hover:ring-border-strong transition-shadow"
               >
-                <Settings className="w-3.5 h-3.5 text-[#9B8A3E] shrink-0" />
-                <span className="hidden sm:inline">Tiện ích</span>
+                <Avatar name={userProfile.name} size={34} />
+                <span
+                  aria-hidden="true"
+                  className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface ${
+                    isDemoMode
+                      ? 'bg-highlight'
+                      : syncStatus === 'offline'
+                      ? 'bg-ink-subtle'
+                      : syncStatus === 'syncing'
+                      ? 'bg-highlight'
+                      : 'bg-success'
+                  }`}
+                />
               </button>
 
-              {/* Settings & Utilities Dropdown Menu */}
-              <div
-                data-testid="navbar-settings-dropdown"
-                role="menu"
-                aria-label="Menu tiện ích và cài đặt hệ thống"
-                className={`${
-                  settingsMenuOpen ? 'block' : 'hidden'
-                } absolute right-0 mt-2 w-72 rounded-2xl border p-3 shadow-2xl z-50 space-y-2.5 ${
-                  isDarkTheme
-                    ? 'bg-[#15231D] border-[#C5B358]/35 text-[#E8EFEA]'
-                    : 'bg-[#FAFBF7] border-[#0F5243]/20 text-[#0F382E]'
-                }`}
-              >
-                {/* Sync Status Row */}
-                <div className="flex items-center justify-between pb-2 border-b border-current/10">
-                  <span className="text-xs font-bold opacity-80">Trạng thái dữ liệu:</span>
-                  <span
-                    data-testid="navbar-sync-status-badge"
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold border whitespace-nowrap ${
-                      isDemoMode
-                        ? 'bg-amber-50 text-amber-800 border-amber-300'
-                        : syncStatus === 'syncing'
-                        ? 'bg-amber-50 text-amber-800 border-amber-300'
-                        : syncStatus === 'offline'
-                        ? 'bg-stone-100 text-stone-700 border-stone-300'
-                        : 'bg-emerald-50 text-[#0F5243] border-emerald-500/30'
-                    }`}
-                  >
-                    <span>
-                      {isDemoMode
-                        ? '🧪'
-                        : syncStatus === 'syncing'
-                        ? '🔄'
-                        : syncStatus === 'offline'
-                        ? '⚡'
-                        : '☁️'}
-                    </span>
-                    <span>
-                      {isDemoMode
-                        ? 'Bản Demo (Tạm thời)'
-                        : syncStatus === 'syncing'
-                        ? 'Đang lưu...'
-                        : syncStatus === 'offline'
-                        ? 'Firestore Offline'
-                        : 'Đã đồng bộ Firestore'}
-                    </span>
-                  </span>
-                </div>
+              {settingsMenuOpen && (
+                <div
+                  data-testid="navbar-settings-dropdown"
+                  role="menu"
+                  aria-label="Tài khoản và tiện ích"
+                  className="absolute right-0 mt-2 w-[300px] max-w-[calc(100vw-24px)] rounded-2xl border border-border bg-surface shadow-xl z-50 animate-fade-in overflow-hidden"
+                >
+                  <div className="p-4 flex items-center gap-3 border-b border-border">
+                    <Avatar name={userProfile.name} size={40} />
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-ink truncate">{displayName}</div>
+                      <div className="text-xs text-ink-muted truncate">
+                        {userProfile.email ||
+                          (userProfile.studentCode ? `Mã học viên ${userProfile.studentCode}` : roleLabel)}
+                      </div>
+                    </div>
+                  </div>
 
-                {/* Role Switcher inside Settings Dropdown */}
-                <div className="space-y-1.5">
-                  <div className="text-xs font-bold opacity-80">Chuyển đổi vai trò:</div>
-                  <div
-                    className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#0F5243]/10 border border-[#0F5243]/20"
-                    role="group"
-                    aria-label="Chuyển đổi nhanh vai trò"
-                  >
+                  <div className="p-4 space-y-4">
+                    <div
+                      data-testid="navbar-sync-status-badge"
+                      className="flex items-center gap-2 text-xs text-ink-muted"
+                    >
+                      <SyncIcon
+                        className={`w-4 h-4 shrink-0 ${syncStatus === 'syncing' && !isDemoMode ? 'animate-spin' : ''}`}
+                        aria-hidden="true"
+                      />
+                      <span>{syncLabel}</span>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-ink-muted mb-1.5">Vai trò</div>
+                      <div
+                        className="grid grid-cols-2 p-1 rounded-xl bg-surface-2"
+                        role="group"
+                        aria-label="Chuyển vai trò"
+                      >
+                        <button
+                          type="button"
+                          data-testid="role-switch-student"
+                          aria-pressed={userProfile.role === 'student'}
+                          onClick={() => {
+                            setSettingsMenuOpen(false);
+                            handleQuickSwitchRole('student');
+                          }}
+                          className={`inline-flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                            userProfile.role === 'student'
+                              ? 'bg-surface text-ink shadow-xs'
+                              : 'text-ink-muted hover:text-ink'
+                          }`}
+                        >
+                          <Users className="w-4 h-4" aria-hidden="true" />
+                          Học viên
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="role-switch-teacher"
+                          aria-pressed={userProfile.role === 'teacher'}
+                          onClick={() => {
+                            setSettingsMenuOpen(false);
+                            handleQuickSwitchRole('teacher');
+                          }}
+                          className={`inline-flex items-center justify-center gap-1.5 h-8 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                            userProfile.role === 'teacher'
+                              ? 'bg-surface text-ink shadow-xs'
+                              : 'text-ink-muted hover:text-ink'
+                          }`}
+                        >
+                          {teacherLocked ? (
+                            <Lock className="w-4 h-4" aria-hidden="true" />
+                          ) : (
+                            <GraduationCap className="w-4 h-4" aria-hidden="true" />
+                          )}
+                          Giáo viên
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-xs font-medium text-ink-muted mb-2">
+                        Giao diện · <span className="text-ink">{selectedTheme.name}</span>
+                      </div>
+                      <ThemePicker
+                        themes={TEACHER_THEME_PRESETS}
+                        selectedId={selectedTheme.id}
+                        onSelect={setSelectedTheme}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-1.5 border-t border-border">
                     <button
                       type="button"
-                      data-testid="role-switch-student"
+                      role="menuitem"
                       onClick={() => {
                         setSettingsMenuOpen(false);
-                        handleQuickSwitchRole('student');
+                        setAuthModalOpen(true);
                       }}
-                      className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        userProfile.role === 'student'
-                          ? 'bg-gradient-to-r from-[#B8292F] to-[#961C21] text-white shadow-xs'
-                          : 'hover:text-[#B8292F]'
-                      }`}
+                      className="w-full flex items-center gap-2.5 px-3 h-9 rounded-lg hover:bg-surface-2 text-sm text-ink transition-colors cursor-pointer"
                     >
-                      <Users className="w-3.5 h-3.5 shrink-0" />
-                      <span>Học sinh</span>
+                      <LogIn className="w-4 h-4 text-ink-muted" aria-hidden="true" />
+                      Đăng nhập & tài khoản
                     </button>
                     <button
                       type="button"
-                      data-testid="role-switch-teacher"
+                      role="menuitem"
+                      data-testid="navbar-view-demo-btn"
                       onClick={() => {
                         setSettingsMenuOpen(false);
-                        handleQuickSwitchRole('teacher');
+                        handleActivateInMemoryDemo(userProfile.role);
                       }}
-                      className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        userProfile.role === 'teacher'
-                          ? 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-white shadow-xs'
-                          : 'hover:text-[#0F5243]'
-                      }`}
+                      className="w-full flex items-center gap-2.5 px-3 h-9 rounded-lg hover:bg-surface-2 text-sm text-ink transition-colors cursor-pointer"
                     >
-                      {userProfile.role === 'teacher' ? (
-                        <GraduationCap className="w-3.5 h-3.5 shrink-0" />
-                      ) : (
-                        <Lock className="w-3.5 h-3.5 shrink-0 text-[#9B8A3E]" />
-                      )}
-                      <span>Giáo viên</span>
+                      <FlaskConical className="w-4 h-4 text-ink-muted" aria-hidden="true" />
+                      <span className="flex-1 text-left">Dùng thử với dữ liệu mẫu</span>
+                      {isDemoMode && <Check className="w-4 h-4 text-primary" aria-hidden="true" />}
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      data-testid="navbar-full-backup-btn"
+                      onClick={() => {
+                        setSettingsMenuOpen(false);
+                        exportFullSystemBackupToFile(slides, getStoredStudentRoster());
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 h-9 rounded-lg hover:bg-surface-2 text-sm text-ink transition-colors cursor-pointer"
+                    >
+                      <Download className="w-4 h-4 text-ink-muted" aria-hidden="true" />
+                      Tải bản sao lưu (.json)
                     </button>
                   </div>
+                  <div className="px-4 py-2.5 border-t border-border text-xs text-ink-subtle">
+                    HANU × 阮文受 · HSK 3.0 · © 2026
+                  </div>
                 </div>
-
-                {/* Demo Mode Button (In-Memory Demo) */}
-                <div className="pt-1 border-t border-current/10">
-                  <button
-                    type="button"
-                    data-testid="navbar-view-demo-btn"
-                    onClick={() => {
-                      setSettingsMenuOpen(false);
-                      handleActivateInMemoryDemo(userProfile.role);
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#E7ECD9]/70 hover:bg-[#E7ECD9] text-xs font-bold text-[#1E3227] transition-colors cursor-pointer"
-                  >
-                    <span>🧪 Xem bản demo (dữ liệu mẫu)</span>
-                    <span className="text-[11px] text-[#0F5243]">Bộ nhớ tạm</span>
-                  </button>
-                </div>
-
-                {/* Utility Buttons */}
-                <div className="space-y-1 pt-1 border-t border-current/10">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setSettingsMenuOpen(false);
-                      setShowThemeDrawer(true);
-                    }}
-                    data-testid="compact-theme-switcher-btn"
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-[#0F5243]/10 text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Palette className="w-4 h-4 text-[#9B8A3E] shrink-0" />
-                      <span>Đổi kiểu giao diện &amp; màu nền</span>
-                    </span>
-                    <span className="text-xs text-[#9B8A3E]">{selectedTheme.name}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    role="menuitem"
-                    data-testid="toggle-hero-banner-btn"
-                    onClick={() => {
-                      setSettingsMenuOpen(false);
-                      setIsHeroCollapsed((v) => !v);
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-[#0F5243]/10 text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      {isHeroCollapsed ? (
-                        <ChevronDown className="w-4 h-4 text-[#9B8A3E] shrink-0" />
-                      ) : (
-                        <ChevronUp className="w-4 h-4 text-[#9B8A3E] shrink-0" />
-                      )}
-                      <span>{isHeroCollapsed ? 'Mở Banner giới thiệu' : 'Ẩn Banner giới thiệu'}</span>
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    role="menuitem"
-                    data-testid="navbar-full-backup-btn"
-                    onClick={() => {
-                      setSettingsMenuOpen(false);
-                      exportFullSystemBackupToFile(slides, getStoredStudentRoster());
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-[#0F5243]/10 text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    <span className="inline-flex items-center gap-2">
-                      <Download className="w-4 h-4 text-[#9B8A3E] shrink-0" />
-                      <span>Sao lưu dữ liệu hệ thống (.json)</span>
-                    </span>
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Ensure document always has a valid semantic <h1> even when Hero Banner is collapsed */}
-      {isHeroCollapsed && (
-        <h1 className="sr-only">
-          HANU × 阮文受 — Hệ Thống Trợ Giảng &amp; Học Tập Hán Ngữ Chuẩn HSK 3.0
-        </h1>
-      )}
-
-      {/* =====================================================================
-          OPTIONAL COMPACT HERO BANNER (WITH DYNAMIC REAL METRICS & CTA)
-          ===================================================================== */}
-      {!isHeroCollapsed && (
-        <section
-          className="halora-stage"
-          aria-label="HANU × 阮文受 — Hệ Thống Trợ Giảng & Học Tập Hán Ngữ Chuẩn HSK 3.0"
+        <main
+          ref={studioSectionRef}
+          id="studio"
+          className={`relative flex-1 w-full max-w-[1320px] mx-auto px-4 sm:px-6 pt-5 sm:pt-6 pb-28 lg:pb-12 transition-[padding] duration-300 ${
+            isBinBinDockedOpen ? 'lg:pr-[384px]' : ''
+          }`}
         >
-          <div className="halora-hero-main">
-            {/* Left Copy Column */}
-            <div className="halora-copy-col">
-              <div className="halora-kicker">
-                <span ref={kickerDotRef} className="halora-kicker-dot" />
-                <span ref={kickerLabelRef}>
-                  HANU × 阮文受 · HỆ THỐNG HÁN NGỮ CHUẨN HSK 3.0
-                </span>
-              </div>
-
-              <h1 className="halora-headline">
-                <span className="halora-headline-mask">
-                  <span ref={headlineLine1Ref} className="halora-headline-line">
-                    Hiểu ngôn ngữ.
-                  </span>
-                </span>
-                <span className="halora-headline-mask">
-                  <span ref={headlineLine2Ref} className="halora-headline-line">
-                    Làm chủ Hán ngữ.
-                  </span>
-                </span>
-              </h1>
-
-              <p ref={bodyCopyRef} className="halora-body-copy">
-                Từ vựng, thứ tự nét viết ô Mễ Tự Cách, ngữ pháp HSK 3.0, bài tập tương tác và chấm điểm tự động — chuẩn hóa thành bài giảng sinh động, tức thì.
-              </p>
-
-              <div ref={ctaGroupRef} className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  data-testid="hero-start-btn"
-                  onClick={() => {
-                    setIsHeroCollapsed(true);
-                    scrollToStudio();
-                  }}
-                  className="halora-pill-dark"
-                >
-                  Vào học ngay
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsHeroCollapsed(true);
-                    handleSelectNavTarget('writing');
-                  }}
-                  className="halora-pill-cart !text-[#1E3227] !bg-white/65 hover:!bg-white/85"
-                >
-                  <Edit3 className="w-4 h-4" />
-                  <span>Tập viết chữ Hán</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="hidden md:block" aria-hidden="true" />
-
-            {/* Right Column: Three Frosted Glass Metric Cards with Dynamic Real Counts */}
-            <div className="halora-metrics-col">
-              <button
-                type="button"
-                ref={(el) => {
-                  glassCardsRef.current[0] = el;
-                }}
-                onClick={() => {
-                  setIsHeroCollapsed(true);
-                  handleSelectNavTarget('vocab');
-                }}
-                className="halora-glass-card"
-                aria-label={`TỪ VỰNG ${slides.length} thẻ bài giảng (${totalVocabBankCount} từ trong kho) — Mở trình chiếu từ vựng`}
-              >
-                <div className="halora-card-label">
-                  <span>BÀI GIẢNG &amp; KHO TỪ</span>
-                  <BookOpen className="w-4 h-4 stroke-[1.75] shrink-0" />
-                </div>
-                <div className="halora-card-value" data-testid="hero-metric-vocab-count">
-                  {slides.length} / {totalVocabBankCount}
-                </div>
-                <div className="halora-card-sub is-gold">THẺ BÀI GIẢNG · HSK 1–9</div>
-              </button>
-
-              <button
-                type="button"
-                ref={(el) => {
-                  glassCardsRef.current[1] = el;
-                }}
-                onClick={() => {
-                  setIsHeroCollapsed(true);
-                  handleSelectNavTarget('vocab');
-                }}
-                className="halora-glass-card"
-                aria-label="SOẠN BÀI Tự động GIÁO ÁN THÔNG MINH — Mở soạn bài tự động"
-              >
-                <div className="halora-card-label">
-                  <span>SOẠN BÀI</span>
-                  <Sparkles className="w-4 h-4 stroke-[1.75] shrink-0" />
-                </div>
-                <div className="halora-card-value">Tự động</div>
-                <div className="halora-card-sub is-gold">GIÁO ÁN HSK 3.0</div>
-              </button>
-
-              <button
-                type="button"
-                ref={(el) => {
-                  glassCardsRef.current[2] = el;
-                }}
-                onClick={() => {
-                  setIsHeroCollapsed(true);
-                  handleSelectNavTarget('class');
-                }}
-                className="halora-glass-card"
-                aria-label={`HỌC VIÊN ${classroomStudentCount} học viên trong lớp — Mở quản lý lớp học`}
-              >
-                <div className="halora-card-label">
-                  <span>SĨ SỐ LỚP HỌC</span>
-                  <Users className="w-4 h-4 stroke-[1.75] shrink-0" />
-                </div>
-                <div className="halora-card-value" data-testid="hero-metric-student-count">
-                  {classroomStudentCount} HV
-                </div>
-                <div className="halora-card-sub">
-                  LỚP HSK {userProfile.classCode || '722229'}
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <LazyErrorBoundary compact>
-            <Suspense fallback={null}>
-              <HaloraCenterScene />
-            </Suspense>
-          </LazyErrorBoundary>
-        </section>
-      )}
-
-      {/* =====================================================================
-          MAIN LEARNING & TEACHING WORKSPACE (#studio) WITH REACT-ROUTER ROUTES
-          ===================================================================== */}
-      <main
-        ref={studioSectionRef}
-        id="studio"
-        className={`relative z-20 w-full max-w-[1360px] box-border mx-auto px-4 sm:px-6 pt-1.5 sm:pt-2 pb-36 sm:pb-32 overflow-x-hidden transition-all duration-300 ${
-          isBinBinDockedOpen ? 'lg:pr-[372px]' : ''
-        }`}
-      >
         <Routes>
-          <Route path="/" element={<Navigate to="/hoc" replace />} />
+          <Route
+            path="/"
+            element={
+              <HomeDashboard
+                userProfile={userProfile}
+                slides={slides}
+                activeSlideIndex={activeSlideIndex}
+                totalVocabBankCount={totalVocabBankCount}
+                classroomStudentCount={classroomStudentCount}
+                onContinueLesson={() => goStudent('/hoc')}
+                onPracticeWriting={(slide) => setWritingModalSlide(slide)}
+                onOpenFlashcard={() => goStudent('/flashcard')}
+                onOpenHomework={() => goStudent('/bai-tap')}
+                onOpenLeaderboard={() => goStudent('/bai-tap/leaderboard')}
+                onOpenLessonBuilder={() => handleQuickSwitchRole('teacher', 'lesson-builder')}
+                onOpenClassroom={() => handleQuickSwitchRole('teacher', 'class-manager')}
+                onPickSlide={(index) => {
+                  setActiveSlideIndex(index);
+                  goStudent('/hoc');
+                }}
+              />
+            }
+          />
 
           {/* /hoc: Student Stroke Writing & Lesson */}
           <Route
@@ -1550,7 +1326,7 @@ export default function App() {
                     navigate('/hoc');
                   }
                 }}
-                onClose={() => navigate('/hoc')}
+                onClose={() => navigate('/')}
               />
             }
           />
@@ -1561,67 +1337,47 @@ export default function App() {
             element={
               <div
                 data-testid="not-found-404-page"
-                className="max-w-lg mx-auto my-12 p-8 rounded-3xl bg-[#FAFBF7] border-2 border-[#9B8A3E]/50 text-center space-y-4 shadow-md"
+                className="max-w-md mx-auto my-16 text-center"
               >
-                <div className="w-14 h-14 mx-auto rounded-2xl bg-[#B8292F]/10 text-[#B8292F] flex items-center justify-center">
-                  <AlertTriangle className="w-7 h-7" />
+                <div className="w-12 h-12 mx-auto rounded-2xl bg-accent-soft text-accent grid place-items-center">
+                  <AlertTriangle className="w-6 h-6" />
                 </div>
-                <div className="text-xs font-extrabold uppercase tracking-wider text-[#9B8A3E]">
-                  LỖI 404 · KHÔNG TÌM THẤY TRANG
-                </div>
-                <h2 className="text-2xl font-bold text-[#1E3227]">
-                  Đường dẫn <code className="text-base px-2 py-0.5 rounded bg-[#E7ECD9]">{location.pathname}</code> không tồn tại
-                </h2>
-                <p className="text-xs sm:text-sm text-[#3F5447]">
-                  Vui lòng quay lại trang Học tập HSK 3.0 hoặc chọn mục trên thanh điều hướng.
+                <h2 className="mt-5 text-xl font-semibold text-ink">Không tìm thấy trang này</h2>
+                <p className="mt-2 text-sm text-ink-muted">
+                  Đường dẫn <code className="px-1.5 py-0.5 rounded bg-surface-2 text-ink">{location.pathname}</code> không tồn tại hoặc đã được đổi.
                 </p>
-                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
                   <Link
-                    to="/hoc"
+                    to="/"
                     data-testid="back-to-study-home-link"
-                    className="px-5 py-2.5 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] text-white text-xs font-bold shadow-xs transition-all"
+                    className="inline-flex items-center h-10 px-4 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors"
                   >
-                    📚 Về trang Học &amp; Viết nét (/hoc)
+                    Về trang tổng quan
                   </Link>
                   <Link
-                    to="/bai-tap"
-                    className="px-4 py-2.5 rounded-xl bg-[#E7ECD9] hover:bg-[#dce3c8] text-[#1E3227] text-xs font-bold transition-all"
+                    to="/hoc"
+                    className="inline-flex items-center h-10 px-4 rounded-xl border border-border-strong bg-surface hover:bg-surface-2 text-ink text-sm font-medium transition-colors"
                   >
-                    📝 Mở Bài tập (/bai-tap)
+                    Mở bài học
                   </Link>
                 </div>
               </div>
             }
           />
         </Routes>
-      </main>
+        </main>
+      </div>
 
-      {/* Quiet Editorial Footer */}
-      <footer
-        className="max-w-[1360px] mx-auto px-4 sm:px-8 py-4 border-t text-center text-sm"
-        style={{
-          color: selectedTheme.inkSecondary,
-          borderColor: isDarkTheme
-            ? 'rgba(255, 255, 255, 0.14)'
-            : 'rgba(30, 50, 39, 0.15)',
-        }}
-      >
-        <span>
-          <strong style={{ color: selectedTheme.inkPrimary }}>
-            HANU × 阮文受 (Nguyễn Văn Thụ)
-          </strong>{' '}
-          · Hệ Thống Trợ Giảng &amp; Học Tập Hán Ngữ Chuẩn HSK 3.0 · 彬彬 © 2026
-        </span>
-      </footer>
+      <AppTabBar items={tabBarItems} activeId={activeNavId} />
 
-      {/* Single Floating Bottom-Right Widget: Trợ Giảng Gấu Trúc · 彬彬 */}
+      {/* Trợ giảng 彬彬 — opened from the top bar */}
       <LazyErrorBoundary compact>
         <Suspense fallback={null}>
           <BinBinPandaAI
             variant="floating"
             activeSlide={slides[activeSlideIndex] || slides[0]}
             onApplyToSlide={handleApplyBinBinSlidePayload}
-            hideFloatingTrigger={userProfile.role === 'student' && studentTab === 'quiz-leaderboard'}
+            hideFloatingTrigger
           />
         </Suspense>
       </LazyErrorBoundary>
@@ -1662,36 +1418,6 @@ export default function App() {
         </LazyErrorBoundary>
       )}
 
-      {/* Theme Customizer Modal */}
-      {showThemeDrawer && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 overflow-y-auto"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Tùy chỉnh giao diện HANU × 阮文受"
-        >
-          <div className="relative w-full max-w-5xl my-auto">
-            <div className="flex justify-end mb-2">
-              <button
-                type="button"
-                onClick={() => setShowThemeDrawer(false)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1E3227] text-white text-sm font-semibold border border-white/20 cursor-pointer"
-              >
-                <Palette className="w-4 h-4" />
-                <span>Đóng bảng Giao diện</span>
-              </button>
-            </div>
-            <LazyErrorBoundary fallbackLabel="Không thể tải bảng Tùy chỉnh Giao diện.">
-              <Suspense fallback={null}>
-                <TeacherThemeStudio
-                  selectedTheme={selectedTheme}
-                  onSelectTheme={setSelectedTheme}
-                />
-              </Suspense>
-            </LazyErrorBoundary>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
