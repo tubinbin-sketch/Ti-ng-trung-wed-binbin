@@ -32,3 +32,10 @@
 ```
 python3 scripts/codemod-design-tokens.py src
 ```
+
+## Chuyển động (animation)
+- Một đường cong `--ease-out` và ba thời lượng: `--dur-fast` 120ms (phản hồi bấm), `--dur-base` 200ms (menu, bong bóng chat), `--dur-slow` 320ms (hộp thoại, lật thẻ).
+- Lớp có sẵn: `animate-pop-in` (menu/popover), `animate-backdrop-in` + `animate-sheet-in` (hộp thoại), `animate-toast-in`, `animate-flip-in` (flashcard, kèm `flip-scene`), `animate-rise-in` + biến `--stagger` (trang Tổng quan), `skeleton` (khung chờ tải), `typing-dots` (彬彬 đang trả lời).
+- Chuyển trang: nội dung `<main>` mờ dần lên bằng Web Animations API, không remount trang.
+- Đổi theme: thêm lớp `theme-transition` ~350ms để màu chuyển dịu.
+- Tất cả tự tắt khi người dùng bật "giảm chuyển động" (`prefers-reduced-motion`).

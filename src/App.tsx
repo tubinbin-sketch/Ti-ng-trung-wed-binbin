@@ -47,6 +47,7 @@ import {
 import { AuthModal, UserProfile, UserRole } from './components/AuthModal';
 import { LazyErrorBoundary } from './components/LazyErrorBoundary';
 import { HomeDashboard } from './components/HomeDashboard';
+import { PageSkeleton } from './components/ui/PageSkeleton';
 import { appStore, useAppStoreSelector } from './context/AppStoreContext';
 import {
   AppSidebar,
@@ -67,6 +68,9 @@ const StudentAssignmentArena = React.lazy(() =>
 );
 const ClassroomManager = React.lazy(() =>
   import('./components/ClassroomManager').then((m) => ({ default: m.ClassroomManager }))
+);
+const PrivacyPolicyPage = React.lazy(() =>
+  import('./components/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage }))
 );
 const BinBinPandaAI = React.lazy(() =>
   import('./components/BinBinPandaAI').then((m) => ({ default: m.BinBinPandaAI }))
@@ -106,6 +110,14 @@ import {
 
 const STORAGE_KEY_UI_THEME = 'hanu_ui_theme';
 
+function prefersReducedMotion(): boolean {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+
 type TeacherTab = 'lesson-builder' | 'class-manager';
 type StudentTab = 'today-lesson' | 'flashcard-srs' | 'quiz-leaderboard';
 
@@ -135,11 +147,7 @@ function AssignmentRouteWrapper({
   return (
     <LazyErrorBoundary fallbackLabel="Không thể tải khu vực Bài tập HSK.">
       <Suspense
-        fallback={
-          <div className="p-8 text-center text-sm font-semibold text-ink-muted">
-            Đang tải khu vực Bài tập HSK...
-          </div>
-        }
+        fallback={<PageSkeleton label="Đang tải bài tập…" />}
       >
         <StudentAssignmentArena
           slides={slides}
@@ -424,14 +432,44 @@ export default function App() {
 
   const studioSectionRef = useRef<HTMLElement | null>(null);
 
+  const isFirstThemeApply = useRef(true);
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', selectedTheme.id);
+    const root = document.documentElement;
+    // Cross-fade colours when the user switches theme (not on first paint).
+    let fadeTimer: number | undefined;
+    if (!isFirstThemeApply.current && !prefersReducedMotion()) {
+      root.classList.add('theme-transition');
+      fadeTimer = window.setTimeout(() => root.classList.remove('theme-transition'), 350);
+    }
+    isFirstThemeApply.current = false;
+    root.setAttribute('data-theme', selectedTheme.id);
     try {
       localStorage.setItem(STORAGE_KEY_UI_THEME, selectedTheme.id);
     } catch {
       // ignore storage errors
     }
+    return () => {
+      if (fadeTimer) window.clearTimeout(fadeTimer);
+      root.classList.remove('theme-transition');
+    };
   }, [selectedTheme]);
+
+  // Gentle fade/rise of the page content on navigation. Uses the Web Animations
+  // API so the route components are not remounted (their state is kept).
+  const lastAnimatedPath = useRef(location.pathname);
+  useEffect(() => {
+    if (lastAnimatedPath.current === location.pathname) return;
+    lastAnimatedPath.current = location.pathname;
+    const el = studioSectionRef.current;
+    if (!el || prefersReducedMotion() || typeof el.animate !== 'function') return;
+    el.animate(
+      [
+        { opacity: 0, transform: 'translateY(6px)' },
+        { opacity: 1, transform: 'none' },
+      ],
+      { duration: 220, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+    );
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -735,10 +773,13 @@ export default function App() {
   // Preload secondary React.lazy modules in the background 1.5s after mount for 0ms tab/modal switching
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void import('./components/StudentAssignmentArena');
-      void import('./components/ClassroomManager');
-      void import('./components/BinBinPandaAI');
-      void import('./components/StrokeWritingModal');
+      // Warm the cache for other sections; a failed prefetch is harmless here
+      // (the real navigation retries and has its own error boundary).
+      const ignore = () => {};
+      import('./components/StudentAssignmentArena').catch(ignore);
+      import('./components/ClassroomManager').catch(ignore);
+      import('./components/BinBinPandaAI').catch(ignore);
+      import('./components/StrokeWritingModal').catch(ignore);
     }, 1500);
     return () => window.clearTimeout(timer);
   }, []);
@@ -788,7 +829,12 @@ export default function App() {
     classroom: 'Quản lý lớp',
   };
   const pageTitle =
-    PAGE_TITLES[activeNavId] || (path === '/dang-nhap' ? 'Đăng nhập' : 'Không tìm thấy trang');
+    PAGE_TITLES[activeNavId] ||
+    (path === '/dang-nhap'
+      ? 'Đăng nhập'
+      : path === '/chinh-sach-rieng-tu'
+      ? 'Chính sách quyền riêng tư'
+      : 'Không tìm thấy trang');
 
   const navHome: NavItem = {
     id: 'home',
@@ -910,7 +956,7 @@ export default function App() {
         }
       />
 
-      <div className="min-w-0 flex flex-col min-h-dvh">
+      <div className="min-w-0 flex flex-col min-h-dvh overflow-x-clip">
         {/* Top bar */}
         <header
           data-testid="floating-glass-dock"
@@ -981,7 +1027,7 @@ export default function App() {
                   data-testid="navbar-settings-dropdown"
                   role="menu"
                   aria-label="Tài khoản và tiện ích"
-                  className="absolute right-0 mt-2 w-[300px] max-w-[calc(100vw-24px)] rounded-2xl border border-border bg-surface shadow-xl z-50 animate-fade-in overflow-hidden"
+                  className="absolute right-0 mt-2 w-[300px] max-w-[calc(100vw-24px)] rounded-2xl border border-border bg-surface shadow-xl z-50 animate-pop-in overflow-hidden"
                 >
                   <div className="p-4 flex items-center gap-3 border-b border-border">
                     <Avatar name={userProfile.name} size={40} />
@@ -1107,8 +1153,15 @@ export default function App() {
                       Tải bản sao lưu (.json)
                     </button>
                   </div>
-                  <div className="px-4 py-2.5 border-t border-border text-xs text-ink-subtle">
-                    HANU × 阮文受 · HSK 3.0 · © 2026
+                  <div className="px-4 py-2.5 border-t border-border flex items-center justify-between gap-2 text-xs text-ink-subtle">
+                    <span>HANU × 阮文受 · © 2026</span>
+                    <Link
+                      to="/chinh-sach-rieng-tu"
+                      onClick={() => setSettingsMenuOpen(false)}
+                      className="hover:text-ink hover:underline"
+                    >
+                      Quyền riêng tư
+                    </Link>
                   </div>
                 </div>
               )}
@@ -1284,11 +1337,7 @@ export default function App() {
             element={
               <LazyErrorBoundary fallbackLabel="Không thể tải Bảng điều khiển Quản lý Lớp học.">
                 <Suspense
-                  fallback={
-                    <div className="p-8 text-center text-sm font-semibold text-ink-muted">
-                      Đang tải Bảng điều khiển Quản lý Lớp học...
-                    </div>
-                  }
+                  fallback={<PageSkeleton label="Đang tải trang quản lý lớp…" />}
                 >
                   <ClassroomManager
                     slides={slides}
@@ -1328,6 +1377,20 @@ export default function App() {
                 }}
                 onClose={() => navigate('/')}
               />
+            }
+          />
+
+          {/* /chinh-sach-rieng-tu: Privacy policy (linked from the login dialog) */}
+          <Route
+            path="/chinh-sach-rieng-tu"
+            element={
+              <LazyErrorBoundary fallbackLabel="Không tải được trang Chính sách quyền riêng tư.">
+                <Suspense
+                  fallback={<PageSkeleton />}
+                >
+                  <PrivacyPolicyPage />
+                </Suspense>
+              </LazyErrorBoundary>
             }
           />
 

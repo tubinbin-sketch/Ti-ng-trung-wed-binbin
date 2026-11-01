@@ -88,7 +88,7 @@ export const FilterDisplayPopover: React.FC<FilterDisplayPopoverProps> = ({
       {isOpen && (
         <div
           data-testid="filter-display-popover-content"
-          className="absolute left-0 xl:left-auto xl:right-0 mt-2 w-[min(350px,calc(100vw-2rem))] sm:w-[370px] z-40 rounded-2xl bg-surface border border-border shadow-xl p-4 space-y-3.5 text-sm text-ink"
+          className="absolute left-0 xl:left-auto xl:right-0 mt-2 w-[min(350px,calc(100vw-2rem))] sm:w-[370px] z-40 rounded-2xl bg-surface border border-border shadow-xl p-4 animate-pop-in space-y-3.5 text-sm text-ink"
         >
           {/* 1. HSK 3.0 Level Selector */}
           <div className="space-y-1.5">

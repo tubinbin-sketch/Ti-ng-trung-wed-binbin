@@ -80,7 +80,13 @@ const adminDb =
 
 export const app = express();
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
 app.use(express.json({ limit: '1mb' }));
+
+// Liveness probe for Cloud Run / uptime monitors (no auth, no rate limit).
+app.get('/healthz', (_req, res) => {
+  res.set('Cache-Control', 'no-store').json({ ok: true, uptimeSeconds: Math.round(process.uptime()) });
+});
 
 // ============================================================================
 // 0. SELF-HOSTED HANZI-WRITER-DATA STATIC & API SERVING
@@ -110,7 +116,94 @@ app.get('/api/hanzi/char/:char', (req, res) => {
   res.sendFile(charFile);
 });
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+// ============================================================================
+// GEMINI MODELS, SHARED CLIENT, FALLBACK & CACHE
+// ============================================================================
+// Gemini 2.5 is only served to projects that used it before, so a new API key
+// would fail on it. Default to the current GA models and fall back down the list
+// when a model is unavailable or overloaded. Override with env vars if needed:
+//   GEMINI_CHAT_MODEL  — BinBin conversations (quality first)
+//   GEMINI_FAST_MODEL  — word lookups & suggestions (speed first)
+//   GEMINI_MODEL       — legacy single override, tried first for both
+const DEFAULT_CHAT_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+const DEFAULT_FAST_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+// Per-call timeout and an overall budget across retries/fallbacks, kept under the
+// browser's own timeout (GEMINI_API_TIMEOUT_MS in chineseEngine.ts).
+const GEMINI_REQUEST_TIMEOUT_MS = 12_000;
+const GEMINI_TOTAL_BUDGET_MS = 22_000;
+
+type GeminiTask = 'chat' | 'fast';
+
+export function geminiModelChain(task: GeminiTask): string[] {
+  const preferred = [
+    task === 'chat' ? process.env.GEMINI_CHAT_MODEL : process.env.GEMINI_FAST_MODEL,
+    process.env.GEMINI_MODEL,
+  ]
+    .map((m) => m?.trim())
+    .filter((m): m is string => Boolean(m));
+  const defaults = task === 'chat' ? DEFAULT_CHAT_MODELS : DEFAULT_FAST_MODELS;
+  return Array.from(new Set([...preferred, ...defaults]));
+}
+
+let cachedGeminiClient: { key: string; client: GoogleGenAI } | null = null;
+
+/** Returns null when no usable API key is configured. One client per key, reused. */
+function getGeminiClient(): GoogleGenAI | null {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') return null;
+  if (cachedGeminiClient?.key !== apiKey) {
+    cachedGeminiClient = {
+      key: apiKey,
+      client: new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          timeout: GEMINI_REQUEST_TIMEOUT_MS,
+          headers: { 'User-Agent': 'aistudio-build' },
+        },
+      }),
+    };
+  }
+  return cachedGeminiClient.client;
+}
+
+/** Small TTL + size-bounded cache for deterministic lookups (word enrich / suggest). */
+export class TtlCache<V> {
+  private store = new Map<string, { value: V; expiresAt: number }>();
+  constructor(private maxEntries: number, private ttlMs: number) {}
+  get(key: string): V | undefined {
+    const hit = this.store.get(key);
+    if (!hit) return undefined;
+    if (hit.expiresAt < Date.now()) {
+      this.store.delete(key);
+      return undefined;
+    }
+    // refresh recency
+    this.store.delete(key);
+    this.store.set(key, hit);
+    return hit.value;
+  }
+  set(key: string, value: V): void {
+    if (this.store.has(key)) this.store.delete(key);
+    this.store.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+    while (this.store.size > this.maxEntries) {
+      const oldest = this.store.keys().next().value;
+      if (oldest === undefined) break;
+      this.store.delete(oldest);
+    }
+  }
+}
+
+const AI_LOOKUP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const enrichCache = new TtlCache<unknown>(500, AI_LOOKUP_CACHE_TTL_MS);
+const suggestCache = new TtlCache<unknown>(300, AI_LOOKUP_CACHE_TTL_MS);
+
+/** Parse a model's JSON reply, tolerating an accidental ```json fence. */
+export function parseModelJson<T>(raw: string | undefined, fallback: T): T {
+  const text = (raw || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  if (!text) return fallback;
+  const parsed = JSON.parse(text);
+  return (parsed && typeof parsed === 'object' ? parsed : fallback) as T;
+}
 
 const BINBIN_SYSTEM_INSTRUCTION =
   "Bạn là Gấu trúc Bin Bin (彬彬) — Trợ giảng & Gia sư Hán ngữ Thực dụng của nền tảng HANU × 阮文受 (Thầy Nguyễn Văn Thụ). Nguyên tắc bắt buộc: Trả lời trực diện, súc tích, thực dụng, KHÔNG rườm rà chào hỏi sáo rỗng, KHÔNG bao giờ ghép từ giả tạo kiểu '学习X' hay '常用X'. Luôn cung cấp: (1) Bản chất & Ngữ cảnh thực tế, (2) Collocations kết hợp từ chuẩn 100% người bản xứ, (3) Phân biệt từ dễ nhầm, (4) 2 câu ví dụ thực tế có Pinyin + Dịch nghĩa, hoặc Dịch song ngữ / Sửa câu sai / Soạn 5 câu bài tập HSK 3.0 theo đúng yêu cầu.";
@@ -1438,14 +1531,78 @@ app.post('/api/submissions', async (req, res) => {
   }
 });
 
-async function callGeminiModel(
+function geminiErrorText(err: unknown): string {
+  const e = err as { message?: string; status?: number | string; code?: number | string };
+  return `${e?.status ?? ''} ${e?.code ?? ''} ${e?.message ?? String(err ?? '')}`.toLowerCase();
+}
+
+/** Model is missing / not enabled for this key / retired → try the next model. */
+function isModelUnavailableError(err: unknown): boolean {
+  const t = geminiErrorText(err);
+  return (
+    t.includes('not found') ||
+    t.includes('404') ||
+    t.includes('is not supported') ||
+    t.includes('not available') ||
+    t.includes('permission') ||
+    t.includes('403')
+  );
+}
+
+/** Temporary server-side trouble → one quick retry, then the next model. */
+function isTransientGeminiError(err: unknown): boolean {
+  const t = geminiErrorText(err);
+  return (
+    t.includes('503') ||
+    t.includes('unavailable') ||
+    t.includes('overloaded') ||
+    t.includes('500') ||
+    t.includes('internal') ||
+    t.includes('deadline') ||
+    t.includes('timeout') ||
+    t.includes('timed out') ||
+    t.includes('429') ||
+    t.includes('resource_exhausted')
+  );
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Call Gemini with the model chain for this task. Returns the response and the
+ * model that answered. Invalid-request errors (bad prompt/schema/key) are not
+ * retried because another model would fail the same way.
+ */
+export async function callGeminiModel(
   ai: GoogleGenAI,
+  task: GeminiTask,
   params: Omit<Parameters<typeof ai.models.generateContent>[0], 'model'>
 ) {
-  return await ai.models.generateContent({
-    ...params,
-    model: GEMINI_MODEL,
-  });
+  const chain = geminiModelChain(task);
+  const deadline = Date.now() + GEMINI_TOTAL_BUDGET_MS;
+  let lastError: unknown = null;
+  for (const model of chain) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (lastError && Date.now() > deadline) throw lastError;
+      try {
+        const response = await ai.models.generateContent({ ...params, model });
+        return { response, model };
+      } catch (err) {
+        lastError = err;
+        if (isModelUnavailableError(err)) break; // next model
+        if (isTransientGeminiError(err)) {
+          if (attempt === 0) {
+            await sleep(400 + Math.round(Math.random() * 400));
+            continue; // retry same model once
+          }
+          break; // next model
+        }
+        throw err; // bad request, auth, etc.
+      }
+    }
+    console.warn(`[gemini] model ${model} failed, trying next`, geminiErrorText(lastError).slice(0, 160));
+  }
+  throw lastError ?? new Error('No Gemini model available');
 }
 
 function classifyErrorStatus(err: unknown): number {
@@ -1468,22 +1625,20 @@ app.post('/api/hanzi/enrich', protectAiRoute, async (req, res) => {
       return;
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+    const cacheKey = hanzi;
+    const cached = enrichCache.get(cacheKey);
+    if (cached) {
+      res.set('X-AI-Cache', 'hit').status(200).json(cached);
+      return;
+    }
+
+    const ai = getGeminiClient();
+    if (!ai) {
       res.status(401).json({ fallback: true, error: 'Gemini API key is not configured.' });
       return;
     }
 
-    const ai = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
-
-    const response = await callGeminiModel(ai, {
+    const { response, model } = await callGeminiModel(ai, 'fast', {
       contents: `Hãy phân tích từ/chữ tiếng Trung "${hanzi}" dành cho học viên Việt Nam học HSK.
 Trả về JSON chính xác gồm:
 - pinyin: phiên âm Pinyin chuẩn có dấu thanh điệu, các âm tiết cách nhau 1 khoảng trắng (ví dụ: "温暖" -> "wēn nuǎn")
@@ -1542,9 +1697,13 @@ Trả về JSON chính xác gồm:
       },
     });
 
-    const text = response.text?.trim() || '{}';
-    const parsed = JSON.parse(text);
-    res.status(200).json(parsed);
+    const parsed = parseModelJson<Record<string, unknown>>(response.text, {});
+    if (!parsed.pinyin || !parsed.meaning) {
+      res.status(502).json({ fallback: true, error: 'AI returned an incomplete word entry.' });
+      return;
+    }
+    enrichCache.set(cacheKey, parsed);
+    res.set('X-AI-Model', model).status(200).json(parsed);
   } catch (err) {
     const status = classifyErrorStatus(err);
     res.status(status).json({
@@ -1564,22 +1723,20 @@ app.post('/api/hanzi/suggest', protectAiRoute, async (req, res) => {
       return;
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+    const cacheKey = `${query.toLowerCase()}|${limit}`;
+    const cached = suggestCache.get(cacheKey);
+    if (cached) {
+      res.set('X-AI-Cache', 'hit').status(200).json(cached);
+      return;
+    }
+
+    const ai = getGeminiClient();
+    if (!ai) {
       res.status(401).json({ fallback: true, error: 'Gemini API key is not configured.' });
       return;
     }
 
-    const ai = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
-
-    const response = await callGeminiModel(ai, {
+    const { response, model } = await callGeminiModel(ai, 'fast', {
       contents: `Giáo viên tiếng Trung đang tìm kiếm từ vựng với từ khóa/chủ đề: "${query}".
 Hãy gợi ý ${limit} từ vựng tiếng Trung HSK sát nghĩa và hữu ích nhất để giáo viên chọn đưa vào bài giảng.
 Trả về JSON có thuộc tính "suggestions" là mảng các đối tượng, mỗi đối tượng gồm:
@@ -1633,9 +1790,11 @@ Trả về JSON có thuộc tính "suggestions" là mảng các đối tượng,
       },
     });
 
-    const text = response.text?.trim() || '{"suggestions":[]}';
-    const parsed = JSON.parse(text);
-    res.status(200).json(parsed);
+    const parsed = parseModelJson<{ suggestions?: unknown[] }>(response.text, { suggestions: [] });
+    const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, limit) : [];
+    const payload = { suggestions };
+    if (suggestions.length > 0) suggestCache.set(cacheKey, payload);
+    res.set('X-AI-Model', model).status(200).json(payload);
   } catch (err) {
     const status = classifyErrorStatus(err);
     res.status(status).json({
@@ -1652,26 +1811,28 @@ app.post('/api/binbin/chat', protectAiRoute, async (req, res) => {
     const actionType = String(req.body?.actionType || 'chat').trim();
     const contextSlide = req.body?.contextSlide || null;
     const contextQuiz = req.body?.contextQuiz || null;
+    // Last few turns so BinBin can follow up ("cho thêm ví dụ", "giải thích lại").
+    const rawHistory: unknown[] = Array.isArray(req.body?.history) ? req.body.history : [];
+    const history = rawHistory
+      .slice(-6)
+      .map((turn) => {
+        const t = turn as { role?: unknown; text?: unknown };
+        const role = t?.role === 'model' ? 'model' : t?.role === 'user' ? 'user' : null;
+        const text = typeof t?.text === 'string' ? t.text.trim().slice(0, 800) : '';
+        return role && text ? { role, parts: [{ text }] } : null;
+      })
+      .filter((t): t is { role: 'user' | 'model'; parts: { text: string }[] } => t !== null);
 
     if (!prompt || prompt.length > 1500) {
       res.status(400).json({ error: 'Invalid or missing prompt (max 1500 characters).' });
       return;
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+    const ai = getGeminiClient();
+    if (!ai) {
       res.status(401).json({ fallback: true, error: 'Gemini API key is not configured.' });
       return;
     }
-
-    const ai = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
 
     const contextSummary = [
       contextSlide
@@ -1684,8 +1845,7 @@ app.post('/api/binbin/chat', protectAiRoute, async (req, res) => {
       .filter(Boolean)
       .join('\n');
 
-    const response = await callGeminiModel(ai, {
-      contents: `${contextSummary ? `[Ngữ cảnh bài giảng hiện tại]\n${contextSummary}\n\n` : ''}[Chế độ: ${actionType}]\nYêu cầu của Giáo viên / Học viên: ${prompt}
+    const currentTurn = `${contextSummary ? `[Ngữ cảnh bài giảng hiện tại]\n${contextSummary}\n\n` : ''}[Chế độ: ${actionType}]\nYêu cầu của Giáo viên / Học viên: ${prompt}
 
 Hãy giải đáp trực diện, thực dụng theo chuẩn HSK 3.0 dưới dạng JSON:
 - replyText: Giải thích ngắn gọn, đi thẳng vào trọng tâm bằng gạch đầu dòng rõ ràng (tuyệt đối không chào hỏi dài dòng, không ghép từ máy móc kiểu "学习X" hay "常用X"). Nếu người dùng nhập câu sai, hãy chỉ rõ lỗi sai và cách sửa tự nhiên. Nếu giáo viên yêu cầu tạo bài tập/hội thoại, hãy trình bày rõ từng câu.
@@ -1696,7 +1856,11 @@ Hãy giải đáp trực diện, thực dụng theo chuẩn HSK 3.0 dưới dạ
 - chinesePhrase: câu tiếng Trung tiêu biểu số 1.
 - pinyinPhrase: phiên âm Pinyin có dấu của chinesePhrase.
 - vietnamesePhrase: nghĩa tiếng Việt của chinesePhrase.
-- targetWord: thông tin từ vựng trọng tâm để có thể thêm ngay vào Slide bài giảng { hanzi, pinyin, hanViet, meaning, partOfSpeech, hskLevel }.`,
+- targetWord: thông tin từ vựng trọng tâm để có thể thêm ngay vào Slide bài giảng { hanzi, pinyin, hanViet, meaning, partOfSpeech, hskLevel }.`;
+
+    const { response, model } = await callGeminiModel(ai, 'chat', {
+      // Earlier turns give the conversation memory; JSON instructions only on the latest turn.
+      contents: [...history, { role: 'user', parts: [{ text: currentTurn }] }],
       config: {
         systemInstruction: BINBIN_SYSTEM_INSTRUCTION,
         responseMimeType: 'application/json',
@@ -1766,9 +1930,12 @@ Hãy giải đáp trực diện, thực dụng theo chuẩn HSK 3.0 dưới dạ
       },
     });
 
-    const text = response.text?.trim() || '{}';
-    const parsed = JSON.parse(text);
-    res.status(200).json(parsed);
+    const parsed = parseModelJson<Record<string, unknown>>(response.text, {});
+    if (!parsed.replyText) {
+      res.status(502).json({ fallback: true, error: 'AI returned an empty reply.' });
+      return;
+    }
+    res.set('X-AI-Model', model).status(200).json(parsed);
   } catch (err) {
     const status = classifyErrorStatus(err);
     res.status(status).json({
@@ -1789,21 +1956,82 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.resolve(ROOT_DIR, 'dist');
-    app.use(express.static(distPath));
+    // Hashed build files never change, so browsers may keep them for a year.
+    // index.html must always be revalidated so a new deploy is picked up.
+    const HASHED_ASSET = /-[A-Za-z0-9_-]{8,}\.(?:js|mjs|css|woff2?)$/;
+    app.use(
+      express.static(distPath, {
+        index: false,
+        setHeaders(res, filePath) {
+          if (HASHED_ASSET.test(filePath)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          } else if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache');
+          }
+        },
+      })
+    );
     app.get('*', (req, res) => {
       if (req.path.startsWith('/api/')) {
         res.status(404).json({ error: 'API endpoint not found' });
         return;
       }
+      // A missing build file (e.g. an old chunk after a redeploy) must 404,
+      // not fall back to index.html, so the client can detect it and reload.
+      if (req.path.startsWith('/assets/') || /\.[a-z0-9]{2,5}$/i.test(req.path)) {
+        res.status(404).end();
+        return;
+      }
+      res.set('Cache-Control', 'no-cache');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
+  // Last-resort error handler: malformed JSON or an unexpected throw returns a
+  // short JSON error instead of an HTML stack trace.
+  app.use(
+    (err: unknown, req: Request, res: Response, next: NextFunction) => {
+      if (res.headersSent) {
+        next(err);
+        return;
+      }
+      const status =
+        (err as { type?: string })?.type === 'entity.parse.failed'
+          ? 400
+          : (err as { type?: string })?.type === 'entity.too.large'
+          ? 413
+          : 500;
+      if (status === 500) console.error('[server] unhandled error on', req.method, req.path, err);
+      res.status(status).json({
+        error:
+          status === 400
+            ? 'Dữ liệu gửi lên không hợp lệ.'
+            : status === 413
+            ? 'Dữ liệu gửi lên quá lớn.'
+            : 'Máy chủ gặp lỗi, vui lòng thử lại.',
+      });
+    }
+  );
+
   const port = Number(process.env.PORT) || 3000;
-  app.listen(port, '0.0.0.0', () => {
+  const server = app.listen(port, '0.0.0.0', () => {
     console.log(`HANU × 阮文受 server listening on http://0.0.0.0:${port}`);
   });
+
+  // Cloud Run sends SIGTERM before stopping an instance: finish in-flight
+  // requests instead of cutting them off.
+  const shutdown = (signal: string) => {
+    console.log(`[server] ${signal} received, closing`);
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 8000).unref();
+  };
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
 }
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[server] unhandled promise rejection', reason);
+});
 
 if (
   process.argv[1] &&

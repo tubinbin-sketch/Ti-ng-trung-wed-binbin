@@ -10,7 +10,6 @@ import {
   PlusCircle,
   RotateCcw,
   Send,
-  Sparkles,
   Trash2,
   Volume2,
   X,
@@ -20,6 +19,7 @@ import { VocabSlide } from '../data/chineseData';
 import {
   askBinBinPandaAI,
   BinBinActionType,
+  BinBinHistoryTurn,
   BinBinExampleItem,
   BinBinSentenceCorrection,
   BinBinSlidePayload,
@@ -305,6 +305,8 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     buildInitialMessage(activeSlide),
   ]);
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  messagesRef.current = messages;
 
   const [isSpeakingTts, setIsSpeakingTts] = useState<boolean>(() => getIsSpeaking());
   const [appliedSlideMsgId, setAppliedSlideMsgId] = useState<string | null>(null);
@@ -391,28 +393,50 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
       slidePayload: instantReply.slidePayload,
     };
 
+    // Conversation memory: the last few real turns before this question.
+    const history = buildHistory(messages);
+
     setMessages((prev) => [...prev, userMsg, binbinMsg]);
     setMood('cheering');
 
     // Enrich via server-side Gemini (/api/binbin/chat)
-    await enrichMessageWithAI(replyId, actionType, queryText);
+    await enrichMessageWithAI(replyId, actionType, queryText, history);
   };
+
+  const buildHistory = (list: ChatMessage[]): BinBinHistoryTurn[] =>
+    list
+      .filter((m) => m.id !== 'binbin-welcome' && m.text && !m.aiError)
+      .slice(-6)
+      .map(
+        (m): BinBinHistoryTurn => ({ role: m.sender === 'user' ? 'user' : 'model', text: m.text })
+      );
 
   const enrichMessageWithAI = async (
     replyId: string,
     actionType: BinBinActionType,
-    queryText: string
+    queryText: string,
+    history?: BinBinHistoryTurn[]
   ) => {
     setIsLoading(true);
     setMessages((prev) =>
       prev.map((m) => (m.id === replyId ? { ...m, aiError: undefined } : m))
     );
     try {
+      // On retry, rebuild memory from everything before this reply.
+      const turns =
+        history ??
+        buildHistory(
+          messagesRef.current.slice(
+            0,
+            Math.max(0, messagesRef.current.findIndex((m) => m.id === replyId) - 1)
+          )
+        );
       const enriched = await askBinBinPandaAI(
         actionType,
         queryText,
         activeSlide,
-        quizContext
+        quizContext,
+        turns
       );
       if (enriched) {
         if (enriched.usedOfflineFallback) {
@@ -800,7 +824,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
         {messages.map((msg) => {
           if (msg.sender === 'user') {
             return (
-              <div key={msg.id} className="flex justify-end">
+              <div key={msg.id} className="flex justify-end animate-pop-in">
                 <div className="max-w-[85%] rounded-2xl rounded-tr-xs px-3 py-2 bg-primary text-on-primary text-xs font-medium shadow-xs">
                   {msg.text}
                 </div>
@@ -856,8 +880,8 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
             });
 
           return (
-            <div key={msg.id} className="flex justify-start">
-              <div className="w-full rounded-2xl rounded-tl-xs bg-surface/95 border border-primary/15 p-3 shadow-xs space-y-2.5 text-ink">
+            <div key={msg.id} className="flex justify-start animate-fade-in">
+              <div className="w-full rounded-2xl rounded-tl-xs bg-surface border border-border p-3 space-y-2.5 text-ink">
                 {msg.aiError && (
                   <div
                     role="alert"
@@ -1305,9 +1329,18 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
         )}
 
         {isLoading && (
-          <div className="flex items-center gap-2 text-xs text-ink-muted italic px-2">
-            <Sparkles className="w-3.5 h-3.5 text-gold animate-spin" />
-            <span>Gia Sư Hán Ngữ Trực Tuyến · 彬彬 đang phân tích chuyên sâu...</span>
+          <div
+            role="status"
+            aria-live="polite"
+            data-testid="binbin-typing-indicator"
+            className="inline-flex items-center gap-2 ml-1 px-3 py-2 rounded-2xl rounded-tl-md bg-surface border border-border text-xs text-ink-muted animate-pop-in"
+          >
+            <span className="typing-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+            <span>彬彬 đang soạn câu trả lời</span>
           </div>
         )}
       </div>
@@ -1393,14 +1426,9 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
           </button>
         </form>
 
-        {/* Footer System Signature Label */}
-        <div
-          data-testid="binbin-footer-label"
-          className="pt-0.5 flex items-center justify-between text-xs font-semibold text-ink-muted"
-        >
-          <span>Hệ Thống Trợ Giảng Hán Ngữ Thông Minh · 彬彬</span>
-          <span className="text-gold font-bold">Gia Sư Hán Ngữ Trực Tuyến</span>
-        </div>
+        <p data-testid="binbin-footer-label" className="text-[11px] text-ink-subtle text-center">
+          彬彬 dùng AI và có thể nhầm — hãy kiểm tra lại với giáo viên khi cần.
+        </p>
       </div>
     </div>
   );

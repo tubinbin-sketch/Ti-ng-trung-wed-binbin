@@ -527,7 +527,7 @@ test('applyStudentSubmissionToRoster updates timeSeconds and increments streak, 
   }
 });
 
-test('Phase 1 & Firebase Migration Patch: GEMINI_API_TIMEOUT_MS is 20000ms and runStorageMigrations upgrades schema cleanly', async () => {
+test('Phase 1 & Firebase Migration Patch: GEMINI_API_TIMEOUT_MS covers the server AI budget and runStorageMigrations upgrades schema cleanly', async () => {
   const { GEMINI_API_TIMEOUT_MS } = await import('./chineseEngine');
   const {
     runStorageMigrations,
@@ -535,7 +535,7 @@ test('Phase 1 & Firebase Migration Patch: GEMINI_API_TIMEOUT_MS is 20000ms and r
   } = await import('./storageService');
   const { INITIAL_VOCAB_SLIDES } = await import('../data/chineseData');
 
-  assert.equal(GEMINI_API_TIMEOUT_MS, 20000);
+  assert.equal(GEMINI_API_TIMEOUT_MS, 26000);
   assert.equal(CURRENT_SCHEMA_VERSION, '4.0.0-firebase');
 
   const migrated = runStorageMigrations(INITIAL_VOCAB_SLIDES);

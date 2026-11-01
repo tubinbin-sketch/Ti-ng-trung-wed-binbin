@@ -3,6 +3,7 @@ import {
   Award,
   Calendar,
   CheckCircle2,
+  Dices,
   Download,
   Mic,
   Plus,
@@ -420,44 +421,45 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               type="button"
               onClick={() => legacyBackupInputRef.current?.click()}
               data-testid="import-legacy-json-backup-btn"
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-canvas hover:bg-primary/10 text-ink border border-border-strong text-xs font-bold transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border text-sm font-medium transition-colors cursor-pointer"
             >
-              <UploadCloud className="w-3.5 h-3.5 text-primary" />
-              <span>Chuyển JSON cũ lên Firestore</span>
+              <UploadCloud className="w-4 h-4 text-ink-muted" />
+              <span>Nhập dữ liệu cũ (.json)</span>
             </button>
             <button
               type="button"
               onClick={handleActivateDemoClassroom}
               data-testid="activate-demo-classroom-btn"
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+              aria-pressed={classroomMode === 'demo' && studentsList.length > 0}
+              className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
                 classroomMode === 'demo' && studentsList.length > 0
-                  ? 'bg-primary text-on-primary border-primary'
-                  : 'bg-canvas hover:bg-primary/10 text-ink border-transparent'
+                  ? 'bg-primary-soft text-primary border-primary/30'
+                  : 'bg-surface hover:bg-surface-2 text-ink border-border'
               }`}
             >
-              <span>🧪 Xem bản demo</span>
+              <span>Dữ liệu mẫu</span>
             </button>
             <button
               type="button"
               onClick={handleCreateNewClassroom}
               data-testid="create-new-classroom-btn"
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
                 classroomMode === 'new' && studentsList.length === 0
-                  ? 'bg-accent text-on-primary border-accent'
-                  : 'bg-canvas hover:bg-primary/10 text-ink border-transparent'
+                  ? 'bg-primary-soft text-primary border-primary/30'
+                  : 'bg-surface hover:bg-surface-2 text-ink border-border'
               }`}
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
               <span>Tạo lớp học mới</span>
             </button>
             <button
               type="button"
               onClick={handleExportCsv}
               data-testid="header-export-csv-report-btn"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-canvas hover:bg-primary/10 text-ink border border-border-strong text-xs font-bold transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border text-sm font-medium transition-colors cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5 text-gold" />
-              <span>Xuất Bảng Điểm CSV</span>
+              <Download className="w-4 h-4 text-ink-muted" />
+              <span>Xuất bảng điểm (CSV)</span>
             </button>
             <button
               type="button"
@@ -467,17 +469,17 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 setActionBanner('Hoàn tất tự động: Đã giao bài và chấm điểm toàn bộ 19/19 buổi học!');
               }}
               data-testid="batch-autograde-btn"
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Giao &amp; Tự chấm toàn khóa</span>
+              <span>Giao &amp; chấm toàn khóa</span>
             </button>
           </div>
         </div>
 
         {/* 4 Synchronized KPI Stat Boxes */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <div className="rounded-xl bg-canvas border border-border p-3.5 flex flex-col justify-between">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="rounded-2xl bg-surface-2 p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
               <span>Tổng số buổi</span>
               <Calendar className="w-3.5 h-3.5 text-gold" />
@@ -485,27 +487,27 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             <div className="text-xl sm:text-2xl font-bold text-ink mt-1 tabular-nums">{totalCourseSessions}</div>
             <div className="text-xs text-ink-muted mt-0.5 truncate">Khóa chuẩn HSK 1–3</div>
           </div>
-          <div className="rounded-xl bg-canvas border border-border p-3.5 flex flex-col justify-between">
+          <div className="rounded-2xl bg-surface-2 p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
               <span>Đã giao bài</span>
-              <Send className="w-3.5 h-3.5 text-primary" />
+              <Send className="w-3.5 h-3.5 text-ink-muted" />
             </div>
             <div className="text-xl sm:text-2xl font-bold text-ink mt-1 tabular-nums" data-testid="assigned-sessions-count">
               {assignedCount}/{totalCourseSessions}
             </div>
             <div className="text-xs text-primary font-semibold mt-0.5 truncate">Kèm Slide &amp; Đề chuẩn</div>
           </div>
-          <div className="rounded-xl bg-canvas border border-border p-3.5 flex flex-col justify-between">
+          <div className="rounded-2xl bg-surface-2 p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
               <span>Đã tự chấm điểm</span>
-              <Sparkles className="w-3.5 h-3.5 text-gold" />
+              <Sparkles className="w-3.5 h-3.5 text-ink-muted" />
             </div>
             <div className="text-xl sm:text-2xl font-bold text-gold mt-1 tabular-nums" data-testid="graded-sessions-count">
               {gradedCount}/{totalCourseSessions}
             </div>
             <div className="text-xs text-gold font-semibold mt-0.5 truncate">100% học viên đã chấm</div>
           </div>
-          <div className="rounded-xl bg-canvas border border-border p-3.5 flex flex-col justify-between">
+          <div className="rounded-2xl bg-surface-2 p-4 flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
               <span>Sĩ số học viên</span>
               <Award className="w-3.5 h-3.5 text-primary" />
@@ -539,87 +541,91 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
           onOpenAddStudentModal={() => setIsAddStudentModalOpen(true)}
         />
 
-        {/* Sub-navigation Tabs & Search Toolbar */}
+        {/* Class actions + section tabs */}
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setActiveTab('schedule')}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                  activeTab === 'schedule'
-                    ? 'bg-primary text-on-primary'
-                    : 'bg-canvas text-ink-muted border border-border hover:text-ink'
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5 text-gold" />
-                Chương trình và tiến độ
-              </button>
-              <button
-                type="button"
-                data-testid="tab-student-grading"
-                onClick={() => setActiveTab('grading')}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                  activeTab === 'grading'
-                    ? 'bg-primary text-on-primary'
-                    : 'bg-canvas text-ink-muted border border-border hover:text-ink'
-                }`}
-              >
-                <Award className="w-3.5 h-3.5 text-gold" />
-                Bảng điểm tự động học viên ({studentCount})
-              </button>
-              <button
-                type="button"
-                data-testid="tab-reading-writing-analytics"
-                onClick={() => setActiveTab('analytics')}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                  activeTab === 'analytics'
-                    ? 'bg-primary text-on-primary'
-                    : 'bg-canvas text-ink-muted border border-border hover:text-ink'
-                }`}
-              >
-                <Mic className="w-3.5 h-3.5 text-gold" />
-                Luyện Đọc &amp; Viết chữ ({readingHistory.length + handwritingHistory.length})
-              </button>
-            </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              data-testid="open-lucky-wheel-btn"
+              onClick={() => setIsLuckyWheelOpen(true)}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border text-sm font-medium transition-colors cursor-pointer"
+            >
+              <Dices className="w-4 h-4 text-ink-muted" />
+              <span>Vòng quay gọi tên &amp; ghép thẻ</span>
+            </button>
+            <button
+              type="button"
+              data-testid="classroom-print-worksheet-btn"
+              onClick={() => setIsWorksheetModalOpen(true)}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border text-sm font-medium transition-colors cursor-pointer"
+            >
+              <Printer className="w-4 h-4 text-ink-muted" />
+              <span>In phiếu viết A4</span>
+            </button>
+            <button
+              type="button"
+              data-testid="open-add-student-modal-btn"
+              onClick={() => setIsAddStudentModalOpen(true)}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Thêm học viên</span>
+            </button>
+          </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                data-testid="open-lucky-wheel-btn"
-                onClick={() => setIsLuckyWheelOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gold/15 hover:bg-gold/25 text-ink border border-border-strong text-xs font-bold transition-all cursor-pointer"
-              >
-                <span>🎡 Gọi tên ngẫu nhiên (Lucky Wheel) &amp; Ghép Thẻ</span>
-              </button>
-              <button
-                type="button"
-                data-testid="open-add-student-modal-btn"
-                onClick={() => setIsAddStudentModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Thêm học viên mới</span>
-              </button>
-              <button
-                type="button"
-                data-testid="export-students-csv-btn"
-                onClick={handleExportCsv}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-canvas hover:bg-primary/10 text-ink border border-border-strong text-xs font-bold transition-all cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-gold" />
-                <span>Xuất Bảng Điểm CSV/In Báo Cáo</span>
-              </button>
-              <button
-                type="button"
-                data-testid="classroom-print-worksheet-btn"
-                onClick={() => setIsWorksheetModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface hover:bg-primary/10 text-ink border border-border-strong text-xs font-bold transition-all cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5 text-gold" />
-                <span>In Phiếu Viết A4 (PDF)</span>
-              </button>
-            </div>
+          <div
+            role="tablist"
+            aria-label="Các mục quản lý lớp"
+            className="flex items-end gap-1 border-b border-border overflow-x-auto no-scrollbar"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'schedule'}
+              onClick={() => setActiveTab('schedule')}
+              className={`inline-flex items-center gap-2 h-11 px-3 sm:px-4 -mb-px border-b-2 text-sm whitespace-nowrap transition-colors cursor-pointer ${
+                  activeTab === 'schedule'
+                    ? 'border-primary text-primary font-semibold'
+                    : 'border-transparent text-ink-muted hover:text-ink font-medium'
+                }`}
+            >
+              <Calendar className="w-4 h-4" />
+              Chương trình &amp; tiến độ
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'grading'}
+              data-testid="tab-student-grading"
+              onClick={() => setActiveTab('grading')}
+              className={`inline-flex items-center gap-2 h-11 px-3 sm:px-4 -mb-px border-b-2 text-sm whitespace-nowrap transition-colors cursor-pointer ${
+                  activeTab === 'grading'
+                    ? 'border-primary text-primary font-semibold'
+                    : 'border-transparent text-ink-muted hover:text-ink font-medium'
+                }`}
+            >
+              <Award className="w-4 h-4" />
+              Bảng điểm
+              <span className="px-1.5 py-0.5 rounded-md bg-surface-2 text-ink-muted text-xs tabular-nums">{studentCount}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'analytics'}
+              data-testid="tab-reading-writing-analytics"
+              onClick={() => setActiveTab('analytics')}
+              className={`inline-flex items-center gap-2 h-11 px-3 sm:px-4 -mb-px border-b-2 text-sm whitespace-nowrap transition-colors cursor-pointer ${
+                  activeTab === 'analytics'
+                    ? 'border-primary text-primary font-semibold'
+                    : 'border-transparent text-ink-muted hover:text-ink font-medium'
+                }`}
+            >
+              <Mic className="w-4 h-4" />
+              Luyện đọc &amp; viết
+              <span className="px-1.5 py-0.5 rounded-md bg-surface-2 text-ink-muted text-xs tabular-nums">
+                {readingHistory.length + handwritingHistory.length}
+              </span>
+            </button>
           </div>
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 p-2.5 rounded-2xl bg-canvas border border-border">

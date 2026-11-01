@@ -121,7 +121,7 @@ export const Dialog: React.FC<DialogProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/55 backdrop-blur-xs overflow-y-auto animate-backdrop-in"
       role="dialog"
       aria-modal="true"
       aria-label={ariaLabel || (!effectiveLabelledBy ? 'Hộp thoại' : undefined)}
@@ -136,7 +136,7 @@ export const Dialog: React.FC<DialogProps> = ({
       <div
         ref={containerRef}
         tabIndex={-1}
-        className={`relative w-full ${maxWidthClass} my-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus`}
+        className={`relative w-full ${maxWidthClass} my-auto animate-sheet-in focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus`}
       >
         {title && !labelledBy && (
           <h2 id={fallbackTitleId} className="sr-only">

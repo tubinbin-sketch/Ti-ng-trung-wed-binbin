@@ -57,36 +57,6 @@ export interface VocabSlide {
   characters: StrokeData[];
 }
 
-export interface WarmupPair {
-  id: string;
-  number: number;
-  letter: string;
-  hanzi: string;
-  pinyin: string;
-  meaning: string;
-  illustrationKey: IllustrationCategoryKey;
-}
-
-export interface SentenceQuizItem {
-  id: string;
-  vietnamesePrompt: string;
-  correctTokens: string[];
-  distractorTokens?: string[];
-  pinyinHint: string;
-  grammarPoint: string;
-}
-
-export interface MultipleChoiceQuizItem {
-  id: string;
-  question: string;
-  hanziFocus: string;
-  pinyinFocus: string;
-  options: { id: string; text: string; isCorrect: boolean }[];
-  grammarRule: string;
-  exampleSentence: string;
-  exampleTranslation: string;
-}
-
 export interface LeaderboardEntry {
   id: string;
   studentName: string;
@@ -1814,94 +1784,6 @@ export const INITIAL_VOCAB_SLIDES: VocabSlide[] = [
     imageUrl: '/illustrations/school_study.svg',
     learned: false,
     characters: [STROKE_LIBRARY['既'], STROKE_LIBRARY['然']],
-  },
-];
-
-export const WARMUP_PAIRS: WarmupPair[] = [
-  { id: 'wp-1', number: 1, letter: 'C', hanzi: '冰箱', pinyin: 'bīng xiāng', meaning: 'Tủ lạnh', illustrationKey: 'bingxiang' },
-  { id: 'wp-2', number: 2, letter: 'A', hanzi: '空调', pinyin: 'kōng tiáo', meaning: 'Điều hòa', illustrationKey: 'kongtiao' },
-  { id: 'wp-3', number: 3, letter: 'B', hanzi: '洗衣机', pinyin: 'xǐ yī jī', meaning: 'Máy giặt', illustrationKey: 'xiyiji' },
-  { id: 'wp-4', number: 4, letter: 'D', hanzi: '花园', pinyin: 'huā yuán', meaning: 'Vườn hoa', illustrationKey: 'huayuan' },
-  { id: 'wp-5', number: 5, letter: 'E', hanzi: '卫生间', pinyin: 'wèi shēng jiān', meaning: 'Nhà vệ sinh', illustrationKey: 'weishengjian' },
-  { id: 'wp-6', number: 6, letter: 'F', hanzi: '灯', pinyin: 'dēng', meaning: 'Đèn', illustrationKey: 'deng' },
-];
-
-export const SENTENCE_QUIZ_ITEMS: SentenceQuizItem[] = [
-  {
-    id: 'sq-1',
-    vietnamesePrompt: 'đây là bố mẹ của tôi',
-    correctTokens: ['这是', '我的爸爸', '和妈妈'],
-    pinyinHint: 'Zhè shì / wǒ de bàba / hé māma',
-    grammarPoint: 'Cấu trúc giới thiệu người thân: 这是 + Cụm danh từ',
-  },
-  {
-    id: 'sq-2',
-    vietnamesePrompt: 'Hôm nay thời tiết như thế nào',
-    correctTokens: ['今天', '天气', '怎么样？'],
-    pinyinHint: 'Jīntiān / tiānqì / zěnmeyàng?',
-    grammarPoint: 'Đại từ nghi vấn 怎么样 hỏi tính chất, tình trạng',
-  },
-  {
-    id: 'sq-3',
-    vietnamesePrompt: 'Chúng ta cùng đi xem phim đi',
-    correctTokens: ['咱们', '一起', '看个电影吧'],
-    pinyinHint: 'Zánmen / yīqǐ / kàn ge diànyǐng ba',
-    grammarPoint: 'Cấu trúc rủ rê: 咱们 + 一起 + Động từ + 吧',
-  },
-  {
-    id: 'sq-4',
-    vietnamesePrompt: 'Vườn hoa này khá đẹp',
-    correctTokens: ['这个', '花园', '挺漂亮的'],
-    pinyinHint: 'Zhège / huāyuán / tǐng piàoliang de',
-    grammarPoint: 'Cấu trúc cảm thán mức độ: 挺 + Tính từ + 的',
-  },
-];
-
-export const MULTIPLE_CHOICE_ITEMS: MultipleChoiceQuizItem[] = [
-  {
-    id: 'mc-1',
-    question: '“愿意” nghĩa là gì?',
-    hanziFocus: '愿意',
-    pinyinFocus: 'yuàn yì',
-    options: [
-      { id: 'a', text: 'bằng lòng, sẵn lòng', isCorrect: true },
-      { id: 'b', text: 'tự nghĩ, tự', isCorrect: false },
-      { id: 'c', text: 'luôn luôn', isCorrect: false },
-      { id: 'd', text: 'thảo nguyên', isCorrect: false },
-    ],
-    grammarRule: '愿意 + Động từ (Biểu thị sự tự nguyện, đồng ý làm gì)',
-    exampleSentence: '我 很 愿意 帮助 你。',
-    exampleTranslation: 'Tớ rất sẵn lòng giúp bạn.',
-  },
-  {
-    id: 'mc-2',
-    question: '“初中” dùng để chỉ cấp học nào?',
-    hanziFocus: '初中',
-    pinyinFocus: 'chū zhōng',
-    options: [
-      { id: 'a', text: 'Tiểu học (Cấp 1)', isCorrect: false },
-      { id: 'b', text: 'Trung học cơ sở (Cấp 2)', isCorrect: true },
-      { id: 'c', text: 'Trung học phổ thông (Cấp 3)', isCorrect: false },
-      { id: 'd', text: 'Đại học', isCorrect: false },
-    ],
-    grammarRule: 'Danh từ + 生 = Học sinh cấp đó (初中生 = Học sinh cấp 2)',
-    exampleSentence: '我女儿 是 初中生。',
-    exampleTranslation: 'Con gái tôi là học sinh trung học cơ sở.',
-  },
-  {
-    id: 'mc-3',
-    question: 'Lượng từ thích hợp đi với “洗衣机” và “空调” là gì?',
-    hanziFocus: '一台洗衣机',
-    pinyinFocus: 'yī tái xǐ yī jī',
-    options: [
-      { id: 'a', text: '台 (tái) — dùng cho máy móc, thiết bị điện', isCorrect: true },
-      { id: 'b', text: '本 (běn) — dùng cho sách vở', isCorrect: false },
-      { id: 'c', text: '件 (jiàn) — dùng cho quần áo, sự việc', isCorrect: false },
-      { id: 'd', text: '张 (zhāng) — dùng cho vật có bề mặt phẳng', isCorrect: false },
-    ],
-    grammarRule: 'Số từ + 台 + Danh từ thiết bị điện (空调, 洗衣机, 电脑)',
-    exampleSentence: '这台 洗衣机 不 好用，买 新的吧。',
-    exampleTranslation: 'Chiếc máy giặt này không tiện dụng, mua cái mới đi.',
   },
 ];
 
