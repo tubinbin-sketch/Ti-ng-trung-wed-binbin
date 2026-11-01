@@ -41,7 +41,7 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
               Kết quả tự động chấm bài tập về nhà (HSK 1–3) — Hiển thị: {filteredStudents.length}/{studentsList.length} học viên
             </h4>
             <p className="text-xs text-ink-muted mt-0.5">
-              Bấm &ldquo;+ Thêm học viên mới&rdquo; để cấp Mã học viên (HV-001...) hoặc &ldquo;Xuất Bảng Điểm CSV&rdquo; để tải về máy.
+              Bấm &ldquo;Thêm học viên&rdquo; để cấp Mã học viên (HV-001...) hoặc &ldquo;Xuất Bảng Điểm CSV&rdquo; để tải về máy.
             </p>
           </div>
           <div className="flex items-center gap-2">

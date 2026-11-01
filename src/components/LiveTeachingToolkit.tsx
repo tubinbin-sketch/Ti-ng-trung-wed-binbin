@@ -367,17 +367,17 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
             type="button"
             data-testid="classroom-tools-dropdown-btn"
             onClick={() => setIsToolsDropdownOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-on-primary border border-highlight/60 text-sm font-bold shadow-xs transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border text-sm font-medium transition-colors cursor-pointer whitespace-nowrap"
             title="Mở menu Công cụ đứng lớp (Gọi tên, Bấm giờ, Giao bài, Chính tả, In A4, Phím tắt)"
           >
-            <Wrench className="w-4 h-4 shrink-0" />
+            <Wrench className="w-4 h-4 text-ink-muted shrink-0" />
             <span>Công cụ đứng lớp</span>
             {isTimerRunning && (
-              <span className="px-1.5 py-0.5 rounded bg-highlight text-on-highlight font-mono text-sm font-semibold tabular-nums">
+              <span className="px-1.5 py-0.5 rounded-md bg-highlight/20 text-gold text-xs font-semibold tabular-nums">
                 {formatClassTimer(remainingSeconds)}
               </span>
             )}
-            <ChevronDown className="w-4 h-4 text-highlight shrink-0" />
+            <ChevronDown className="w-4 h-4 text-ink-muted shrink-0" />
           </button>
         </div>
 
@@ -385,24 +385,23 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
         {isToolsDropdownOpen && (
           <div
             data-testid="classroom-tools-dropdown-menu"
-            className="absolute right-0 mt-2 w-[300px] sm:w-[340px] z-40 rounded-2xl backdrop-blur-xl bg-[#182B22]/98 text-white border border-highlight/60 shadow-2xl p-3 space-y-2"
+            className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-[min(360px,calc(100vw-2rem))] z-40 rounded-2xl bg-surface text-ink border border-border shadow-xl p-1.5 animate-fade-in"
           >
-            <div className="flex items-center justify-between pb-2 border-b border-white/15">
-              <span className="text-sm font-bold text-highlight flex items-center gap-1.5">
-                <Wrench className="w-4 h-4" />
-                <span>Công cụ giảng dạy trực tiếp</span>
+            <div className="flex items-center justify-between px-2.5 pt-1.5 pb-2">
+              <span className="text-xs font-medium text-ink-muted">
+                Công cụ giảng dạy trên lớp
               </span>
               <button
                 type="button"
                 onClick={() => setIsToolsDropdownOpen(false)}
                 aria-label="Đóng menu công cụ đứng lớp"
-                className="p-1 rounded-lg text-white/70 hover:text-white hover:bg-white/10 cursor-pointer"
+                className="p-1 rounded-lg text-ink-subtle hover:text-ink hover:bg-surface-2 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-1.5">
+            <div className="grid grid-cols-1 gap-0.5">
               <button
                 type="button"
                 data-testid="toolkit-projector-btn"
@@ -411,13 +410,13 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                   setIsProjectorOpen(true);
                   speakChinese(currentSlide.hanzi);
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-highlight hover:bg-highlight text-on-highlight text-sm font-bold transition-all cursor-pointer"
+                className="w-full flex items-center justify-between gap-2 h-10 px-2.5 rounded-xl hover:bg-surface-2 text-ink text-sm transition-colors cursor-pointer"
               >
                 <span className="inline-flex items-center gap-2">
-                  <Monitor className="w-4 h-4 shrink-0" />
+                  <Monitor className="w-4 h-4 text-ink-muted shrink-0" />
                   <span>Trình chiếu Fullscreen</span>
                 </span>
-                <span className="text-sm font-semibold opacity-80">Phím F</span>
+                <span className="text-xs text-ink-subtle whitespace-nowrap">Phím F</span>
               </button>
 
               <button
@@ -427,13 +426,13 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                   setIsToolsDropdownOpen(false);
                   handleOpenLuckyPicker();
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 text-sm font-bold transition-all cursor-pointer"
+                className="w-full flex items-center justify-between gap-2 h-10 px-2.5 rounded-xl hover:bg-surface-2 text-ink text-sm transition-colors cursor-pointer"
               >
                 <span className="inline-flex items-center gap-2">
-                  <Dices className="w-4 h-4 text-highlight shrink-0" />
+                  <Dices className="w-4 h-4 text-ink-muted shrink-0" />
                   <span>Gọi tên ngẫu nhiên</span>
                 </span>
-                <span className="text-sm text-highlight">{roster.length} HV</span>
+                <span className="text-xs text-ink-subtle whitespace-nowrap">{roster.length} HV</span>
               </button>
 
               <button
@@ -442,13 +441,13 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                 onClick={() => {
                   setIsTimerPanelOpen((v) => !v);
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 text-sm font-bold transition-all cursor-pointer tabular-nums"
+                className="w-full flex items-center justify-between gap-2 h-10 px-2.5 rounded-xl hover:bg-surface-2 text-ink text-sm transition-colors cursor-pointer tabular-nums"
               >
                 <span className="inline-flex items-center gap-2">
-                  <Timer className="w-4 h-4 text-highlight shrink-0" />
+                  <Timer className="w-4 h-4 text-ink-muted shrink-0" />
                   <span>Bấm giờ thảo luận</span>
                 </span>
-                <span className="px-2 py-0.5 rounded bg-black/30 text-highlight font-mono text-sm">
+                <span className="px-1.5 py-0.5 rounded-md bg-surface-2 text-ink-muted text-xs tabular-nums">
                   {formatClassTimer(remainingSeconds)}
                 </span>
               </button>
@@ -460,13 +459,13 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                   setIsToolsDropdownOpen(false);
                   handleOpenMiniGame();
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-accent hover:bg-accent/90 text-on-primary border border-highlight/40 text-sm font-bold transition-all cursor-pointer"
+                className="w-full flex items-center justify-between gap-2 h-10 px-2.5 rounded-xl hover:bg-surface-2 text-ink text-sm transition-colors cursor-pointer"
               >
                 <span className="inline-flex items-center gap-2">
-                  <Gamepad2 className="w-4 h-4 text-[#FDE68A] shrink-0" />
+                  <Gamepad2 className="w-4 h-4 text-ink-muted shrink-0" />
                   <span>Mini-Game cả lớp</span>
                 </span>
-                <span className="text-sm text-[#FDE68A]">6 câu</span>
+                <span className="text-xs text-ink-subtle whitespace-nowrap">6 câu</span>
               </button>
 
               <button
@@ -482,13 +481,13 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                   setIsDictationOpen(true);
                   speakChinese(currentSlide.hanzi, 0.9);
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 text-sm font-bold transition-all cursor-pointer"
+                className="w-full flex items-center justify-between gap-2 h-10 px-2.5 rounded-xl hover:bg-surface-2 text-ink text-sm transition-colors cursor-pointer"
               >
                 <span className="inline-flex items-center gap-2">
-                  <Headphones className="w-4 h-4 text-highlight shrink-0" />
-                  <span>Chính tả Nghe - Viết (听写)</span>
+                  <Headphones className="w-4 h-4 text-ink-muted shrink-0" />
+                  <span>Chính tả nghe – viết</span>
                 </span>
-                <span className="text-sm text-highlight">HSK 3.0</span>
+                <span className="text-xs text-ink-subtle whitespace-nowrap">HSK 3.0</span>
               </button>
 
               <button
@@ -498,13 +497,13 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                   setIsToolsDropdownOpen(false);
                   handleOpenAssignFromSlideModal();
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 text-sm font-bold transition-all cursor-pointer"
+                className="w-full flex items-center justify-between gap-2 h-10 px-2.5 rounded-xl hover:bg-surface-2 text-ink text-sm transition-colors cursor-pointer"
               >
                 <span className="inline-flex items-center gap-2">
-                  <Send className="w-4 h-4 text-highlight shrink-0" />
+                  <Send className="w-4 h-4 text-ink-muted shrink-0" />
                   <span>Giao bài tập từ Slide</span>
                 </span>
-                <span className="text-sm text-highlight">1-Click</span>
+                <span className="text-xs text-ink-subtle whitespace-nowrap">1-Click</span>
               </button>
 
               <button
@@ -514,13 +513,13 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                   setIsToolsDropdownOpen(false);
                   setIsLessonPlanOpen(true);
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 text-sm font-bold transition-all cursor-pointer"
+                className="w-full flex items-center justify-between gap-2 h-10 px-2.5 rounded-xl hover:bg-surface-2 text-ink text-sm transition-colors cursor-pointer"
               >
                 <span className="inline-flex items-center gap-2">
-                  <FileSpreadsheet className="w-4 h-4 text-highlight shrink-0" />
+                  <FileSpreadsheet className="w-4 h-4 text-ink-muted shrink-0" />
                   <span>Giáo án chuẩn HSK 3.0</span>
                 </span>
-                <span className="text-sm text-highlight">{slides.length} từ</span>
+                <span className="text-xs text-ink-subtle whitespace-nowrap">{slides.length} từ</span>
               </button>
 
               {onOpenWorksheetModal && (
@@ -531,13 +530,13 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                     setIsToolsDropdownOpen(false);
                     onOpenWorksheetModal();
                   }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 text-sm font-bold transition-all cursor-pointer"
+                  className="w-full flex items-center justify-between gap-2 h-10 px-2.5 rounded-xl hover:bg-surface-2 text-ink text-sm transition-colors cursor-pointer"
                 >
                   <span className="inline-flex items-center gap-2">
-                    <Printer className="w-4 h-4 text-highlight shrink-0" />
+                    <Printer className="w-4 h-4 text-ink-muted shrink-0" />
                     <span>In phiếu tập viết A4</span>
                   </span>
-                  <span className="text-sm text-highlight">PDF/In</span>
+                  <span className="text-xs text-ink-subtle whitespace-nowrap">PDF/In</span>
                 </button>
               )}
 
@@ -549,13 +548,13 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                     setIsToolsDropdownOpen(false);
                     onToggleShortcutsHint();
                   }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 text-sm font-bold transition-all cursor-pointer"
+                  className="w-full flex items-center justify-between gap-2 h-10 px-2.5 rounded-xl hover:bg-surface-2 text-ink text-sm transition-colors cursor-pointer"
                 >
                   <span className="inline-flex items-center gap-2">
-                    <Keyboard className="w-4 h-4 text-highlight shrink-0" />
+                    <Keyboard className="w-4 h-4 text-ink-muted shrink-0" />
                     <span>Phím tắt đứng lớp</span>
                   </span>
-                  <span className="text-sm text-highlight">Space / W / F</span>
+                  <span className="text-xs text-ink-subtle whitespace-nowrap">Space / W / F</span>
                 </button>
               )}
             </div>
@@ -564,12 +563,12 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
             {isTimerPanelOpen && (
               <div
                 data-testid="toolkit-timer-panel"
-                className="mt-2 pt-2.5 border-t border-white/15 space-y-2"
+                className="mt-1 mx-1 mb-1 p-2.5 rounded-xl bg-surface-2 space-y-2"
               >
                 <div className="flex flex-wrap items-center justify-between gap-1.5">
-                  <span className="text-sm font-bold text-highlight flex items-center gap-1">
+                  <span className="text-xs font-medium text-ink-muted flex items-center gap-1">
                     <Timer className="w-4 h-4" />
-                    <span>Bấm giờ:</span>
+                    <span>Bấm giờ</span>
                   </span>
                   <div className="flex items-center gap-1">
                     {[
@@ -582,10 +581,10 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                         type="button"
                         data-testid={`timer-preset-${preset.secs}`}
                         onClick={() => handleSelectTimerPreset(preset.secs)}
-                        className={`px-2.5 py-1 rounded-lg text-sm font-bold transition-all cursor-pointer ${
+                        className={`h-7 px-2.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                           timerPresetSeconds === preset.secs
-                            ? 'bg-highlight text-on-highlight'
-                            : 'bg-white/10 text-white hover:bg-white/20'
+                            ? 'bg-primary text-on-primary'
+                            : 'bg-surface text-ink border border-border hover:border-border-strong'
                         }`}
                       >
                         {preset.label}
@@ -597,10 +596,10 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                 <div className="flex items-center justify-between gap-2">
                   <div
                     data-testid="class-timer-readout"
-                    className={`px-3 py-1 rounded-lg font-mono text-sm font-bold tabular-nums border ${
+                    className={`px-3 py-1 rounded-lg text-lg font-semibold tabular-nums border ${
                       timerFinishedAlert
-                        ? 'bg-accent text-on-primary border-white'
-                        : 'bg-surface text-ink border-highlight'
+                        ? 'bg-accent text-on-primary border-transparent'
+                        : 'bg-surface text-ink border-border'
                     }`}
                   >
                     {formatClassTimer(remainingSeconds)}
@@ -617,7 +616,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                         }
                         setIsTimerRunning((r) => !r);
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-highlight text-on-highlight text-sm font-bold cursor-pointer"
+                      className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold cursor-pointer"
                     >
                       {isTimerRunning ? (
                         <>
@@ -640,7 +639,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                         setTimerFinishedAlert(false);
                         setRemainingSeconds(timerPresetSeconds);
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-semibold cursor-pointer"
+                      className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-surface border border-border hover:bg-surface-2 text-ink text-sm font-medium whitespace-nowrap cursor-pointer"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                       <span>Đặt lại</span>
