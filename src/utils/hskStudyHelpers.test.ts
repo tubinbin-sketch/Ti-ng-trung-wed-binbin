@@ -248,17 +248,27 @@ test('server AI route origin guard and periodic rate-limit memory cleanup work a
 test('AI endpoints require Firebase ID Token (Authorization: Bearer <token>), rate-limit by UID, and legacy PIN/storage routes are removed', async () => {
   const {
     app,
+    createInMemoryServerStoreAdapter,
     resetAllRateLimitersForTest,
     setFirebaseTokenVerifierForTest,
+    setServerStoreAdapterForTest,
   } = await import('../../server');
   resetAllRateLimitersForTest();
+
+  const memStore = createInMemoryServerStoreAdapter();
+  await memStore.setDoc('users/uid-student-1', {
+    uid: 'uid-student-1',
+    enrolledClassIds: ['class-hsk3'],
+    activeClassId: 'class-hsk3',
+  });
+  setServerStoreAdapterForTest(memStore);
 
   setFirebaseTokenVerifierForTest(async (token: string) => {
     if (token === 'valid-token-uid-student-1') {
       return { uid: 'uid-student-1', email: 'student1@hanu.edu.vn' };
     }
     if (token === 'valid-token-uid-teacher-1') {
-      return { uid: 'uid-teacher-1', email: 'teacher@hanu.edu.vn' };
+      return { uid: 'uid-teacher-1', email: 'teacher@hanu.edu.vn', role: 'teacher' };
     }
     throw new Error('Invalid Firebase ID token');
   });
@@ -273,7 +283,7 @@ test('AI endpoints require Firebase ID Token (Authorization: Bearer <token>), ra
   const originHeader = `http://127.0.0.1:${port}`;
 
   try {
-    // 1. Legacy routes (/api/auth/teacher-verify, /api/storage/state, /api/submissions) are completely removed (404)
+    // 1. Legacy routes (/api/auth/teacher-verify, /api/storage/state) are removed (404), and /api/submissions requires Auth (401)
     const legacyPinRes = await fetch(`${baseUrl}/api/auth/teacher-verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -284,12 +294,12 @@ test('AI endpoints require Firebase ID Token (Authorization: Bearer <token>), ra
     const legacyStateRes = await fetch(`${baseUrl}/api/storage/state`);
     assert.equal(legacyStateRes.status, 404);
 
-    const legacySubRes = await fetch(`${baseUrl}/api/submissions`, {
+    const unauthSubRes = await fetch(`${baseUrl}/api/submissions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    assert.equal(legacySubRes.status, 404);
+    assert.equal(unauthSubRes.status, 401);
 
     // 2. Calling AI route without Authorization: Bearer <token> returns 401
     const noTokenRes = await fetch(`${baseUrl}/api/hanzi/enrich`, {
@@ -314,7 +324,7 @@ test('AI endpoints require Firebase ID Token (Authorization: Bearer <token>), ra
     });
     assert.equal(badTokenRes.status, 401);
 
-    // 4. UID-based daily quota enforcement (AI_DAILY_LIMIT = 3 per UID)
+    // 4. UID-based daily quota enforcement (AI_DAILY_LIMIT = 3 per UID via Firestore aiUsage transaction)
     for (let i = 1; i <= 3; i++) {
       const r = await fetch(`${baseUrl}/api/hanzi/suggest`, {
         method: 'POST',
@@ -325,8 +335,7 @@ test('AI endpoints require Firebase ID Token (Authorization: Bearer <token>), ra
         },
         body: JSON.stringify({ topic: 'Gia đình', count: 2 }),
       });
-      // Without GEMINI_API_KEY in test env it returns 503 after passing Auth + UID quota check
-      assert.notEqual(r.status, 401);
+      assert.notEqual(r.status, 403);
       assert.notEqual(r.status, 429);
     }
 
@@ -364,6 +373,7 @@ test('AI endpoints require Firebase ID Token (Authorization: Bearer <token>), ra
     if (prevDailyLimit === undefined) delete process.env.AI_DAILY_LIMIT;
     else process.env.AI_DAILY_LIMIT = prevDailyLimit;
     setFirebaseTokenVerifierForTest(null);
+    setServerStoreAdapterForTest(null);
     resetAllRateLimitersForTest();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }

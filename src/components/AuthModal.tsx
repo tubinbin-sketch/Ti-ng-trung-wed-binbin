@@ -14,8 +14,10 @@ import {
   Lock,
 } from 'lucide-react';
 import {
+  auth,
   signInTeacherWithGoogle,
   joinClassAsStudent,
+  linkAnonymousStudentWithGoogle,
   type ClassroomMetadata,
 } from '../firebase';
 import {
@@ -332,7 +334,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 >
                   2. Mã học sinh của riêng bạn:
                 </label>
-                <input
+                  <input
                   id="student-code-input"
                   type="text"
                   value={studentCodeInput}
@@ -340,7 +342,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     setStudentCodeInput(e.target.value.toUpperCase());
                     setStudentError('');
                   }}
-                  placeholder="VD: HV-001"
+                  placeholder="VD: HV-8K4M9P"
                   className="w-full px-3 py-2 rounded-xl border border-border bg-canvas text-sm font-bold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus uppercase"
                 />
               </div>
@@ -377,6 +379,44 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <LogIn className="w-4 h-4" />
                 <span>Đăng nhập Google &amp; Tham gia lớp</span>
               </button>
+
+              {auth.currentUser?.isAnonymous && (
+                <button
+                  type="button"
+                  data-testid="link-anonymous-google-btn"
+                  disabled={isStudentLoading}
+                  onClick={async () => {
+                    setStudentError('');
+                    setIsStudentLoading(true);
+                    try {
+                      const linkedUser = await linkAnonymousStudentWithGoogle();
+                      onSelectRoleAndLogin?.({
+                        role: 'student',
+                        name: linkedUser.displayName || studentName,
+                        uid: linkedUser.uid,
+                        email: linkedUser.email || undefined,
+                        classId: currentUser?.classId,
+                        classCode: currentUser?.classCode,
+                        studentCode: currentUser?.studentCode,
+                        isDemo: false,
+                      });
+                      onClose();
+                    } catch (err) {
+                      setStudentError(
+                        err instanceof Error
+                          ? err.message
+                          : 'Không thể liên kết tài khoản Google lúc này.'
+                      );
+                    } finally {
+                      setIsStudentLoading(false);
+                    }
+                  }}
+                  className="w-full py-1.5 rounded-xl font-bold text-xs text-ink bg-canvas hover:bg-gold/15 border border-gold/50 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-gold" />
+                  <span>Liên kết Google (Giữ tiến độ khi đổi máy)</span>
+                </button>
+              )}
             </form>
           </div>
 

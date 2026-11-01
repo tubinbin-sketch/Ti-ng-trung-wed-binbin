@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Sparkles, Trash2, Users } from 'lucide-react';
+import { Plus, RefreshCw, Sparkles, Trash2, Users } from 'lucide-react';
 import { isStudentNeedsSupport } from '../../utils/chineseEngine';
 import { Dialog } from '../ui/Dialog';
 import { EmptyState } from '../ui/EmptyState';
@@ -12,6 +12,7 @@ interface ClassroomGradingGridProps {
   onResetFilters: () => void;
   onOpenAddStudentModal: () => void;
   onDeleteStudentClick: (student: ClassStudent, e?: React.MouseEvent) => void;
+  onReissueStudentCode?: (student: ClassStudent) => void;
   onAwardBonusPoints: (studentId: string, bonusPoints: number, reason: string) => void;
   studentToDelete: ClassStudent | null;
   onCloseDeleteModal: () => void;
@@ -25,6 +26,7 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
   onResetFilters,
   onOpenAddStudentModal,
   onDeleteStudentClick,
+  onReissueStudentCode,
   onAwardBonusPoints,
   studentToDelete,
   onCloseDeleteModal,
@@ -118,6 +120,18 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
                       >
                         {needsSupport ? 'Cần kèm thêm' : 'Đã hoàn thành'}
                       </span>
+                      {onReissueStudentCode && (
+                        <button
+                          type="button"
+                          data-testid={`reissue-code-btn-${st.id}`}
+                          onClick={() => onReissueStudentCode(st)}
+                          title="Gỡ liên kết thiết bị cũ và cấp lại mã học viên"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-primary hover:bg-primary/10 border border-primary/30 text-xs font-medium transition-colors cursor-pointer"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>Cấp lại mã</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={(e) => onDeleteStudentClick(st, e)}

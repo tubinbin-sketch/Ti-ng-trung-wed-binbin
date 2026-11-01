@@ -201,21 +201,33 @@ test('setPreferredSpeechRate and setPreferredStrokeSpeedMs clamp and persist sli
 });
 
 test('createStudentRecord, filterClassroomStudents, and generateStudentsCsvContent work accurately', () => {
+  const s0 = createStudentRecord({ name: 'Lê Hoàng Nam', hskLevel: 'HSK 2' });
+  assert.equal(s0.name, 'Lê Hoàng Nam');
+  assert.match(s0.studentCode, /^HV-[A-Z0-9]{6}$/);
+  assert.equal(s0.totalPoints, 0);
+  assert.equal(s0.vocabScore, '');
+  assert.equal(s0.writingScore, '');
+  assert.equal(s0.quizScore, '');
+  assert.equal(s0.feedback, '');
+  assert.equal(s0.status, 'Chưa nộp');
+  assert.equal(s0.timeSeconds, 0);
+  assert.equal(s0.streak, 0);
+
   const s1 = createStudentRecord(
     { name: 'Nguyễn Minh Châu', hskLevel: 'HSK 3', initialPoints: 96 },
     12
   );
   assert.equal(s1.name, 'Nguyễn Minh Châu');
-  assert.equal(s1.studentCode, 'HV-013');
+  assert.match(s1.studentCode, /^HV-[A-Z0-9]{6}$/);
   assert.equal(s1.hskLevel, 'HSK 3');
   assert.equal(s1.totalPoints, 96);
   assert.equal(s1.status, 'Đã chấm tự động');
 
   const s2 = createStudentRecord(
-    { name: 'Phạm Gia Bảo', studentCode: 'HV-099', hskLevel: 'HSK 1', initialPoints: 82 },
+    { name: 'Phạm Gia Bảo', studentCode: 'HV-9K8M2P', hskLevel: 'HSK 1', initialPoints: 82 },
     13
   );
-  assert.equal(s2.studentCode, 'HV-099');
+  assert.equal(s2.studentCode, 'HV-9K8M2P');
   assert.equal(s2.status, 'Cần kèm thêm');
 
   const roster = [s1, s2];
@@ -228,7 +240,7 @@ test('createStudentRecord, filterClassroomStudents, and generateStudentsCsvConte
   assert.ok(csv.includes('Nhận xét & Chữa lỗi chi tiết'));
   assert.equal(csv.includes('Nhận xét AI'), false);
   assert.ok(csv.includes('Nguyễn Minh Châu'));
-  assert.ok(csv.includes('HV-099'));
+  assert.ok(csv.includes('HV-9K8M2P'));
   assert.ok(csv.includes('Cần kèm thêm'));
 });
 

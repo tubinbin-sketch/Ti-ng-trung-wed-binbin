@@ -2,7 +2,7 @@
   "entities": {
     "TeacherProfile": {
       "title": "TeacherProfile",
-      "description": "Authenticated teacher profile managed via Google Sign-In.",
+      "description": "Authenticated teacher profile managed via Google Sign-In and allowlist custom claims.",
       "type": "object",
       "properties": {
         "uid": { "type": "string", "description": "Firebase Auth UID of the teacher" },
@@ -14,6 +14,17 @@
       },
       "required": ["uid", "displayName", "role", "updatedAt"]
     },
+    "JoinCodeMapping": {
+      "title": "JoinCodeMapping",
+      "description": "Unique random class join code mapping to a specific classId.",
+      "type": "object",
+      "properties": {
+        "classId": { "type": "string", "description": "Target classroom document ID" },
+        "teacherUid": { "type": "string", "description": "Owner teacher Firebase UID" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["classId", "teacherUid", "createdAt"]
+    },
     "Classroom": {
       "title": "Classroom",
       "description": "A Chinese HSK classroom owned by a specific teacher.",
@@ -22,7 +33,7 @@
         "teacherUid": { "type": "string", "description": "Owner teacher Firebase UID" },
         "name": { "type": "string", "description": "Classroom display name" },
         "hskLevel": { "type": "string", "description": "Target HSK level (e.g. HSK 1-3)" },
-        "joinCode": { "type": "string", "description": "Class join code issued to students" },
+        "joinCode": { "type": "string", "description": "Random 6+ char class join code issued to students" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -35,7 +46,7 @@
       "properties": {
         "studentUid": { "type": "string", "description": "Bound Firebase Auth UID of the student" },
         "name": { "type": "string", "description": "Student full name" },
-        "studentCode": { "type": "string", "description": "Teacher-issued student code (e.g. HV-001)" },
+        "studentCode": { "type": "string", "description": "Teacher-issued random student code (e.g. HV-8K4M9P)" },
         "hskLevel": { "type": "string", "description": "Student HSK level" },
         "totalPoints": { "type": "number", "description": "Latest score out of 100" },
         "vocabScore": { "type": "string" },
@@ -64,7 +75,7 @@
     },
     "ClassAssignment": {
       "title": "ClassAssignment",
-      "description": "Homework or quiz package assigned to a classroom.",
+      "description": "Sanitized homework or quiz package assigned to a classroom (without secret answer keys).",
       "type": "object",
       "properties": {
         "teacherUid": { "type": "string" },
@@ -79,16 +90,32 @@
       },
       "required": ["teacherUid", "title", "updatedAt"]
     },
-    "AssignmentSubmission": {
-      "title": "AssignmentSubmission",
-      "description": "Immutable student homework submission.",
+    "AssignmentAnswerKey": {
+      "title": "AssignmentAnswerKey",
+      "description": "Private teacher-only answer key for server-side grading.",
       "type": "object",
       "properties": {
-        "studentUid": { "type": "string", "description": "Must match request.auth.uid" },
+        "assignmentId": { "type": "string" },
+        "teacherUid": { "type": "string" },
+        "multipleChoiceAnswers": { "type": "object" },
+        "sentenceOrderingAnswers": { "type": "object" },
+        "essayModels": { "type": "object" },
+        "maxAttempts": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["assignmentId", "teacherUid", "updatedAt"]
+    },
+    "AssignmentSubmission": {
+      "title": "AssignmentSubmission",
+      "description": "Server-graded student homework submission.",
+      "type": "object",
+      "properties": {
+        "studentUid": { "type": "string", "description": "Must match authenticated student UID" },
         "studentCode": { "type": "string" },
         "studentName": { "type": "string" },
         "assignmentId": { "type": "string" },
         "score": { "type": "number" },
+        "attemptCount": { "type": "number" },
         "answers": { "type": "object" },
         "submittedAt": { "type": "string", "format": "date-time" }
       },
@@ -96,7 +123,7 @@
     },
     "LeaderboardEntrySummary": {
       "title": "LeaderboardEntrySummary",
-      "description": "Sanitized class leaderboard entry exposing only student name, code, score, time, and streak.",
+      "description": "Sanitized class leaderboard entry written by the server after grading.",
       "type": "object",
       "properties": {
         "studentUid": { "type": "string" },
@@ -109,6 +136,18 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["studentUid", "name", "score", "updatedAt"]
+    },
+    "UserEnrollmentProfile": {
+      "title": "UserEnrollmentProfile",
+      "description": "Server-managed record of classes a student is enrolled in.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "enrolledClassIds": { "type": "array" },
+        "activeClassId": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "enrolledClassIds", "updatedAt"]
     },
     "UserSrsRecord": {
       "title": "UserSrsRecord",
@@ -127,6 +166,18 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["wordId", "hanzi", "learned", "updatedAt"]
+    },
+    "AiDailyUsage": {
+      "title": "AiDailyUsage",
+      "description": "Server-managed daily AI call counter per user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "date": { "type": "string" },
+        "count": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "date", "count", "updatedAt"]
     }
   },
   "firestore": {
@@ -134,13 +185,17 @@
       "schema": { "$ref": "#/entities/TeacherProfile" },
       "description": "Teacher profiles keyed by Firebase Auth UID."
     },
+    "/joinCodes/{code}": {
+      "schema": { "$ref": "#/entities/JoinCodeMapping" },
+      "description": "Unique random class join codes mapping to classId."
+    },
     "/classes/{classId}": {
       "schema": { "$ref": "#/entities/Classroom" },
       "description": "Classrooms owned by teachers."
     },
     "/classes/{classId}/students/{studentUid}": {
       "schema": { "$ref": "#/entities/ClassStudent" },
-      "description": "Enrolled students in a class keyed by studentUid (or pre-registered invite key)."
+      "description": "Enrolled students in a class keyed by studentUid (or teacher-created slot)."
     },
     "/classes/{classId}/decks/{deckId}": {
       "schema": { "$ref": "#/entities/ClassDeck" },
@@ -148,19 +203,31 @@
     },
     "/classes/{classId}/assignments/{assignmentId}": {
       "schema": { "$ref": "#/entities/ClassAssignment" },
-      "description": "Assignments published to a classroom."
+      "description": "Sanitized assignments published to a classroom (questions only)."
+    },
+    "/classes/{classId}/answerKeys/{assignmentId}": {
+      "schema": { "$ref": "#/entities/AssignmentAnswerKey" },
+      "description": "Private teacher-only answer keys for assignments."
     },
     "/classes/{classId}/submissions/{submissionId}": {
       "schema": { "$ref": "#/entities/AssignmentSubmission" },
-      "description": "Student assignment submissions (append-only for students, private per student & class teacher)."
+      "description": "Server-graded student assignment submissions."
     },
     "/classes/{classId}/leaderboard/{studentUid}": {
       "schema": { "$ref": "#/entities/LeaderboardEntrySummary" },
-      "description": "Sanitized class leaderboard summary readable by class members."
+      "description": "Server-written class leaderboard summary readable by class members."
+    },
+    "/users/{studentUid}": {
+      "schema": { "$ref": "#/entities/UserEnrollmentProfile" },
+      "description": "Server-managed student class enrollment profile."
     },
     "/users/{studentUid}/srs/{wordId}": {
       "schema": { "$ref": "#/entities/UserSrsRecord" },
       "description": "Private student flashcard SRS and learned word progress."
+    },
+    "/aiUsage/{usageId}": {
+      "schema": { "$ref": "#/entities/AiDailyUsage" },
+      "description": "Server-only daily AI quota counters."
     }
   }
 }

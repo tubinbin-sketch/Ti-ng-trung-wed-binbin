@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { AlertCircle, RefreshCw, UserPlus, X } from 'lucide-react';
-import { ClassStudentRecord, createStudentRecord } from '../utils/chineseEngine';
+import {
+  ClassStudentRecord,
+  createStudentRecord,
+  generateRandomStudentCode,
+} from '../utils/chineseEngine';
 import { Dialog } from './ui/Dialog';
 
 export interface ClassroomAddStudentModalProps {
@@ -18,15 +22,14 @@ export const ClassroomAddStudentModal: React.FC<ClassroomAddStudentModalProps> =
 }) => {
   const [modalStudentName, setModalStudentName] = useState('');
   const [modalStudentCode, setModalStudentCode] = useState(() =>
-    `HV-${String(existingStudentsCount + 1).padStart(3, '0')}`
+    generateRandomStudentCode('HV')
   );
   const [modalHskLevel, setModalHskLevel] = useState<'HSK 1' | 'HSK 2' | 'HSK 3' | 'HSK 4'>('HSK 2');
-  const [modalInitialPoints, setModalInitialPoints] = useState<number>(95);
+  const [modalInitialPoints, setModalInitialPoints] = useState<number>(0);
   const [modalValidationError, setModalValidationError] = useState<string | null>(null);
 
   const handleRegenerateCode = () => {
-    const randomSuffix = Math.floor(100 + Math.random() * 900);
-    setModalStudentCode(`HV-${randomSuffix}`);
+    setModalStudentCode(generateRandomStudentCode('HV'));
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -42,8 +45,7 @@ export const ClassroomAddStudentModal: React.FC<ClassroomAddStudentModalProps> =
     }
 
     const cleanCode =
-      modalStudentCode.trim() ||
-      `HV-${String(existingStudentsCount + 1).padStart(3, '0')}`;
+      modalStudentCode.trim().toUpperCase() || generateRandomStudentCode('HV');
 
     const newRecord = createStudentRecord(
       {
@@ -57,6 +59,8 @@ export const ClassroomAddStudentModal: React.FC<ClassroomAddStudentModalProps> =
 
     onAddStudent(newRecord);
     setModalStudentName('');
+    setModalStudentCode(generateRandomStudentCode('HV'));
+    setModalInitialPoints(0);
     setModalValidationError(null);
     onClose();
   };

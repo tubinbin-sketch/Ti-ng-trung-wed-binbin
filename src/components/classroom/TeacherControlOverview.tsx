@@ -182,17 +182,27 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-2 pt-1 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
             <span className="text-ink-muted">
               Tổng cộng: <strong className="text-ink">{totalQuestions} câu hỏi</strong>
             </span>
-            <button
-              type="button"
-              onClick={() => onLoadDemoPackage(PRESET_ASSIGNMENT_BUOI_15)}
-              className="px-2.5 py-1.5 rounded-xl bg-canvas hover:bg-primary/10 text-primary border border-border font-bold transition-colors cursor-pointer"
-            >
-              Đổi sang đề Buổi 15
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                data-testid="add-sample-assignment-btn"
+                onClick={() => onLoadDemoPackage(PRESET_ASSIGNMENT_BUOI_14)}
+                className="px-2.5 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 font-bold transition-colors cursor-pointer"
+              >
+                + Thêm bài mẫu
+              </button>
+              <button
+                type="button"
+                onClick={() => onLoadDemoPackage(PRESET_ASSIGNMENT_BUOI_15)}
+                className="px-2.5 py-1.5 rounded-xl bg-canvas hover:bg-primary/10 text-primary border border-border font-bold transition-colors cursor-pointer"
+              >
+                Đổi sang đề Buổi 15
+              </button>
+            </div>
           </div>
         </div>
 

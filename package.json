@@ -11,6 +11,7 @@
     "build:server": "esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=dist-server/server.js",
     "preview": "vite preview",
     "test": "npx --yes tsx --test src/utils/*.test.ts",
+    "test:rules": "npx --yes eslint firestore.rules && npx --yes tsx --test src/utils/firestore.rules.test.ts",
     "clean": "rm -rf dist dist-server server.js",
     "lint": "tsc --noEmit"
   },

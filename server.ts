@@ -6,6 +6,8 @@ import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
 import { initializeApp as initializeAdminApp, getApps as getAdminApps, cert } from 'firebase-admin/app';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
+import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
+import { getAppCheck as getAdminAppCheck } from 'firebase-admin/app-check';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,25 +16,39 @@ const ROOT_DIR =
     ? path.resolve(__dirname, '..')
     : __dirname;
 
-// Load Firebase project ID from environment or firebase-applet-config.json
+// Load Firebase project ID and Firestore Database ID from environment or firebase-applet-config.json
 let defaultFirebaseProjectId =
   process.env.FIREBASE_PROJECT_ID ||
   process.env.GOOGLE_CLOUD_PROJECT ||
   process.env.VITE_FIREBASE_PROJECT_ID ||
   '';
 
-if (!defaultFirebaseProjectId) {
-  try {
-    const configPath = path.resolve(ROOT_DIR, 'firebase-applet-config.json');
-    if (fs.existsSync(configPath)) {
-      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      if (parsed?.projectId) {
-        defaultFirebaseProjectId = String(parsed.projectId);
-      }
+let defaultFirestoreDatabaseId =
+  process.env.FIRESTORE_DATABASE_ID ||
+  process.env.VITE_FIRESTORE_DATABASE_ID ||
+  '';
+
+try {
+  const configPath = path.resolve(ROOT_DIR, 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    if (!defaultFirebaseProjectId && parsed?.projectId) {
+      defaultFirebaseProjectId = String(parsed.projectId);
     }
-  } catch {
-    // ignore
+    if (
+      !defaultFirestoreDatabaseId &&
+      parsed?.firestoreDatabaseId &&
+      !String(parsed.firestoreDatabaseId).includes('.')
+    ) {
+      defaultFirestoreDatabaseId = String(parsed.firestoreDatabaseId);
+    }
   }
+} catch {
+  // ignore
+}
+
+if (!defaultFirestoreDatabaseId || defaultFirestoreDatabaseId.includes('.')) {
+  defaultFirestoreDatabaseId = '(default)';
 }
 
 function ensureFirebaseAdminApp() {
@@ -57,6 +73,10 @@ function ensureFirebaseAdminApp() {
 }
 
 const firebaseAdminApp = ensureFirebaseAdminApp();
+const adminDb =
+  defaultFirestoreDatabaseId && defaultFirestoreDatabaseId !== '(default)'
+    ? getAdminFirestore(firebaseAdminApp, defaultFirestoreDatabaseId)
+    : getAdminFirestore(firebaseAdminApp);
 
 export const app = express();
 app.set('trust proxy', 1);
@@ -108,9 +128,12 @@ const clientRequestCounts = new Map<string, { count: number; resetAt: number }>(
 const aiUidMinuteCounts = new Map<string, { count: number; resetAt: number }>();
 const aiUidDailyCounts = new Map<string, { count: number; resetAt: number }>();
 
+/**
+ * Unified AI_DAILY_LIMIT: defaults to 60 calls/day/uid (matching .env.example).
+ */
 export function getAiDailyLimit(): number {
   const configured = Number(process.env.AI_DAILY_LIMIT);
-  return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 200;
+  return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 60;
 }
 
 export function resetAllRateLimitersForTest(): void {
@@ -195,14 +218,183 @@ function apiRateLimiter(req: Request, res: Response, next: NextFunction) {
 app.use('/api', apiRateLimiter);
 
 // ============================================================================
-// 2. FIREBASE ID TOKEN VERIFICATION & UID QUOTA PROTECTION FOR GEMINI AI ROUTES
+// 2. SERVER STORE ADAPTER (FIRESTORE ADMIN SDK + TESTABLE IN-MEMORY ADAPTER)
 // ============================================================================
-export type FirebaseTokenVerifier = (idToken: string) => Promise<{ uid: string; email?: string }>;
+export interface ServerAnswerKeyRecord {
+  assignmentId: string;
+  teacherUid: string;
+  multipleChoiceAnswers: Record<string, string>;
+  sentenceOrderingAnswers: Record<string, string[]>;
+  essayModels: Record<string, { targetWord: string; sampleSentence: string }>;
+  maxAttempts?: number;
+  updatedAt?: string;
+}
+
+export interface ServerStoreAdapter {
+  getDoc(docPath: string): Promise<Record<string, any> | null>;
+  setDoc(docPath: string, data: Record<string, any>, options?: { merge?: boolean }): Promise<void>;
+  deleteDoc(docPath: string): Promise<void>;
+  listCollection(collectionPath: string): Promise<Array<{ id: string; data: Record<string, any> }>>;
+  incrementAiUsageTransaction(
+    usageId: string,
+    uid: string,
+    dateStr: string,
+    dailyLimit: number
+  ): Promise<{ allowed: boolean; count: number; dailyLimit: number }>;
+  setTeacherCustomClaim(uid: string): Promise<void>;
+}
+
+const firestoreServerStoreAdapter: ServerStoreAdapter = {
+  async getDoc(docPath: string) {
+    const snap = await adminDb.doc(docPath).get();
+    return snap.exists ? (snap.data() as Record<string, any>) : null;
+  },
+  async setDoc(docPath: string, data: Record<string, any>, options?: { merge?: boolean }) {
+    if (options?.merge) {
+      await adminDb.doc(docPath).set(data, { merge: true });
+    } else {
+      await adminDb.doc(docPath).set(data);
+    }
+  },
+  async deleteDoc(docPath: string) {
+    await adminDb.doc(docPath).delete();
+  },
+  async listCollection(collectionPath: string) {
+    const snap = await adminDb.collection(collectionPath).get();
+    return snap.docs.map((d) => ({
+      id: d.id,
+      data: d.data() as Record<string, any>,
+    }));
+  },
+  async incrementAiUsageTransaction(
+    usageId: string,
+    uid: string,
+    dateStr: string,
+    dailyLimit: number
+  ) {
+    const docRef = adminDb.doc(`aiUsage/${usageId}`);
+    return await adminDb.runTransaction(async (tx) => {
+      const snap = await tx.get(docRef);
+      const currentCount = snap.exists ? Number(snap.data()?.count || 0) : 0;
+      if (currentCount >= dailyLimit) {
+        return { allowed: false, count: currentCount, dailyLimit };
+      }
+      const nextCount = currentCount + 1;
+      tx.set(
+        docRef,
+        {
+          uid,
+          date: dateStr,
+          count: nextCount,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+      return { allowed: true, count: nextCount, dailyLimit };
+    });
+  },
+  async setTeacherCustomClaim(uid: string) {
+    await getAdminAuth(firebaseAdminApp).setCustomUserClaims(uid, { role: 'teacher' });
+  },
+};
+
+let activeServerStore: ServerStoreAdapter = firestoreServerStoreAdapter;
+
+export function setServerStoreAdapterForTest(adapter: ServerStoreAdapter | null): void {
+  activeServerStore = adapter || firestoreServerStoreAdapter;
+}
+
+export function createInMemoryServerStoreAdapter(): ServerStoreAdapter & {
+  docs: Map<string, Record<string, any>>;
+  claims: Map<string, Record<string, any>>;
+} {
+  const docs = new Map<string, Record<string, any>>();
+  const claims = new Map<string, Record<string, any>>();
+
+  const normalize = (p: string) => p.replace(/^\/+|\/+$/g, '');
+
+  return {
+    docs,
+    claims,
+    async getDoc(docPath: string) {
+      const key = normalize(docPath);
+      const found = docs.get(key);
+      return found ? structuredClone(found) : null;
+    },
+    async setDoc(docPath: string, data: Record<string, any>, options?: { merge?: boolean }) {
+      const key = normalize(docPath);
+      if (options?.merge && docs.has(key)) {
+        docs.set(key, { ...structuredClone(docs.get(key)!), ...structuredClone(data) });
+      } else {
+        docs.set(key, structuredClone(data));
+      }
+    },
+    async deleteDoc(docPath: string) {
+      docs.delete(normalize(docPath));
+    },
+    async listCollection(collectionPath: string) {
+      const prefix = `${normalize(collectionPath)}/`;
+      const results: Array<{ id: string; data: Record<string, any> }> = [];
+      for (const [k, v] of docs.entries()) {
+        if (k.startsWith(prefix)) {
+          const remainder = k.slice(prefix.length);
+          if (!remainder.includes('/')) {
+            results.push({ id: remainder, data: structuredClone(v) });
+          }
+        }
+      }
+      return results;
+    },
+    async incrementAiUsageTransaction(
+      usageId: string,
+      uid: string,
+      dateStr: string,
+      dailyLimit: number
+    ) {
+      const key = normalize(`aiUsage/${usageId}`);
+      const existing = docs.get(key);
+      const currentCount = existing ? Number(existing.count || 0) : 0;
+      if (currentCount >= dailyLimit) {
+        return { allowed: false, count: currentCount, dailyLimit };
+      }
+      const nextCount = currentCount + 1;
+      docs.set(key, {
+        uid,
+        date: dateStr,
+        count: nextCount,
+        updatedAt: new Date().toISOString(),
+      });
+      return { allowed: true, count: nextCount, dailyLimit };
+    },
+    async setTeacherCustomClaim(uid: string) {
+      claims.set(uid, { role: 'teacher' });
+    },
+  };
+}
+
+// ============================================================================
+// 3. FIREBASE ID TOKEN, APP CHECK & TEACHER ALLOWLIST VERIFICATION
+// ============================================================================
+export interface VerifiedFirebaseUser {
+  uid: string;
+  email?: string;
+  name?: string;
+  role?: string;
+  signInProvider?: string;
+}
+
+export type FirebaseTokenVerifier = (idToken: string) => Promise<VerifiedFirebaseUser>;
+export type AppCheckTokenVerifier = (appCheckToken: string) => Promise<{ appId: string }>;
 
 let customTokenVerifierForTest: FirebaseTokenVerifier | null = null;
+let customAppCheckVerifierForTest: AppCheckTokenVerifier | null = null;
 
 export function setFirebaseTokenVerifierForTest(verifier: FirebaseTokenVerifier | null): void {
   customTokenVerifierForTest = verifier;
+}
+
+export function setAppCheckVerifierForTest(verifier: AppCheckTokenVerifier | null): void {
+  customAppCheckVerifierForTest = verifier;
 }
 
 export function extractBearerToken(authorizationHeader?: string): string | null {
@@ -219,7 +411,7 @@ export function extractBearerToken(authorizationHeader?: string): string | null 
 
 export async function verifyFirebaseIdToken(
   idToken: string
-): Promise<{ uid: string; email?: string }> {
+): Promise<VerifiedFirebaseUser> {
   if (customTokenVerifierForTest) {
     return await customTokenVerifierForTest(idToken);
   }
@@ -227,7 +419,60 @@ export async function verifyFirebaseIdToken(
   return {
     uid: decoded.uid,
     email: decoded.email,
+    name: typeof decoded.name === 'string' ? decoded.name : undefined,
+    role: typeof (decoded as any).role === 'string' ? (decoded as any).role : undefined,
+    signInProvider: decoded.firebase?.sign_in_provider,
   };
+}
+
+export async function verifyRequestAppCheck(req: Request): Promise<boolean> {
+  const token = String(req.headers['x-firebase-appcheck'] || '').trim();
+  const enforce = process.env.ENFORCE_APP_CHECK === 'true';
+
+  if (customAppCheckVerifierForTest) {
+    if (!token) {
+      return !enforce;
+    }
+    try {
+      await customAppCheckVerifierForTest(token);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  if (!enforce) {
+    return true;
+  }
+
+  if (!token) {
+    return false;
+  }
+
+  try {
+    await getAdminAppCheck(firebaseAdminApp).verifyToken(token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function getTeacherEmailAllowlist(): string[] {
+  const raw =
+    process.env.TEACHER_EMAIL_ALLOWLIST ??
+    'dondon.win10@gmail.com,teacher@hanu.edu.vn';
+  return raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isEmailInTeacherAllowlist(email?: string): boolean {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  if (!clean) return false;
+  const allowlist = getTeacherEmailAllowlist();
+  return allowlist.includes(clean);
 }
 
 export function checkAndIncrementAiUidQuota(
@@ -262,6 +507,88 @@ export function checkAndIncrementAiUidQuota(
   }
 
   return { allowed: true, dailyLimit };
+}
+
+export async function checkAndIncrementAiFirestoreQuota(
+  uid: string,
+  now = new Date()
+): Promise<{ allowed: boolean; reason?: 'minute_limit' | 'daily_limit'; dailyLimit: number; count?: number }> {
+  const cleanUid = uid.trim();
+  const dailyLimit = getAiDailyLimit();
+  const nowMs = now.getTime();
+
+  // 1. Per-minute burst check in memory
+  const minuteEntry = aiUidMinuteCounts.get(cleanUid);
+  if (minuteEntry && nowMs <= minuteEntry.resetAt && minuteEntry.count >= AI_RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, reason: 'minute_limit', dailyLimit };
+  }
+  if (!minuteEntry || nowMs > minuteEntry.resetAt) {
+    aiUidMinuteCounts.set(cleanUid, { count: 1, resetAt: nowMs + RATE_LIMIT_WINDOW_MS });
+  } else {
+    minuteEntry.count += 1;
+  }
+
+  // 2. Daily quota check persisted in Firestore `aiUsage/{uid}_{YYYY-MM-DD}` via transaction
+  const dateStr = now.toISOString().slice(0, 10);
+  const usageId = `${cleanUid}_${dateStr}`;
+  try {
+    const txRes = await activeServerStore.incrementAiUsageTransaction(
+      usageId,
+      cleanUid,
+      dateStr,
+      dailyLimit
+    );
+    if (!txRes.allowed) {
+      return { allowed: false, reason: 'daily_limit', dailyLimit, count: txRes.count };
+    }
+    return { allowed: true, dailyLimit, count: txRes.count };
+  } catch {
+    // Fallback to in-memory daily counter only if local ADC is unavailable in dev
+    const fallback = checkAndIncrementAiUidQuota(cleanUid, nowMs);
+    return fallback;
+  }
+}
+
+export async function isUserAuthorizedForAi(
+  user: VerifiedFirebaseUser,
+  hintClassId?: string
+): Promise<boolean> {
+  // 1. Teacher role custom claim or allowlisted teacher email
+  if (user.role === 'teacher' || isEmailInTeacherAllowlist(user.email)) {
+    return true;
+  }
+
+  try {
+    // 2. Check /teachers/{uid}
+    const teacherDoc = await activeServerStore.getDoc(`teachers/${user.uid}`);
+    if (teacherDoc && teacherDoc.role === 'teacher') {
+      return true;
+    }
+
+    // 3. Check /users/{uid} enrollment profile
+    const userDoc = await activeServerStore.getDoc(`users/${user.uid}`);
+    if (
+      userDoc &&
+      Array.isArray(userDoc.enrolledClassIds) &&
+      userDoc.enrolledClassIds.length > 0
+    ) {
+      return true;
+    }
+
+    // 4. If a specific classId was passed, check /classes/{classId}/students/{uid}
+    if (hintClassId && /^[a-zA-Z0-9_-]{1,128}$/.test(hintClassId)) {
+      const studentDoc = await activeServerStore.getDoc(
+        `classes/${hintClassId}/students/${user.uid}`
+      );
+      if (studentDoc) {
+        return true;
+      }
+    }
+  } catch {
+    // Deny if membership cannot be verified
+  }
+
+  return false;
 }
 
 export function isTrustedRequestOrigin(params: {
@@ -335,6 +662,45 @@ export function isTrustedRequestOrigin(params: {
   return true;
 }
 
+async function authenticateBearerRequest(
+  req: Request,
+  res: Response
+): Promise<VerifiedFirebaseUser | null> {
+  const appCheckOk = await verifyRequestAppCheck(req);
+  if (!appCheckOk) {
+    res.status(401).json({
+      error: 'Unauthorized: Missing or invalid Firebase App Check token.',
+      fallback: true,
+    });
+    return null;
+  }
+
+  const bearerToken = extractBearerToken(
+    typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+  );
+  if (!bearerToken) {
+    res.status(401).json({
+      error: 'Unauthorized: Missing Firebase ID Token in Authorization Bearer header.',
+      fallback: true,
+    });
+    return null;
+  }
+
+  try {
+    const verifiedUser = await verifyFirebaseIdToken(bearerToken);
+    if (!verifiedUser || !verifiedUser.uid) {
+      throw new Error('Missing uid in verified token');
+    }
+    return verifiedUser;
+  } catch {
+    res.status(401).json({
+      error: 'Unauthorized: Invalid or expired Firebase ID Token.',
+      fallback: true,
+    });
+    return null;
+  }
+}
+
 async function protectAiRoute(req: Request, res: Response, next: NextFunction) {
   const origin = String(req.headers.origin || '');
   const referer = String(req.headers.referer || '');
@@ -358,34 +724,24 @@ async function protectAiRoute(req: Request, res: Response, next: NextFunction) {
     return;
   }
 
-  // Require Authorization: Bearer <Firebase ID Token>
-  const bearerToken = extractBearerToken(
-    typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
-  );
-  if (!bearerToken) {
-    res.status(401).json({
-      error: 'Unauthorized: Missing Firebase ID Token in Authorization Bearer header.',
+  const verifiedUser = await authenticateBearerRequest(req, res);
+  if (!verifiedUser) {
+    return;
+  }
+
+  const hintClassId = String(req.body?.classId || req.headers['x-hanu-class-id'] || '').trim();
+  const isAuthorized = await isUserAuthorizedForAi(verifiedUser, hintClassId);
+  if (!isAuthorized) {
+    res.status(403).json({
+      error:
+        'Forbidden: Chỉ tài khoản Giảng viên hoặc Học viên đã tham gia ít nhất 1 lớp học mới được sử dụng tính năng AI.',
       fallback: true,
     });
     return;
   }
 
-  let verifiedUser: { uid: string; email?: string };
-  try {
-    verifiedUser = await verifyFirebaseIdToken(bearerToken);
-    if (!verifiedUser || !verifiedUser.uid) {
-      throw new Error('Missing uid in verified token');
-    }
-  } catch {
-    res.status(401).json({
-      error: 'Unauthorized: Invalid or expired Firebase ID Token.',
-      fallback: true,
-    });
-    return;
-  }
-
-  // Rate-limit by verified Firebase UID (minute burst + AI_DAILY_LIMIT)
-  const quotaResult = checkAndIncrementAiUidQuota(verifiedUser.uid);
+  // Rate-limit by verified Firebase UID (minute burst + Firestore transaction aiUsage/{uid}_{YYYY-MM-DD})
+  const quotaResult = await checkAndIncrementAiFirestoreQuota(verifiedUser.uid);
   if (!quotaResult.allowed) {
     if (quotaResult.reason === 'minute_limit') {
       res.status(429).json({
@@ -401,9 +757,686 @@ async function protectAiRoute(req: Request, res: Response, next: NextFunction) {
     return;
   }
 
-  (req as Request & { firebaseUser?: { uid: string; email?: string } }).firebaseUser = verifiedUser;
+  (req as Request & { firebaseUser?: VerifiedFirebaseUser }).firebaseUser = verifiedUser;
   next();
 }
+
+// ============================================================================
+// 4. CLASSROOM & SECURITY ROUTES (TEACHER BOOTSTRAP, JOIN CLASS, SUBMISSIONS)
+// ============================================================================
+const SERVER_RANDOM_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+function generateServerRandomCode(prefix = 'HV', length = 6): string {
+  let rand = '';
+  for (let i = 0; i < length; i++) {
+    rand += SERVER_RANDOM_ALPHABET[Math.floor(Math.random() * SERVER_RANDOM_ALPHABET.length)];
+  }
+  return `${prefix}-${rand}`;
+}
+
+/**
+ * Built-in server fallback answer keys for preset assignments (`assign-b14`, `assign-b15`, `speedtest-10`)
+ * when a teacher assigns a preset package before saving a custom answerKey doc.
+ */
+const BUILTIN_SERVER_ANSWER_KEYS: Record<string, ServerAnswerKeyRecord> = {
+  'assign-b14': {
+    assignmentId: 'assign-b14',
+    teacherUid: 'system',
+    multipleChoiceAnswers: {
+      'mc-14-1': 'A',
+      'mc-14-2': 'B',
+      'mc-14-3': 'C',
+    },
+    sentenceOrderingAnswers: {
+      'so-14-1': ['春天', '的', '阳光', '非常', '温暖', '。'],
+      'so-14-2': ['咱们', '一起', '看', '个', '电影', '吧', '。'],
+    },
+    essayModels: {
+      'es-14-1': { targetWord: '温暖', sampleSentence: '老师的关怀让我感到很温暖。' },
+      'es-14-2': { targetWord: '换', sampleSentence: '请问，我可以在这里换人民币吗？' },
+    },
+    maxAttempts: 1,
+  },
+  'assign-b15': {
+    assignmentId: 'assign-b15',
+    teacherUid: 'system',
+    multipleChoiceAnswers: {
+      'mc-15-1': 'A',
+      'mc-15-2': 'A',
+      'mc-15-3': 'A',
+    },
+    sentenceOrderingAnswers: {
+      'so-15-1': ['下午', '我', '想', '去', '超市', '买', '一件', '外套', '。'],
+      'so-15-2': ['这些', '东西', '一共', '是', '多少', '钱', '？'],
+    },
+    essayModels: {
+      'es-15-1': { targetWord: '贵', sampleSentence: '这个手机太贵了，我不买。' },
+      'es-15-2': { targetWord: '一件', sampleSentence: '妈妈送给我一件很漂亮的衣服。' },
+    },
+    maxAttempts: 1,
+  },
+  'speedtest-10': {
+    assignmentId: 'speedtest-10',
+    teacherUid: 'system',
+    multipleChoiceAnswers: {
+      'st-1': '温暖',
+      'st-2': '咱们',
+      'st-3': '愿意',
+      'st-4': '空调',
+      'st-5': '洗衣机',
+      'st-6': '换',
+      'st-7': '初中',
+      'st-8': '花园',
+      'st-9': '刻',
+      'st-10': '幸福',
+    },
+    sentenceOrderingAnswers: {},
+    essayModels: {},
+    maxAttempts: 1,
+  },
+};
+
+export function gradeSubmissionPayloadOnServer(params: {
+  answerKey: ServerAnswerKeyRecord;
+  answers: Record<string, any>;
+}): {
+  score: number;
+  correctCount: number;
+  totalQuestions: number;
+  quizScore: string;
+  vocabScore: string;
+  writingScore: string;
+  reviewWords: string[];
+  status: 'Đã chấm tự động' | 'Cần kèm thêm';
+  feedback: string;
+} {
+  const { answerKey, answers } = params;
+  const mcAnswers =
+    (answers?.mcAnswers as Record<string, string> | undefined) ||
+    (answers?.speedTestAnswers as Record<string, string> | undefined) ||
+    (answers as Record<string, string>) ||
+    {};
+  const selectedTokensMap =
+    (answers?.selectedTokensMap as Record<string, string[]> | undefined) || {};
+  const essayAnswers =
+    (answers?.essayAnswers as Record<string, string> | undefined) || {};
+
+  let correctCount = 0;
+  let totalQuestions = 0;
+  const reviewWordsSet = new Set<string>();
+
+  for (const [qId, expectedKey] of Object.entries(answerKey.multipleChoiceAnswers || {})) {
+    totalQuestions += 1;
+    const actual = String(mcAnswers[qId] ?? (answers as any)?.[qId] ?? '').trim();
+    if (actual && actual.toUpperCase() === String(expectedKey).trim().toUpperCase()) {
+      correctCount += 1;
+    }
+  }
+
+  for (const [qId, expectedTokens] of Object.entries(answerKey.sentenceOrderingAnswers || {})) {
+    if (!Array.isArray(expectedTokens) || expectedTokens.length === 0) continue;
+    totalQuestions += 1;
+    const rawSubmitted = selectedTokensMap[qId] ?? (answers as any)?.[qId];
+    const actualSentence = Array.isArray(rawSubmitted)
+      ? rawSubmitted.join('').replace(/\s+/g, '')
+      : String(rawSubmitted || '').replace(/\s+/g, '');
+    const expectedSentence = expectedTokens.join('').replace(/\s+/g, '');
+    if (actualSentence && actualSentence === expectedSentence) {
+      correctCount += 1;
+    }
+  }
+
+  for (const [qId, model] of Object.entries(answerKey.essayModels || {})) {
+    totalQuestions += 1;
+    const actualText = String(essayAnswers[qId] ?? (answers as any)?.[qId] ?? '').trim();
+    const targetWord = String(model?.targetWord || '').trim();
+    if (actualText.length >= 2 && (!targetWord || actualText.includes(targetWord))) {
+      correctCount += 1;
+    } else if (targetWord) {
+      reviewWordsSet.add(targetWord);
+    }
+  }
+
+  if (totalQuestions === 0) {
+    totalQuestions = 1;
+  }
+
+  const score = Math.max(0, Math.min(100, Math.round((correctCount / totalQuestions) * 100)));
+  const reviewWords = Array.from(reviewWordsSet);
+  const learnedVocab = Math.max(0, Math.min(18, Math.round((score / 100) * 18)));
+  const writingPct = score > 0 ? Math.min(100, Math.max(60, score)) : 0;
+  const status: 'Đã chấm tự động' | 'Cần kèm thêm' =
+    score < 90 ? 'Cần kèm thêm' : 'Đã chấm tự động';
+  const feedback =
+    reviewWords.length > 0
+      ? `Chấm điểm trên Server đạt ${score}/100đ (${correctCount}/${totalQuestions} câu đúng) · Cần ôn lại: ${reviewWords.join(', ')}.`
+      : `Hoàn thành bài tập đạt ${score}/100đ (${correctCount}/${totalQuestions} câu đúng), chấm tự động trên Server.`;
+
+  return {
+    score,
+    correctCount,
+    totalQuestions,
+    quizScore: `${correctCount}/${totalQuestions} câu đúng`,
+    vocabScore: `${learnedVocab}/18 từ`,
+    writingScore: score > 0 ? `${writingPct}% độ chuẩn nét` : '',
+    reviewWords,
+    status,
+    feedback,
+  };
+}
+
+/**
+ * 4A. Teacher Bootstrap Route: POST /api/teachers/bootstrap
+ * Verifies that the authenticated user's email is in TEACHER_EMAIL_ALLOWLIST,
+ * sets custom claim `role = 'teacher'`, and creates/updates `/teachers/{uid}`.
+ */
+app.post('/api/teachers/bootstrap', async (req, res) => {
+  const verifiedUser = await authenticateBearerRequest(req, res);
+  if (!verifiedUser) return;
+
+  const email = (verifiedUser.email || '').trim().toLowerCase();
+  if (!isEmailInTeacherAllowlist(email)) {
+    res.status(403).json({
+      error: `Email "${email || '(ẩn danh)'}" không nằm trong danh sách Giảng viên được cấp phép (TEACHER_EMAIL_ALLOWLIST).`,
+    });
+    return;
+  }
+
+  try {
+    await activeServerStore.setTeacherCustomClaim(verifiedUser.uid);
+    const nowIso = new Date().toISOString();
+    const displayName = String(
+      req.body?.displayName || verifiedUser.name || email.split('@')[0] || 'Giảng viên HANU'
+    )
+      .trim()
+      .slice(0, 120);
+
+    const teacherDoc = {
+      uid: verifiedUser.uid,
+      email,
+      displayName,
+      role: 'teacher',
+      updatedAt: nowIso,
+    };
+
+    await activeServerStore.setDoc(`teachers/${verifiedUser.uid}`, teacherDoc, { merge: true });
+
+    res.status(200).json({
+      ok: true,
+      role: 'teacher',
+      teacher: teacherDoc,
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Không thể thiết lập quyền Giảng viên.',
+    });
+  }
+});
+
+/**
+ * 4B. Server-Mediated Class Joining Route: POST /api/classes/join
+ * Body: { joinCode: string, studentCode?: string }
+ * Uses firebase-admin to verify joinCode -> classId, studentCode slot availability,
+ * and writes `classes/{classId}/students/{uid}` with zeroed initial score/feedback fields.
+ */
+app.post('/api/classes/join', async (req, res) => {
+  const verifiedUser = await authenticateBearerRequest(req, res);
+  if (!verifiedUser) return;
+
+  const cleanJoinCode = String(req.body?.joinCode || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, '');
+  const cleanStudentCode = String(req.body?.studentCode || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, '');
+
+  if (cleanJoinCode.length < 6 || cleanJoinCode.length > 32) {
+    res.status(400).json({
+      error: 'Mã lớp (joinCode) không hợp lệ (tối thiểu 6 ký tự).',
+    });
+    return;
+  }
+
+  try {
+    // 1. Lookup joinCodes/{joinCode}
+    const joinCodeDoc = await activeServerStore.getDoc(`joinCodes/${cleanJoinCode}`);
+    if (!joinCodeDoc || !joinCodeDoc.classId) {
+      res.status(404).json({
+        error: `Không tìm thấy lớp học với mã lớp "${cleanJoinCode}".`,
+      });
+      return;
+    }
+
+    const classId = String(joinCodeDoc.classId);
+    const classData = await activeServerStore.getDoc(`classes/${classId}`);
+    if (!classData) {
+      res.status(404).json({
+        error: 'Lớp học không còn tồn tại trên hệ thống.',
+      });
+      return;
+    }
+
+    const classroom = {
+      id: classId,
+      teacherUid: String(classData.teacherUid || ''),
+      teacherName: String(classData.teacherName || 'Giảng viên HSK'),
+      name: String(classData.name || 'Lớp HSK 3.0'),
+      hskLevel: String(classData.hskLevel || 'HSK 3'),
+      joinCode: String(classData.joinCode || cleanJoinCode),
+      createdAt: String(classData.createdAt || new Date().toISOString()),
+      updatedAt: classData.updatedAt ? String(classData.updatedAt) : undefined,
+    };
+
+    // 2. Check if student already has a record at classes/{classId}/students/{uid}
+    const existingOwnStudent = await activeServerStore.getDoc(
+      `classes/${classId}/students/${verifiedUser.uid}`
+    );
+    if (existingOwnStudent) {
+      if (
+        cleanStudentCode &&
+        existingOwnStudent.studentCode &&
+        String(existingOwnStudent.studentCode).toUpperCase() !== cleanStudentCode
+      ) {
+        res.status(403).json({
+          error: `Tài khoản của bạn đã gắn với mã học sinh ${existingOwnStudent.studentCode}. Không thể đổi sang mã ${cleanStudentCode}.`,
+        });
+        return;
+      }
+
+      const studentRecord = {
+        id: verifiedUser.uid,
+        studentCode: String(existingOwnStudent.studentCode || cleanStudentCode),
+        name: String(existingOwnStudent.name || verifiedUser.name || 'Học viên'),
+        hskLevel: String(existingOwnStudent.hskLevel || classroom.hskLevel),
+        vocabScore: String(existingOwnStudent.vocabScore ?? ''),
+        writingScore: String(existingOwnStudent.writingScore ?? ''),
+        quizScore: String(existingOwnStudent.quizScore ?? ''),
+        totalPoints: Number(existingOwnStudent.totalPoints || 0),
+        status: String(existingOwnStudent.status || 'Chưa nộp'),
+        feedback: String(existingOwnStudent.feedback ?? ''),
+        timeSeconds: Number(existingOwnStudent.timeSeconds || 0),
+        streak: Number(existingOwnStudent.streak || 0),
+        reviewWords: Array.isArray(existingOwnStudent.reviewWords)
+          ? existingOwnStudent.reviewWords
+          : [],
+      };
+
+      res.status(200).json({ classroom, studentRecord });
+      return;
+    }
+
+    // 3. Require a valid teacher-issued studentCode slot that has not been claimed by another uid
+    if (!cleanStudentCode || cleanStudentCode.length < 6) {
+      res.status(400).json({
+        error: 'Vui lòng nhập Mã học sinh hợp lệ (tối thiểu 6 ký tự) do Giảng viên cấp.',
+      });
+      return;
+    }
+
+    const allStudentDocs = await activeServerStore.listCollection(
+      `classes/${classId}/students`
+    );
+    const matchedSlot = allStudentDocs.find(
+      (docItem) =>
+        String(docItem.data.studentCode || '').toUpperCase() === cleanStudentCode
+    );
+
+    if (!matchedSlot) {
+      res.status(404).json({
+        error: `Mã học sinh "${cleanStudentCode}" chưa được Giảng viên cấp trong lớp "${classroom.name}".`,
+      });
+      return;
+    }
+
+    const boundUid = String(matchedSlot.data.studentUid || '').trim();
+    if (boundUid && boundUid !== verifiedUser.uid) {
+      res.status(409).json({
+        error: `Mã học sinh "${cleanStudentCode}" đã được kích hoạt bởi một tài khoản khác.`,
+      });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const studentName = String(
+      matchedSlot.data.name || verifiedUser.name || cleanStudentCode
+    )
+      .trim()
+      .slice(0, 120);
+    const hskLevel = String(matchedSlot.data.hskLevel || classroom.hskLevel || 'HSK 3');
+    const joinedAt = String(matchedSlot.data.joinedAt || nowIso.slice(0, 10));
+
+    const newStudentDoc = {
+      studentUid: verifiedUser.uid,
+      studentCode: cleanStudentCode,
+      name: studentName,
+      hskLevel,
+      joinedAt,
+      vocabScore: String(matchedSlot.data.vocabScore ?? ''),
+      writingScore: String(matchedSlot.data.writingScore ?? ''),
+      quizScore: String(matchedSlot.data.quizScore ?? ''),
+      totalPoints: Number(matchedSlot.data.totalPoints || 0),
+      status: String(matchedSlot.data.status || 'Chưa nộp'),
+      feedback: String(matchedSlot.data.feedback ?? ''),
+      timeSeconds: Number(matchedSlot.data.timeSeconds || 0),
+      streak: Number(matchedSlot.data.streak || 0),
+      reviewWords: Array.isArray(matchedSlot.data.reviewWords)
+        ? matchedSlot.data.reviewWords
+        : [],
+      updatedAt: nowIso,
+    };
+
+    // Write canonical student doc keyed by student's UID
+    await activeServerStore.setDoc(
+      `classes/${classId}/students/${verifiedUser.uid}`,
+      newStudentDoc
+    );
+
+    // Mark the teacher slot as claimed by this studentUid
+    if (matchedSlot.id !== verifiedUser.uid) {
+      await activeServerStore.setDoc(
+        `classes/${classId}/students/${matchedSlot.id}`,
+        {
+          ...matchedSlot.data,
+          studentUid: verifiedUser.uid,
+          updatedAt: nowIso,
+        },
+        { merge: true }
+      );
+    }
+
+    // Record enrollment in users/{uid} so AI routes know this student belongs to a class
+    const existingUserDoc = await activeServerStore.getDoc(`users/${verifiedUser.uid}`);
+    const prevClasses = Array.isArray(existingUserDoc?.enrolledClassIds)
+      ? (existingUserDoc!.enrolledClassIds as string[])
+      : [];
+    const nextClasses = Array.from(new Set([...prevClasses, classId]));
+    await activeServerStore.setDoc(
+      `users/${verifiedUser.uid}`,
+      {
+        uid: verifiedUser.uid,
+        enrolledClassIds: nextClasses,
+        activeClassId: classId,
+        updatedAt: nowIso,
+      },
+      { merge: true }
+    );
+
+    res.status(200).json({
+      classroom,
+      studentRecord: {
+        id: verifiedUser.uid,
+        ...newStudentDoc,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Không thể tham gia lớp học lúc này.',
+    });
+  }
+});
+
+/**
+ * 4C. Teacher Reset / Re-issue Student Code Slot:
+ * POST /api/classes/:classId/students/:studentCode/reset-slot
+ * Allows the class teacher to unbind `studentUid` (and optionally regenerate a new random 6-char code)
+ * when a student changes devices.
+ */
+app.post('/api/classes/:classId/students/:studentCode/reset-slot', async (req, res) => {
+  const verifiedUser = await authenticateBearerRequest(req, res);
+  if (!verifiedUser) return;
+
+  const classId = String(req.params.classId || '').trim();
+  const targetCode = String(req.params.studentCode || '')
+    .trim()
+    .toUpperCase();
+  const regenerateCode = Boolean(req.body?.regenerateCode);
+
+  if (!classId || !targetCode) {
+    res.status(400).json({ error: 'Thiếu classId hoặc studentCode.' });
+    return;
+  }
+
+  try {
+    const classData = await activeServerStore.getDoc(`classes/${classId}`);
+    if (!classData || classData.teacherUid !== verifiedUser.uid) {
+      res.status(403).json({
+        error: 'Forbidden: Chỉ Giảng viên chủ nhiệm lớp mới có quyền cấp lại mã học viên.',
+      });
+      return;
+    }
+
+    const allStudentDocs = await activeServerStore.listCollection(
+      `classes/${classId}/students`
+    );
+    const matchingDocs = allStudentDocs.filter(
+      (d) => String(d.data.studentCode || '').toUpperCase() === targetCode
+    );
+
+    if (matchingDocs.length === 0) {
+      res.status(404).json({ error: `Không tìm thấy mã học viên "${targetCode}" trong lớp.` });
+      return;
+    }
+
+    const nextStudentCode = regenerateCode ? generateServerRandomCode('HV', 6) : targetCode;
+    const nowIso = new Date().toISOString();
+    let baseRecord = matchingDocs[0].data;
+
+    for (const docItem of matchingDocs) {
+      const oldUid = String(docItem.data.studentUid || '').trim();
+      if (oldUid && docItem.id === oldUid) {
+        baseRecord = docItem.data;
+        await activeServerStore.deleteDoc(`classes/${classId}/students/${oldUid}`);
+      } else if (!docItem.id.startsWith('slot-')) {
+        await activeServerStore.deleteDoc(`classes/${classId}/students/${docItem.id}`);
+      } else {
+        await activeServerStore.deleteDoc(`classes/${classId}/students/${docItem.id}`);
+      }
+    }
+
+    const newSlotId = `slot-${nextStudentCode.toLowerCase().replace(/[^a-z0-9_-]/g, '')}`;
+    const updatedSlot = {
+      ...baseRecord,
+      studentUid: '',
+      studentCode: nextStudentCode,
+      updatedAt: nowIso,
+    };
+
+    await activeServerStore.setDoc(`classes/${classId}/students/${newSlotId}`, updatedSlot);
+
+    res.status(200).json({
+      ok: true,
+      previousStudentCode: targetCode,
+      studentCode: nextStudentCode,
+      slotId: newSlotId,
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Không thể cấp lại mã học viên.',
+    });
+  }
+});
+
+/**
+ * 4D. Server-Side Homework Grading Route: POST /api/submissions
+ * Body: { classId, assignmentId, answers, timeSeconds? }
+ * Verifies student membership in classId, enforces max attempts, grades against
+ * `classes/{classId}/answerKeys/{assignmentId}`, and writes `submissions`, `leaderboard`, and `students`.
+ */
+app.post('/api/submissions', async (req, res) => {
+  const verifiedUser = await authenticateBearerRequest(req, res);
+  if (!verifiedUser) return;
+
+  const classId = String(req.body?.classId || '').trim();
+  const assignmentId = String(req.body?.assignmentId || 'default-assignment').trim();
+  const answers =
+    req.body?.answers && typeof req.body.answers === 'object'
+      ? (req.body.answers as Record<string, any>)
+      : null;
+  const rawTimeSeconds = Number(req.body?.timeSeconds || 0);
+
+  if (!classId || !/^[a-zA-Z0-9_-]{1,128}$/.test(classId)) {
+    res.status(400).json({ error: 'classId không hợp lệ.' });
+    return;
+  }
+  if (!assignmentId || !/^[a-zA-Z0-9_-]{1,128}$/.test(assignmentId)) {
+    res.status(400).json({ error: 'assignmentId không hợp lệ.' });
+    return;
+  }
+  if (!answers) {
+    res.status(400).json({ error: 'Thiếu dữ liệu bài làm (answers).' });
+    return;
+  }
+
+  try {
+    // 1. Verify student is enrolled in this class
+    const studentDocPath = `classes/${classId}/students/${verifiedUser.uid}`;
+    const studentDoc = await activeServerStore.getDoc(studentDocPath);
+    if (!studentDoc) {
+      res.status(403).json({
+        error: 'Forbidden: Bạn chưa tham gia lớp học này nên không thể nộp bài.',
+      });
+      return;
+    }
+
+    // 2. Load secret answerKey from Firestore (or fallback to built-in preset answer key)
+    const storedAnswerKey = (await activeServerStore.getDoc(
+      `classes/${classId}/answerKeys/${assignmentId}`
+    )) as ServerAnswerKeyRecord | null;
+    const answerKey: ServerAnswerKeyRecord | null =
+      storedAnswerKey || BUILTIN_SERVER_ANSWER_KEYS[assignmentId] || null;
+
+    if (!answerKey) {
+      res.status(404).json({
+        error: `Không tìm thấy đáp án chấm điểm cho bài tập "${assignmentId}".`,
+      });
+      return;
+    }
+
+    // 3. Enforce max submission attempts on deterministic submission doc ID `{assignmentId}_{uid}`
+    const configuredMax = Number(process.env.MAX_SUBMISSION_ATTEMPTS || 1);
+    const maxAttempts = Math.max(
+      1,
+      Math.floor(Number(answerKey.maxAttempts || configuredMax || 1))
+    );
+    const submissionId = `${assignmentId}_${verifiedUser.uid}`;
+    const submissionPath = `classes/${classId}/submissions/${submissionId}`;
+    const existingSub = await activeServerStore.getDoc(submissionPath);
+    const prevAttempts = existingSub ? Number(existingSub.attemptCount || 1) : 0;
+
+    if (prevAttempts >= maxAttempts) {
+      res.status(409).json({
+        error: `Bạn đã nộp bài tập này (${prevAttempts}/${maxAttempts} lượt cho phép).`,
+      });
+      return;
+    }
+
+    // 4. Grade answers on the server against answerKey
+    const graded = gradeSubmissionPayloadOnServer({
+      answerKey,
+      answers,
+    });
+
+    const nowIso = new Date().toISOString();
+    const timeSeconds =
+      Number.isFinite(rawTimeSeconds) && rawTimeSeconds > 0
+        ? Math.max(5, Math.min(3600, Math.round(rawTimeSeconds)))
+        : 30;
+    const prevStreak = Number(studentDoc.streak || 0);
+    const nextStreak = prevStreak + 1;
+    const attemptCount = prevAttempts + 1;
+
+    const studentCode = String(studentDoc.studentCode || 'HV-RANDOM');
+    const studentName = String(studentDoc.name || verifiedUser.name || 'Học viên');
+    const hskLevel = String(studentDoc.hskLevel || 'HSK 3');
+
+    const submissionDoc = {
+      id: submissionId,
+      studentUid: verifiedUser.uid,
+      studentCode,
+      studentName,
+      assignmentId,
+      score: graded.score,
+      attemptCount,
+      quizScore: graded.quizScore,
+      vocabScore: graded.vocabScore,
+      writingScore: graded.writingScore,
+      reviewWords: graded.reviewWords,
+      feedback: graded.feedback,
+      answers,
+      submittedAt: nowIso,
+    };
+
+    await activeServerStore.setDoc(submissionPath, submissionDoc);
+
+    // 5. Update leaderboard summary via Admin SDK
+    await activeServerStore.setDoc(`classes/${classId}/leaderboard/${verifiedUser.uid}`, {
+      studentUid: verifiedUser.uid,
+      studentCode,
+      name: studentName,
+      hskLevel,
+      score: graded.score,
+      timeSeconds,
+      streak: nextStreak,
+      updatedAt: nowIso,
+    });
+
+    // 6. Update student's score/status/feedback fields in classes/{classId}/students/{uid}
+    const updatedStudentFields = {
+      vocabScore: graded.vocabScore,
+      writingScore: graded.writingScore,
+      quizScore: graded.quizScore,
+      totalPoints: graded.score,
+      status: graded.status,
+      feedback: graded.feedback,
+      reviewWords: graded.reviewWords,
+      timeSeconds,
+      streak: nextStreak,
+      lastSubmittedAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    await activeServerStore.setDoc(studentDocPath, updatedStudentFields, { merge: true });
+
+    // Also keep any pre-registered slot doc in sync for teacher roster view
+    const slotId = `slot-${studentCode.toLowerCase().replace(/[^a-z0-9_-]/g, '')}`;
+    const existingSlot = await activeServerStore.getDoc(
+      `classes/${classId}/students/${slotId}`
+    );
+    if (existingSlot) {
+      await activeServerStore.setDoc(
+        `classes/${classId}/students/${slotId}`,
+        {
+          ...updatedStudentFields,
+          studentUid: verifiedUser.uid,
+        },
+        { merge: true }
+      );
+    }
+
+    res.status(200).json({
+      submissionId,
+      score: graded.score,
+      correctCount: graded.correctCount,
+      totalQuestions: graded.totalQuestions,
+      attemptCount,
+      maxAttempts,
+      quizScore: graded.quizScore,
+      vocabScore: graded.vocabScore,
+      writingScore: graded.writingScore,
+      reviewWords: graded.reviewWords,
+      status: graded.status,
+      feedback: graded.feedback,
+      timeSeconds,
+      streak: nextStreak,
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Không thể chấm bài trên server lúc này.',
+    });
+  }
+});
 
 async function callGeminiModel(
   ai: GoogleGenAI,

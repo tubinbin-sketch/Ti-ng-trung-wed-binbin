@@ -3871,6 +3871,30 @@ export function isStudentNeedsSupport(student: {
   return student.totalPoints < 90 || student.status === 'Cần kèm thêm';
 }
 
+const RANDOM_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+export function generateRandomAlphanumericCode(length = 6): string {
+  const safeLen = Math.max(6, Math.min(24, Math.floor(length)));
+  let result = '';
+  for (let i = 0; i < safeLen; i++) {
+    const idx = Math.floor(Math.random() * RANDOM_CODE_ALPHABET.length);
+    result += RANDOM_CODE_ALPHABET[idx];
+  }
+  return result;
+}
+
+export function generateRandomJoinCode(prefix = 'HSK'): string {
+  const cleanPrefix = prefix.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 6);
+  const randomPart = generateRandomAlphanumericCode(6);
+  return cleanPrefix ? `${cleanPrefix}-${randomPart}` : randomPart;
+}
+
+export function generateRandomStudentCode(prefix = 'HV'): string {
+  const cleanPrefix = prefix.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 4);
+  const randomPart = generateRandomAlphanumericCode(6);
+  return cleanPrefix ? `${cleanPrefix}-${randomPart}` : randomPart;
+}
+
 export function createStudentRecord(
   input: {
     name: string;
@@ -3878,13 +3902,11 @@ export function createStudentRecord(
     hskLevel?: 'HSK 1' | 'HSK 2' | 'HSK 3' | 'HSK 4' | string;
     initialPoints?: number;
   },
-  existingCount = 12
+  _existingCount = 0
 ): ClassStudentRecord {
   const cleanName = input.name.trim();
-  const nextNumber = existingCount + 1;
   const cleanCode =
-    (input.studentCode || '').trim() ||
-    `HV-${String(nextNumber).padStart(3, '0')}`;
+    (input.studentCode || '').trim().toUpperCase() || generateRandomStudentCode('HV');
   const validLevels = ['HSK 1', 'HSK 2', 'HSK 3', 'HSK 4'] as const;
   const cleanLevel = validLevels.includes(input.hskLevel as any)
     ? (input.hskLevel as 'HSK 1' | 'HSK 2' | 'HSK 3' | 'HSK 4')
@@ -3893,8 +3915,26 @@ export function createStudentRecord(
   const rawPoints =
     typeof input.initialPoints === 'number' && !Number.isNaN(input.initialPoints)
       ? input.initialPoints
-      : 95;
+      : 0;
   const clampedPoints = Math.max(0, Math.min(100, Math.round(rawPoints)));
+
+  if (clampedPoints === 0) {
+    return {
+      id: `st-${Date.now()}-${generateRandomAlphanumericCode(6).toLowerCase()}`,
+      studentCode: cleanCode,
+      hskLevel: cleanLevel,
+      name: cleanName,
+      vocabScore: '',
+      writingScore: '',
+      quizScore: '',
+      totalPoints: 0,
+      status: 'Chưa nộp',
+      reviewWords: [],
+      timeSeconds: 0,
+      streak: 0,
+      feedback: '',
+    };
+  }
 
   const vocabCount = Math.min(
     18,
@@ -3909,7 +3949,7 @@ export function createStudentRecord(
   const needsSupport = clampedPoints < 90;
 
   return {
-    id: `st-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: `st-${Date.now()}-${generateRandomAlphanumericCode(6).toLowerCase()}`,
     studentCode: cleanCode,
     hskLevel: cleanLevel,
     name: cleanName,

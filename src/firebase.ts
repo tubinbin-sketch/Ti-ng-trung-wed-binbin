@@ -1,9 +1,16 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+  getToken as getAppCheckToken,
+  type AppCheck,
+} from 'firebase/app-check';
+import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
   signInAnonymously,
+  linkWithPopup,
   signOut,
   onAuthStateChanged,
   connectAuthEmulator,
@@ -11,6 +18,9 @@ import {
 } from 'firebase/auth';
 import {
   getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   connectFirestoreEmulator,
   doc,
   getDoc,
@@ -24,6 +34,7 @@ import {
   where,
   onSnapshot,
   writeBatch,
+  type Firestore,
   type Unsubscribe,
 } from 'firebase/firestore';
 import firebaseAppletConfig from '../firebase-applet-config.json';
@@ -33,10 +44,13 @@ import {
 } from './data/chineseData';
 import {
   ClassStudentRecord,
+  generateRandomJoinCode,
+  generateRandomStudentCode,
   registerFirebaseTokenGetter,
 } from './utils/chineseEngine';
 import {
-  PRESET_ASSIGNMENT_BUOI_14,
+  extractAssignmentAnswerKey,
+  sanitizeAssignmentForPublic,
   type UploadedAssignmentPackage,
 } from './utils/assignmentParser';
 import type { SrsWordRecord } from './utils/hskStudyHelpers';
@@ -73,8 +87,43 @@ export const firebaseConfig = {
 };
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+function createPersistentFirestoreInstance(): Firestore {
+  if (typeof window !== 'undefined') {
+    try {
+      return initializeFirestore(
+        app,
+        {
+          localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager(),
+          }),
+        },
+        firebaseConfig.firestoreDatabaseId
+      );
+    } catch {
+      // Fallback if Firestore was already initialized in this tab
+    }
+  }
+  return getFirestore(app, firebaseConfig.firestoreDatabaseId);
+}
+
+export const db = createPersistentFirestoreInstance();
 export const auth = getAuth(app);
+
+let appCheckInstance: AppCheck | null = null;
+if (typeof window !== 'undefined') {
+  const recaptchaSiteKey = (envConfig.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY || '').trim();
+  if (recaptchaSiteKey) {
+    try {
+      appCheckInstance = initializeAppCheck(app, {
+        provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
+        isTokenAutoRefreshEnabled: true,
+      });
+    } catch {
+      // Ignore if App Check is already initialized
+    }
+  }
+}
 
 let emulatorsConnected = false;
 if (
@@ -205,25 +254,91 @@ export interface FirestoreLeaderboardDoc {
 }
 
 /**
- * Returns Authorization header with current Firebase user's ID Token for server-side Gemini AI routes.
+ * Returns Authorization header with current Firebase user's ID Token
+ * and X-Firebase-AppCheck header (when App Check is configured) for server routes.
  */
 export async function getFirebaseAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
   try {
     if (auth.currentUser) {
       const token = await auth.currentUser.getIdToken();
       if (token) {
-        return { Authorization: `Bearer ${token}` };
+        headers.Authorization = `Bearer ${token}`;
       }
     }
   } catch {
     // Ignore token refresh errors
   }
-  return {};
+
+  if (appCheckInstance) {
+    try {
+      const appCheckTokenResult = await getAppCheckToken(appCheckInstance, false);
+      if (appCheckTokenResult?.token) {
+        headers['X-Firebase-AppCheck'] = appCheckTokenResult.token;
+      }
+    } catch {
+      // Ignore App Check token errors when not enforced
+    }
+  }
+
+  return headers;
+}
+
+/**
+ * Generates a unique random joinCode (at least 6 random characters, never derived from uid)
+ * and verifies that `/joinCodes/{code}` does not already exist.
+ */
+async function reserveUniqueRandomJoinCode(
+  classId: string,
+  teacherUid: string,
+  preferredCode?: string
+): Promise<string> {
+  const nowIso = new Date().toISOString();
+  const cleanPreferred = (preferredCode || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, '');
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const candidate =
+      attempt === 0 && cleanPreferred.length >= 6
+        ? cleanPreferred.slice(0, 32)
+        : generateRandomJoinCode('HSK');
+
+    try {
+      const existingSnap = await getDoc(doc(db, 'joinCodes', candidate));
+      if (existingSnap.exists()) {
+        if (existingSnap.data()?.classId === classId) {
+          return candidate;
+        }
+        continue;
+      }
+
+      await setDoc(doc(db, 'joinCodes', candidate), {
+        classId,
+        teacherUid,
+        createdAt: nowIso,
+      });
+      return candidate;
+    } catch {
+      // If reservation failed due to collision, retry with a fresh random code
+    }
+  }
+
+  const fallbackCode = generateRandomJoinCode('HSK');
+  await setDoc(doc(db, 'joinCodes', fallbackCode), {
+    classId,
+    teacherUid,
+    createdAt: nowIso,
+  });
+  return fallbackCode;
 }
 
 /**
  * Teacher Google Sign-In via Firebase Auth Popup.
- * Automatically creates/updates `/teachers/{uid}` and ensures at least one default class exists for the teacher.
+ * Calls server `/api/teachers/bootstrap` to verify `TEACHER_EMAIL_ALLOWLIST` and set custom claim `role = 'teacher'`,
+ * refreshes the ID token so Firestore security rules recognize `request.auth.token.role == 'teacher'`,
+ * and ensures at least one default class exists for the teacher.
  */
 export async function signInTeacherWithGoogle(): Promise<{
   user: User;
@@ -234,35 +349,37 @@ export async function signInTeacherWithGoogle(): Promise<{
   provider.setCustomParameters({ prompt: 'select_account' });
   const cred = await signInWithPopup(auth, provider);
   const user = cred.user;
-  const nowIso = new Date().toISOString();
+  const displayName = (
+    user.displayName ||
+    user.email?.split('@')[0] ||
+    'Giảng viên HANU'
+  ).slice(0, 120);
 
-  const teacherPath = `teachers/${user.uid}`;
-  try {
-    await setDoc(
-      doc(db, 'teachers', user.uid),
-      {
-        uid: user.uid,
-        email: user.email || '',
-        displayName: (
-          user.displayName ||
-          user.email?.split('@')[0] ||
-          'Giảng viên HANU'
-        ).slice(0, 120),
-        photoURL: user.photoURL || '',
-        role: 'teacher',
-        createdAt: nowIso,
-        updatedAt: nowIso,
-      },
-      { merge: true }
-    );
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, teacherPath);
+  const authHeaders = await getFirebaseAuthHeaders();
+  const bootstrapRes = await fetch('/api/teachers/bootstrap', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders,
+    },
+    body: JSON.stringify({ displayName }),
+  });
+
+  if (!bootstrapRes.ok) {
+    let errMsg = 'Tài khoản Google này không nằm trong danh sách Giảng viên được cấp phép (TEACHER_EMAIL_ALLOWLIST).';
+    try {
+      const errData = await bootstrapRes.json();
+      if (errData?.error) errMsg = String(errData.error);
+    } catch {
+      // ignore
+    }
+    throw new Error(errMsg);
   }
 
-  const allClasses = await fetchTeacherClasses(
-    user.uid,
-    user.displayName || 'Giảng viên HANU'
-  );
+  // Force token refresh so custom claim `role: 'teacher'` is immediately available to Firestore rules
+  await user.getIdToken(true);
+
+  const allClasses = await fetchTeacherClasses(user.uid, displayName);
   return {
     user,
     classroom: allClasses[0],
@@ -291,9 +408,9 @@ export async function fetchTeacherClasses(
       return list;
     }
 
-    // Bootstrap a default class for this teacher
-    const defaultJoinCode = `HANU-${teacherUid.slice(0, 4).toUpperCase()}`;
-    const classId = `lop-hsk3-${teacherUid.slice(0, 8).toLowerCase()}`;
+    // Bootstrap a default class for this teacher using a random joinCode (never derived from uid)
+    const classId = `lop-hsk3-${Date.now().toString(36)}`;
+    const randomJoinCode = generateRandomJoinCode('HANU');
     const nowIso = new Date().toISOString();
     const newClass: ClassroomMetadata = {
       id: classId,
@@ -301,7 +418,7 @@ export async function fetchTeacherClasses(
       teacherName: teacherDisplayName.slice(0, 120),
       name: 'Lớp HSK 3.0 Chuẩn HANU',
       hskLevel: 'HSK 3',
-      joinCode: defaultJoinCode,
+      joinCode: randomJoinCode,
       createdAt: nowIso,
       updatedAt: nowIso,
     };
@@ -316,20 +433,23 @@ export async function fetchTeacherClasses(
       updatedAt: newClass.updatedAt,
     });
 
-    // Seed default deck & assignment for the new class
+    const verifiedJoinCode = await reserveUniqueRandomJoinCode(
+      classId,
+      teacherUid,
+      randomJoinCode
+    );
+    if (verifiedJoinCode !== randomJoinCode) {
+      newClass.joinCode = verifiedJoinCode;
+      await updateDoc(doc(db, 'classes', classId), { joinCode: verifiedJoinCode });
+    }
+
+    // Seed default vocabulary deck ONLY (do NOT auto-create Buổi 14 assignment; teacher chooses via "Thêm bài mẫu")
     await setDoc(doc(db, 'classes', classId, 'decks', 'main'), {
       id: 'main',
       title: 'Bộ từ vựng HSK 3.0 Trọng tâm',
       hskLevel: 'HSK 3',
       teacherUid,
       slides: INITIAL_VOCAB_SLIDES,
-      updatedAt: nowIso,
-    });
-
-    await setDoc(doc(db, 'classes', classId, 'assignments', PRESET_ASSIGNMENT_BUOI_14.id), {
-      ...PRESET_ASSIGNMENT_BUOI_14,
-      title: PRESET_ASSIGNMENT_BUOI_14.sessionTitle,
-      teacherUid,
       updatedAt: nowIso,
     });
 
@@ -368,12 +488,14 @@ export async function createNewTeacherClass(
           joinCode: paramsOrName.joinCode,
         };
 
-  const cleanJoinCode = (
-    params.joinCode?.trim() ||
-    `HSK-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+  const candidateJoinCode = (
+    params.joinCode?.trim() || generateRandomJoinCode('HSK')
   )
     .toUpperCase()
     .replace(/[^A-Z0-9_-]/g, '');
+
+  const safeJoinCode =
+    candidateJoinCode.length >= 6 ? candidateJoinCode.slice(0, 32) : generateRandomJoinCode('HSK');
 
   const classId = `lop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const nowIso = new Date().toISOString();
@@ -383,7 +505,7 @@ export async function createNewTeacherClass(
     teacherName: params.teacherName.slice(0, 120),
     name: params.name.trim().slice(0, 160),
     hskLevel: params.hskLevel.trim().slice(0, 40) || 'HSK 3',
-    joinCode: cleanJoinCode.slice(0, 32),
+    joinCode: safeJoinCode,
     createdAt: nowIso,
     updatedAt: nowIso,
   };
@@ -399,19 +521,22 @@ export async function createNewTeacherClass(
       updatedAt: metadata.updatedAt,
     });
 
+    const reservedCode = await reserveUniqueRandomJoinCode(
+      classId,
+      metadata.teacherUid,
+      metadata.joinCode
+    );
+    if (reservedCode !== metadata.joinCode) {
+      metadata.joinCode = reservedCode;
+      await updateDoc(doc(db, 'classes', classId), { joinCode: reservedCode });
+    }
+
     await setDoc(doc(db, 'classes', classId, 'decks', 'main'), {
       id: 'main',
       title: `Bài giảng ${metadata.name}`,
       hskLevel: metadata.hskLevel,
       teacherUid: metadata.teacherUid,
       slides: INITIAL_VOCAB_SLIDES,
-      updatedAt: nowIso,
-    });
-
-    await setDoc(doc(db, 'classes', classId, 'assignments', PRESET_ASSIGNMENT_BUOI_14.id), {
-      ...PRESET_ASSIGNMENT_BUOI_14,
-      title: PRESET_ASSIGNMENT_BUOI_14.sessionTitle,
-      teacherUid: metadata.teacherUid,
       updatedAt: nowIso,
     });
 
@@ -422,9 +547,9 @@ export async function createNewTeacherClass(
 }
 
 /**
- * Student joins a class using `joinCode` (Mã lớp) + `studentCode` (Mã học sinh do GV cấp),
- * or signs in with Google first and enters `joinCode` (+ optional `studentCode`).
- * Guarantees each student has their own Firebase Auth UID and cannot impersonate another student.
+ * Student joins a class exclusively through the server (`POST /api/classes/join`).
+ * The server verifies the Firebase ID token, checks `joinCodes/{joinCode}`, verifies the
+ * teacher-issued `studentCode` slot is unclaimed, and writes `classes/{classId}/students/{uid}`.
  */
 export async function joinClassAsStudent(params: {
   joinCode: string;
@@ -438,16 +563,26 @@ export async function joinClassAsStudent(params: {
   const cleanJoinCode = params.joinCode.trim().toUpperCase();
   const cleanStudentCode = (params.studentCode || '').trim().toUpperCase();
 
-  if (!cleanJoinCode) {
-    throw new Error('Vui lòng nhập Mã lớp (joinCode) do Giảng viên cung cấp.');
+  if (!cleanJoinCode || cleanJoinCode.length < 6) {
+    throw new Error('Vui lòng nhập Mã lớp hợp lệ (tối thiểu 6 ký tự) do Giảng viên cung cấp.');
   }
 
   let currentUser = auth.currentUser;
   if (params.useGooglePopup) {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    const cred = await signInWithPopup(auth, provider);
-    currentUser = cred.user;
+    if (currentUser && currentUser.isAnonymous) {
+      try {
+        const linked = await linkWithPopup(currentUser, provider);
+        currentUser = linked.user;
+      } catch {
+        const cred = await signInWithPopup(auth, provider);
+        currentUser = cred.user;
+      }
+    } else {
+      const cred = await signInWithPopup(auth, provider);
+      currentUser = cred.user;
+    }
   } else if (!currentUser) {
     try {
       const anonCred = await signInAnonymously(auth);
@@ -464,181 +599,93 @@ export async function joinClassAsStudent(params: {
     throw new Error('Không thể khởi tạo phiên xác thực Firebase cho học viên.');
   }
 
-  // Find class by joinCode
-  const classesSnap = await getDocs(
-    query(collection(db, 'classes'), where('joinCode', '==', cleanJoinCode))
-  );
+  const authHeaders = await getFirebaseAuthHeaders();
+  const response = await fetch('/api/classes/join', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders,
+    },
+    body: JSON.stringify({
+      joinCode: cleanJoinCode,
+      studentCode: cleanStudentCode || undefined,
+    }),
+  });
 
-  if (classesSnap.empty) {
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
     throw new Error(
-      `Không tìm thấy lớp học với mã lớp "${cleanJoinCode}". Vui lòng kiểm tra lại.`
+      String(
+        payload?.error ||
+          'Không thể tham gia lớp học. Vui lòng kiểm tra lại Mã lớp và Mã học sinh.'
+      )
     );
   }
 
-  const classDocSnap = classesSnap.docs[0];
-  const classId = classDocSnap.id;
-  const classData = classDocSnap.data() as Omit<ClassroomMetadata, 'id'>;
-  const classroom: ClassroomMetadata = {
-    ...classData,
-    id: classId,
+  return {
+    user: currentUser,
+    classroom: payload.classroom as ClassroomMetadata,
+    studentRecord: payload.studentRecord as ClassStudentRecord,
   };
+}
 
-  // Check if this uid already has a student document in `/classes/{classId}/students/{uid}`
-  const ownStudentDocRef = doc(db, 'classes', classId, 'students', currentUser.uid);
-  const ownStudentSnap = await getDoc(ownStudentDocRef);
-  const nowIso = new Date().toISOString();
+/**
+ * Links an anonymous student account to Google via `linkWithPopup` so their UID,
+ * SRS flashcards, and class progress are preserved across devices.
+ */
+export async function linkAnonymousStudentWithGoogle(): Promise<User> {
+  const currentUser = auth.currentUser;
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
 
-  if (ownStudentSnap.exists()) {
-    const existingData = ownStudentSnap.data();
-    if (cleanStudentCode && existingData.studentCode !== cleanStudentCode) {
-      throw new Error(
-        `Tài khoản của bạn đã gắn với mã học viên ${existingData.studentCode}. Bạn không thể đổi sang mã ${cleanStudentCode} của học viên khác.`
-      );
-    }
-    const record: ClassStudentRecord = {
-      id: currentUser.uid,
-      studentCode: String(existingData.studentCode || 'HV-001'),
-      name: String(existingData.name || 'Học viên'),
-      hskLevel: (existingData.hskLevel as ClassStudentRecord['hskLevel']) || 'HSK 3',
-      vocabScore: String(existingData.vocabScore || '0/18 từ'),
-      writingScore: String(existingData.writingScore || '0% độ chuẩn nét'),
-      quizScore: String(existingData.quizScore || '0/10 câu đúng'),
-      totalPoints: Number(existingData.totalPoints || 0),
-      status: (existingData.status as ClassStudentRecord['status']) || 'Đang nộp bài',
-      feedback: String(existingData.feedback || 'Đã tham gia lớp học.'),
-      timeSeconds: Number(existingData.timeSeconds || 30),
-      streak: Number(existingData.streak || 1),
-    };
-    return { user: currentUser, classroom, studentRecord: record };
+  if (!currentUser) {
+    const cred = await signInWithPopup(auth, provider);
+    return cred.user;
   }
 
-  // Look up teacher-issued student slots in `/classes/{classId}/students`
-  const studentsColRef = collection(db, 'classes', classId, 'students');
-  const studentsSnap = await getDocs(studentsColRef);
-
-  let matchedPreRegisteredSlot: { docId: string; data: Record<string, unknown> } | null =
-    null as { docId: string; data: Record<string, unknown> } | null;
-  studentsSnap.forEach((docSnap) => {
-    const data = docSnap.data();
-    const code = String(data.studentCode || '').toUpperCase();
-    if (cleanStudentCode && code === cleanStudentCode) {
-      matchedPreRegisteredSlot = { docId: docSnap.id, data };
-    }
-  });
-
-  if (matchedPreRegisteredSlot) {
-    const slotData = matchedPreRegisteredSlot.data;
-    const boundUid = String(slotData.studentUid || '');
-    if (boundUid && boundUid !== currentUser.uid) {
-      throw new Error(
-        `Mã học sinh "${cleanStudentCode}" đã được kích hoạt bởi một tài khoản khác. Bạn không thể chọn mã của bạn học khác.`
-      );
-    }
-
-    const studentName = String(
-      slotData.name || currentUser.displayName || cleanStudentCode
-    ).slice(0, 120);
-    const hskLevel = (slotData.hskLevel as ClassStudentRecord['hskLevel']) || 'HSK 3';
-    const joinedAt = String(slotData.joinedAt || nowIso.slice(0, 10));
-
-    // Create canonical `/classes/{classId}/students/{currentUser.uid}` document for security rules (`isEnrolledStudent`)
-    await setDoc(ownStudentDocRef, {
-      studentUid: currentUser.uid,
-      studentCode: cleanStudentCode,
-      name: studentName,
-      hskLevel,
-      joinedAt,
-      vocabScore: String(slotData.vocabScore || '0/18 từ'),
-      writingScore: String(slotData.writingScore || '0% độ chuẩn nét'),
-      quizScore: String(slotData.quizScore || '0/10 câu đúng'),
-      totalPoints: Number(slotData.totalPoints || 0),
-      status: String(slotData.status || 'Đã chấm tự động'),
-      feedback: String(slotData.feedback || 'Đã tham gia lớp học.'),
-      timeSeconds: Number(slotData.timeSeconds || 30),
-      streak: Number(slotData.streak || 1),
-    });
-
-    if (matchedPreRegisteredSlot.docId !== currentUser.uid) {
-      try {
-        await updateDoc(
-          doc(db, 'classes', classId, 'students', matchedPreRegisteredSlot.docId),
-          {
-            studentUid: currentUser.uid,
-            studentCode: cleanStudentCode,
-            name: studentName,
-          }
-        );
-      } catch {
-        // Ignore if rule prevents updating non-uid slot
-      }
-    }
-
-    const record: ClassStudentRecord = {
-      id: currentUser.uid,
-      studentCode: cleanStudentCode,
-      name: studentName,
-      hskLevel,
-      vocabScore: String(slotData.vocabScore || '0/18 từ'),
-      writingScore: String(slotData.writingScore || '0% độ chuẩn nét'),
-      quizScore: String(slotData.quizScore || '0/10 câu đúng'),
-      totalPoints: Number(slotData.totalPoints || 0),
-      status: (slotData.status as ClassStudentRecord['status']) || 'Đã chấm tự động',
-      feedback: String(slotData.feedback || 'Đã tham gia lớp học.'),
-      timeSeconds: Number(slotData.timeSeconds || 30),
-      streak: Number(slotData.streak || 1),
-    };
-    return { user: currentUser, classroom, studentRecord: record };
+  if (!currentUser.isAnonymous) {
+    return currentUser;
   }
 
-  // If the student signed in with Google and joined by class code
-  if (currentUser.displayName || currentUser.email) {
-    const generatedCode =
-      cleanStudentCode || `HV-${currentUser.uid.slice(0, 5).toUpperCase()}`;
-    const studentName = (
-      currentUser.displayName ||
-      currentUser.email?.split('@')[0] ||
-      generatedCode
-    ).slice(0, 120);
+  const linkedCred = await linkWithPopup(currentUser, provider);
+  return linkedCred.user;
+}
 
-    await setDoc(ownStudentDocRef, {
-      studentUid: currentUser.uid,
-      studentCode: generatedCode,
-      name: studentName,
-      hskLevel: 'HSK 3',
-      joinedAt: nowIso.slice(0, 10),
-      vocabScore: '0/18 từ',
-      writingScore: '90% độ chuẩn nét',
-      quizScore: '0/10 câu đúng',
-      totalPoints: 0,
-      status: 'Đang nộp bài',
-      feedback: 'Học viên mới tham gia lớp học qua Google Auth.',
-      timeSeconds: 30,
-      streak: 1,
-    });
-
-    return {
-      user: currentUser,
-      classroom,
-      studentRecord: {
-        id: currentUser.uid,
-        studentCode: generatedCode,
-        name: studentName,
-        hskLevel: 'HSK 3',
-        vocabScore: '0/18 từ',
-        writingScore: '90% độ chuẩn nét',
-        quizScore: '0/10 câu đúng',
-        totalPoints: 0,
-        status: 'Đang nộp bài',
-        feedback: 'Học viên mới tham gia lớp học qua Google Auth.',
-        timeSeconds: 30,
-        streak: 1,
+/**
+ * Teacher resets or re-issues a student's code slot (`POST /api/classes/:classId/students/:studentCode/reset-slot`)
+ * so the student can bind a new device if they lost an unlinked anonymous session.
+ */
+export async function resetTeacherStudentSlotInFirestore(
+  classId: string,
+  studentCode: string,
+  regenerateCode = false
+): Promise<{ studentCode: string; slotId: string }> {
+  const authHeaders = await getFirebaseAuthHeaders();
+  const response = await fetch(
+    `/api/classes/${encodeURIComponent(classId)}/students/${encodeURIComponent(
+      studentCode
+    )}/reset-slot`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
       },
-    };
+      body: JSON.stringify({ regenerateCode }),
+    }
+  );
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      String(payload?.error || 'Không thể cấp lại mã học viên lúc này.')
+    );
   }
 
-  throw new Error(
-    `Mã học sinh "${cleanStudentCode || '(trống)'}" chưa được Giảng viên cấp trong lớp "${classroom.name}". Vui lòng nhập đúng Mã học sinh hoặc Đăng nhập bằng Google.`
-  );
+  return {
+    studentCode: String(payload.studentCode || studentCode),
+    slotId: String(payload.slotId || ''),
+  };
 }
 
 export async function signOutFirebaseUser(): Promise<void> {
@@ -673,6 +720,11 @@ export async function saveTeacherDeckToFirestore(
   }
 }
 
+/**
+ * Splits an assignment into:
+ * 1. Sanitized public questions at `/classes/{classId}/assignments/{assignmentId}` (readable by class members)
+ * 2. Confidential answer key at `/classes/{classId}/answerKeys/{assignmentId}` (readable ONLY by the class teacher & server)
+ */
 export async function saveTeacherAssignmentToFirestore(
   classId: string,
   assignmentOrTeacherUid: UploadedAssignmentPackage | string,
@@ -689,16 +741,28 @@ export async function saveTeacherAssignmentToFirestore(
   if (!assignment) return;
   const assignmentId = assignment.id || 'default-assignment';
   const path = `classes/${classId}/assignments/${assignmentId}`;
+  const nowIso = new Date().toISOString();
+
+  const sanitizedAssignment = sanitizeAssignmentForPublic(assignment);
+  const answerKey = extractAssignmentAnswerKey(assignment, teacherUid, 1);
+
   try {
     await setDoc(doc(db, 'classes', classId, 'assignments', assignmentId), {
-      ...assignment,
+      ...sanitizedAssignment,
       id: assignmentId,
       title: (assignment.sessionTitle || assignment.fileName || 'Bài tập HSK 3.0').slice(
         0,
         240
       ),
       teacherUid,
-      updatedAt: new Date().toISOString(),
+      updatedAt: nowIso,
+    });
+
+    await setDoc(doc(db, 'classes', classId, 'answerKeys', assignmentId), {
+      ...answerKey,
+      assignmentId,
+      teacherUid,
+      updatedAt: nowIso,
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -709,9 +773,13 @@ export async function saveTeacherStudentSlotToFirestore(
   classId: string,
   student: ClassStudentRecord
 ): Promise<void> {
+  const cleanStudentCode =
+    student.studentCode.trim().toUpperCase().slice(0, 40) ||
+    generateRandomStudentCode('HV');
   const docId =
-    student.id || `slot-${student.studentCode.toLowerCase().replace(/[^a-z0-9_-]/g, '')}`;
+    student.id || `slot-${cleanStudentCode.toLowerCase().replace(/[^a-z0-9_-]/g, '')}`;
   const path = `classes/${classId}/students/${docId}`;
+  const points = Number(student.totalPoints || 0);
   try {
     await setDoc(
       doc(db, 'classes', classId, 'students', docId),
@@ -720,34 +788,18 @@ export async function saveTeacherStudentSlotToFirestore(
           student.id.startsWith('slot-') || student.id.startsWith('st-')
             ? ''
             : student.id,
-        studentCode: student.studentCode.trim().toUpperCase().slice(0, 40),
+        studentCode: cleanStudentCode,
         name: student.name.trim().slice(0, 120),
         hskLevel: student.hskLevel || 'HSK 3',
         joinedAt: new Date().toISOString().slice(0, 10),
-        vocabScore: student.vocabScore || '0/18 từ',
-        writingScore: student.writingScore || '90% độ chuẩn nét',
-        quizScore: student.quizScore || '0/10 câu đúng',
-        totalPoints: Number(student.totalPoints || 0),
-        status: student.status || 'Đã chấm tự động',
-        feedback: student.feedback || '',
-        timeSeconds: Number(student.timeSeconds || 30),
-        streak: Number(student.streak || 1),
-      },
-      { merge: true }
-    );
-
-    // Also update leaderboard summary for this student
-    await setDoc(
-      doc(db, 'classes', classId, 'leaderboard', docId),
-      {
-        studentUid: docId,
-        studentCode: student.studentCode.trim().toUpperCase().slice(0, 40),
-        name: student.name.trim().slice(0, 120),
-        hskLevel: student.hskLevel || 'HSK 3',
-        score: Math.max(0, Math.min(100, Number(student.totalPoints || 0))),
-        timeSeconds: Number(student.timeSeconds || 30),
-        streak: Number(student.streak || 1),
-        updatedAt: new Date().toISOString(),
+        vocabScore: points > 0 ? student.vocabScore || '' : '',
+        writingScore: points > 0 ? student.writingScore || '' : '',
+        quizScore: points > 0 ? student.quizScore || '' : '',
+        totalPoints: points,
+        status: points > 0 ? student.status || 'Đã chấm tự động' : 'Chưa nộp',
+        feedback: points > 0 ? student.feedback || '' : '',
+        timeSeconds: points > 0 ? Number(student.timeSeconds || 0) : 0,
+        streak: points > 0 ? Number(student.streak || 0) : 0,
       },
       { merge: true }
     );
@@ -764,13 +816,9 @@ export async function deleteTeacherStudentSlotFromFirestore(
   const path = `classes/${classId}/students/${studentId}`;
   try {
     await deleteDoc(doc(db, 'classes', classId, 'students', studentId));
-    await deleteDoc(doc(db, 'classes', classId, 'leaderboard', studentId)).catch(
-      () => {}
-    );
     if (studentCode) {
       const slotId = `slot-${studentCode.toLowerCase().replace(/[^a-z0-9_-]/g, '')}`;
       await deleteDoc(doc(db, 'classes', classId, 'students', slotId)).catch(() => {});
-      await deleteDoc(doc(db, 'classes', classId, 'leaderboard', slotId)).catch(() => {});
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
@@ -778,9 +826,9 @@ export async function deleteTeacherStudentSlotFromFirestore(
 }
 
 /**
- * Student submits an assignment to `/classes/{classId}/submissions/{submissionId}`
- * and updates `/classes/{classId}/leaderboard/{studentUid}`.
- * Note: Security rules enforce `studentUid == request.auth.uid` and forbid modifying a submission once created.
+ * Student submits an assignment through the server (`POST /api/submissions`).
+ * The server verifies class membership, checks maxAttempts, grades against `answerKeys`,
+ * and writes `submissions/{assignmentId}_{uid}`, `leaderboard/{uid}`, and `students/{uid}`.
  */
 export async function submitStudentAssignmentToFirestore(params: {
   classId: string;
@@ -800,40 +848,29 @@ export async function submitStudentAssignmentToFirestore(params: {
   quizTotalCount?: number;
   reviewWords?: string[];
 }): Promise<string> {
-  const submissionId = `sub-${params.studentUid}-${Date.now()}`;
-  const subPath = `classes/${params.classId}/submissions/${submissionId}`;
-  const nowIso = new Date().toISOString();
-  const clampedScore = Math.max(0, Math.min(100, Math.round(params.score)));
-
-  try {
-    await setDoc(doc(db, 'classes', params.classId, 'submissions', submissionId), {
-      studentUid: params.studentUid,
-      studentCode: params.studentCode.slice(0, 40),
-      studentName: params.studentName.slice(0, 120),
-      assignmentId: (params.assignmentId || 'default-assignment').slice(0, 120),
-      score: clampedScore,
+  const authHeaders = await getFirebaseAuthHeaders();
+  const response = await fetch('/api/submissions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders,
+    },
+    body: JSON.stringify({
+      classId: params.classId,
+      assignmentId: params.assignmentId || 'default-assignment',
       answers: params.answers || {},
-      submittedAt: nowIso,
-    });
+      timeSeconds: params.timeSeconds,
+    }),
+  });
 
-    await setDoc(
-      doc(db, 'classes', params.classId, 'leaderboard', params.studentUid),
-      {
-        studentUid: params.studentUid,
-        studentCode: params.studentCode.slice(0, 40),
-        name: params.studentName.slice(0, 120),
-        hskLevel: (params.hskLevel || 'HSK 3').slice(0, 40),
-        score: clampedScore,
-        timeSeconds: Math.max(1, Math.round(params.timeSeconds || 20)),
-        streak: Math.max(1, Math.round(params.streak || 1)),
-        updatedAt: nowIso,
-      }
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      String(payload?.error || 'Không thể nộp bài tập lên máy chủ lúc này.')
     );
-
-    return submissionId;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, subPath);
   }
+
+  return String(payload.submissionId || `${params.assignmentId}_${params.studentUid}`);
 }
 
 /**
@@ -1029,8 +1066,8 @@ export function subscribeToClassroom(
               name: String(data.name || ''),
               hskLevel: String(data.hskLevel || 'HSK 3'),
               score: Number(data.score || 0),
-              timeSeconds: Number(data.timeSeconds || 25),
-              streak: Number(data.streak || 1),
+              timeSeconds: Number(data.timeSeconds || 0),
+              streak: Number(data.streak || 0),
               updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
             });
           });
@@ -1041,46 +1078,83 @@ export function subscribeToClassroom(
     )
   );
 
-  // 4. Students roster listener
-  unsubs.push(
-    onSnapshot(
-      collection(db, 'classes', params.classId, 'students'),
-      (snap) => {
-        if (params.onStudentsUpdate) {
-          const byCode = new Map<string, ClassStudentRecord>();
-          snap.forEach((d) => {
-            const data = d.data();
-            const code = String(data.studentCode || d.id).toUpperCase();
-            const existing = byCode.get(code);
-            if (!existing || (data.studentUid && d.id === data.studentUid)) {
-              byCode.set(code, {
-                id: String(data.studentUid || d.id),
+  // 4. Students roster listener:
+  // Teachers can list the full roster (`isClassTeacher`); students listen ONLY to their own document (`students/{uid}`).
+  if (params.isTeacher) {
+    unsubs.push(
+      onSnapshot(
+        collection(db, 'classes', params.classId, 'students'),
+        (snap) => {
+          if (params.onStudentsUpdate) {
+            const byCode = new Map<string, ClassStudentRecord>();
+            snap.forEach((d) => {
+              const data = d.data();
+              const code = String(data.studentCode || d.id).toUpperCase();
+              const existing = byCode.get(code);
+              if (!existing || (data.studentUid && d.id === data.studentUid)) {
+                byCode.set(code, {
+                  id: String(data.studentUid || d.id),
+                  studentCode: code,
+                  name: String(data.name || code),
+                  hskLevel:
+                    (data.hskLevel as ClassStudentRecord['hskLevel']) || 'HSK 3',
+                  vocabScore: String(data.vocabScore ?? ''),
+                  writingScore: String(data.writingScore ?? ''),
+                  quizScore: String(data.quizScore ?? ''),
+                  totalPoints: Number(data.totalPoints || 0),
+                  status:
+                    (data.status as ClassStudentRecord['status']) ||
+                    'Chưa nộp',
+                  feedback: String(data.feedback ?? ''),
+                  timeSeconds: Number(data.timeSeconds || 0),
+                  streak: Number(data.streak || 0),
+                  lastSubmittedAt: data.lastSubmittedAt
+                    ? String(data.lastSubmittedAt)
+                    : undefined,
+                });
+              }
+            });
+            params.onStudentsUpdate(Array.from(byCode.values()));
+          }
+        },
+        (err) => console.warn('Students listener info:', err.message)
+      )
+    );
+  } else if (params.currentUid) {
+    unsubs.push(
+      onSnapshot(
+        doc(db, 'classes', params.classId, 'students', params.currentUid),
+        (docSnap) => {
+          if (docSnap.exists() && params.onStudentsUpdate) {
+            const data = docSnap.data();
+            const code = String(data.studentCode || docSnap.id).toUpperCase();
+            params.onStudentsUpdate([
+              {
+                id: docSnap.id,
                 studentCode: code,
                 name: String(data.name || code),
                 hskLevel:
                   (data.hskLevel as ClassStudentRecord['hskLevel']) || 'HSK 3',
-                vocabScore: String(data.vocabScore || '18/18 từ'),
-                writingScore: String(data.writingScore || '92% độ chuẩn nét'),
-                quizScore: String(data.quizScore || '9/10 câu đúng'),
+                vocabScore: String(data.vocabScore ?? ''),
+                writingScore: String(data.writingScore ?? ''),
+                quizScore: String(data.quizScore ?? ''),
                 totalPoints: Number(data.totalPoints || 0),
                 status:
-                  (data.status as ClassStudentRecord['status']) ||
-                  'Đã chấm tự động',
-                feedback: String(data.feedback || 'Đã đồng bộ trên Firestore.'),
-                timeSeconds: Number(data.timeSeconds || 30),
-                streak: Number(data.streak || 1),
+                  (data.status as ClassStudentRecord['status']) || 'Chưa nộp',
+                feedback: String(data.feedback ?? ''),
+                timeSeconds: Number(data.timeSeconds || 0),
+                streak: Number(data.streak || 0),
                 lastSubmittedAt: data.lastSubmittedAt
                   ? String(data.lastSubmittedAt)
                   : undefined,
-              });
-            }
-          });
-          params.onStudentsUpdate(Array.from(byCode.values()));
-        }
-      },
-      (err) => console.warn('Students listener info:', err.message)
-    )
-  );
+              },
+            ]);
+          }
+        },
+        (err) => console.warn('Student own-record listener info:', err.message)
+      )
+    );
+  }
 
   // 5. Submissions listener (Teacher reads all class submissions; Student reads only their own submissions)
   const subQuery = params.isTeacher
@@ -1122,9 +1196,8 @@ export function subscribeToClassroom(
 }
 
 /**
- * Legacy JSON Data Migration Tool (Mục 5):
- * Parses a legacy JSON backup file (from `exportFullSystemBackupToFile` or `data/classroom-state.json`)
- * and creates/updates the class, student roster, vocabulary deck, assignment, and leaderboard in Firestore.
+ * Legacy JSON Data Migration Tool:
+ * Parses a legacy JSON backup file and creates/updates the class, joinCode, student roster, vocabulary deck, and assignment in Firestore.
  */
 export async function importLegacyBackupToFirestore(
   paramsOrBackupObj:
@@ -1176,7 +1249,7 @@ export async function importLegacyBackupToFirestore(
 
   const nowIso = new Date().toISOString();
   const classId = targetClassId || `lop-migrated-${Date.now().toString(36)}`;
-  const joinCode = `HANU-${classId.slice(-4).toUpperCase()}`;
+  const joinCode = generateRandomJoinCode('HANU');
   const className = (
     classNameOverride || 'Lớp HSK 3.0 (Đã khôi phục từ JSON)'
   ).slice(0, 160);
@@ -1205,7 +1278,7 @@ export async function importLegacyBackupToFirestore(
     updatedAt: nowIso,
   };
 
-  // 1. Ensure class document exists
+  // 1. Ensure class document and joinCodes mapping exist
   batch.set(
     doc(db, 'classes', classId),
     {
@@ -1220,6 +1293,12 @@ export async function importLegacyBackupToFirestore(
     { merge: true }
   );
 
+  batch.set(doc(db, 'joinCodes', joinCode), {
+    classId,
+    teacherUid,
+    createdAt: nowIso,
+  });
+
   // 2. Write vocabulary slide deck
   batch.set(doc(db, 'classes', classId, 'decks', 'main'), {
     id: 'main',
@@ -1230,11 +1309,14 @@ export async function importLegacyBackupToFirestore(
     updatedAt: nowIso,
   });
 
-  // 3. Write custom assignment if present
+  // 3. Write custom assignment (sanitized) + answerKey if present
   if (customAssignment && (customAssignment.sessionTitle || customAssignment.fileName)) {
     const assignId = customAssignment.id || 'default-assignment';
+    const sanitized = sanitizeAssignmentForPublic(customAssignment);
+    const answerKey = extractAssignmentAnswerKey(customAssignment, teacherUid, 1);
+
     batch.set(doc(db, 'classes', classId, 'assignments', assignId), {
-      ...customAssignment,
+      ...sanitized,
       id: assignId,
       title: (
         customAssignment.sessionTitle ||
@@ -1244,18 +1326,23 @@ export async function importLegacyBackupToFirestore(
       teacherUid,
       updatedAt: nowIso,
     });
+
+    batch.set(doc(db, 'classes', classId, 'answerKeys', assignId), {
+      ...answerKey,
+      assignmentId: assignId,
+      teacherUid,
+      updatedAt: nowIso,
+    });
   }
 
-  // 4. Write students and leaderboard entries
+  // 4. Write students with random codes if missing
   let studentsCount = 0;
   for (const st of students) {
     if (!st || !st.name) continue;
-    const cleanCode = String(
-      st.studentCode || `HV-${String(studentsCount + 1).padStart(3, '0')}`
-    )
-      .trim()
-      .toUpperCase()
-      .slice(0, 40);
+    const rawCode = String(st.studentCode || '').trim().toUpperCase();
+    const cleanCode = (
+      rawCode.length >= 6 ? rawCode : generateRandomStudentCode('HV')
+    ).slice(0, 40);
     const slotId = `slot-${cleanCode.toLowerCase().replace(/[^a-z0-9_-]/g, '')}`;
     const score = Math.max(
       0,
@@ -1268,25 +1355,14 @@ export async function importLegacyBackupToFirestore(
       name: String(st.name).trim().slice(0, 120),
       hskLevel: String(st.hskLevel || 'HSK 3').slice(0, 40),
       joinedAt: nowIso.slice(0, 10),
-      vocabScore: String(st.vocabScore || '18/18 từ'),
-      writingScore: String(st.writingScore || '90% độ chuẩn nét'),
-      quizScore: String(st.quizScore || '9/10 câu đúng'),
+      vocabScore: String(st.vocabScore ?? ''),
+      writingScore: String(st.writingScore ?? ''),
+      quizScore: String(st.quizScore ?? ''),
       totalPoints: score,
-      status: String(st.status || 'Đã chấm tự động'),
-      feedback: String(st.feedback || 'Khôi phục từ file backup JSON.'),
-      timeSeconds: Number(st.timeSeconds || 30),
-      streak: Number(st.streak || 1),
-    });
-
-    batch.set(doc(db, 'classes', classId, 'leaderboard', slotId), {
-      studentUid: slotId,
-      studentCode: cleanCode,
-      name: String(st.name).trim().slice(0, 120),
-      hskLevel: String(st.hskLevel || 'HSK 3').slice(0, 40),
-      score,
-      timeSeconds: Number(st.timeSeconds || 30),
-      streak: Number(st.streak || 1),
-      updatedAt: nowIso,
+      status: String(st.status || (score > 0 ? 'Đã chấm tự động' : 'Chưa nộp')),
+      feedback: String(st.feedback ?? ''),
+      timeSeconds: Number(st.timeSeconds || 0),
+      streak: Number(st.streak || 0),
     });
 
     studentsCount++;

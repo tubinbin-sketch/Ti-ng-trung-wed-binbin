@@ -1,0 +1,39 @@
+name: CI — Security Rules, Unit Tests & Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Java 21 for Firestore Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Firestore Security Rules Tests (with Firestore Emulator)
+        run: npx --yes firebase-tools emulators:exec --only firestore --project demo-hanu-hsk-test "npm run test:rules"
+
+      - name: Run Unit & Server Security Tests
+        run: npm test
+
+      - name: Typecheck & Production Build
+        run: npm run lint && npm run build

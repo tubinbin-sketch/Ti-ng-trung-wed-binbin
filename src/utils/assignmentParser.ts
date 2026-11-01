@@ -383,3 +383,200 @@ export function saveStoredAssignment(pkg: UploadedAssignmentPackage): void {
     // Ignore storage quota errors
   }
 }
+
+export interface AssignmentAnswerKey {
+  assignmentId: string;
+  teacherUid: string;
+  multipleChoiceAnswers: Record<string, string>;
+  sentenceOrderingAnswers: Record<string, string[]>;
+  essayModels: Record<
+    string,
+    {
+      targetWord: string;
+      sampleSentence: string;
+    }
+  >;
+  maxAttempts: number;
+  updatedAt: string;
+}
+
+/**
+ * Extracts the confidential answer key from a teacher's assignment package so it can be stored
+ * separately in `/classes/{classId}/answerKeys/{assignmentId}` (readable ONLY by the class teacher and server).
+ */
+export function extractAssignmentAnswerKey(
+  pkg: UploadedAssignmentPackage,
+  teacherUid: string,
+  maxAttempts = 1
+): AssignmentAnswerKey {
+  const multipleChoiceAnswers: Record<string, string> = {};
+  for (const mc of pkg.multipleChoiceList || []) {
+    const correctOpt = (mc.options || []).find((o) => o.isCorrect);
+    if (correctOpt) {
+      multipleChoiceAnswers[mc.id] = correctOpt.key;
+    }
+  }
+
+  const sentenceOrderingAnswers: Record<string, string[]> = {};
+  for (const so of pkg.sentenceOrderingList || []) {
+    sentenceOrderingAnswers[so.id] = Array.isArray(so.correctTokens)
+      ? [...so.correctTokens]
+      : [];
+  }
+
+  const essayModels: Record<string, { targetWord: string; sampleSentence: string }> = {};
+  for (const es of pkg.essayList || []) {
+    essayModels[es.id] = {
+      targetWord: es.targetWord || '',
+      sampleSentence: es.sampleSentence || '',
+    };
+  }
+
+  return {
+    assignmentId: pkg.id || 'default-assignment',
+    teacherUid,
+    multipleChoiceAnswers,
+    sentenceOrderingAnswers,
+    essayModels,
+    maxAttempts: Math.max(1, Math.floor(maxAttempts)),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Strips confidential answer key fields (`isCorrect`, `correctTokens`, `modelSentence`, `sampleSentence`)
+ * from an assignment before publishing it to `/classes/{classId}/assignments/{assignmentId}`.
+ */
+export function sanitizeAssignmentForPublic(
+  pkg: UploadedAssignmentPackage
+): UploadedAssignmentPackage {
+  return {
+    ...pkg,
+    multipleChoiceList: (pkg.multipleChoiceList || []).map((mc) => ({
+      ...mc,
+      options: (mc.options || []).map((opt) => ({
+        key: opt.key,
+        label: opt.label,
+        isCorrect: false,
+      })),
+    })),
+    sentenceOrderingList: (pkg.sentenceOrderingList || []).map((so) => ({
+      ...so,
+      correctTokens: [],
+      modelSentence: '',
+    })),
+    essayList: (pkg.essayList || []).map((es) => ({
+      ...es,
+      sampleSentence: '',
+    })),
+  };
+}
+
+/**
+ * Grades a student's submission on the server against the confidential `AssignmentAnswerKey`.
+ */
+export function gradeSubmissionWithAnswerKey(params: {
+  answerKey: AssignmentAnswerKey;
+  answers: Record<string, unknown>;
+  assignment?: Partial<UploadedAssignmentPackage> | null;
+}): {
+  score: number;
+  correctCount: number;
+  totalQuestions: number;
+  quizScore: string;
+  vocabScore: string;
+  writingScore: string;
+  reviewWords: string[];
+  status: 'Đã chấm tự động' | 'Cần kèm thêm';
+  feedback: string;
+} {
+  const { answerKey, answers, assignment } = params;
+  const mcAnswers =
+    (answers?.mcAnswers as Record<string, string> | undefined) ||
+    (answers as Record<string, string>) ||
+    {};
+  const selectedTokensMap =
+    (answers?.selectedTokensMap as Record<string, string[]> | undefined) || {};
+  const essayAnswers =
+    (answers?.essayAnswers as Record<string, string> | undefined) || {};
+
+  let correctCount = 0;
+  let totalQuestions = 0;
+  const reviewWordsSet = new Set<string>();
+
+  const mcTargetWordById: Record<string, string> = {};
+  for (const q of assignment?.multipleChoiceList || []) {
+    if (q?.id && q?.targetWord) mcTargetWordById[q.id] = q.targetWord;
+  }
+  const soTargetWordById: Record<string, string> = {};
+  for (const q of assignment?.sentenceOrderingList || []) {
+    if (q?.id && q?.targetWord) soTargetWordById[q.id] = q.targetWord;
+  }
+
+  for (const [qId, correctKey] of Object.entries(answerKey.multipleChoiceAnswers || {})) {
+    totalQuestions += 1;
+    const submittedKey = String(mcAnswers[qId] ?? (answers as any)?.[qId] ?? '').trim();
+    if (submittedKey && submittedKey.toUpperCase() === String(correctKey).trim().toUpperCase()) {
+      correctCount += 1;
+    } else if (mcTargetWordById[qId]) {
+      reviewWordsSet.add(mcTargetWordById[qId]);
+    }
+  }
+
+  for (const [qId, expectedTokens] of Object.entries(answerKey.sentenceOrderingAnswers || {})) {
+    if (!Array.isArray(expectedTokens) || expectedTokens.length === 0) continue;
+    totalQuestions += 1;
+    const rawSubmitted = selectedTokensMap[qId] ?? (answers as any)?.[qId];
+    const submittedSentence = Array.isArray(rawSubmitted)
+      ? rawSubmitted.join('').replace(/\s+/g, '')
+      : String(rawSubmitted || '').replace(/\s+/g, '');
+    const expectedSentence = expectedTokens.join('').replace(/\s+/g, '');
+    if (submittedSentence && submittedSentence === expectedSentence) {
+      correctCount += 1;
+    } else if (soTargetWordById[qId]) {
+      reviewWordsSet.add(soTargetWordById[qId]);
+    }
+  }
+
+  for (const [qId, model] of Object.entries(answerKey.essayModels || {})) {
+    totalQuestions += 1;
+    const submittedText = String(essayAnswers[qId] ?? (answers as any)?.[qId] ?? '').trim();
+    const targetWord = (model?.targetWord || '').trim();
+    if (
+      submittedText.length >= 2 &&
+      (!targetWord || submittedText.includes(targetWord))
+    ) {
+      correctCount += 1;
+    } else if (targetWord) {
+      reviewWordsSet.add(targetWord);
+    }
+  }
+
+  if (totalQuestions === 0) {
+    totalQuestions = 1;
+  }
+
+  const score = Math.max(0, Math.min(100, Math.round((correctCount / totalQuestions) * 100)));
+  const reviewWords = Array.from(reviewWordsSet);
+  const learnedVocab = Math.max(0, Math.min(18, Math.round((score / 100) * 18)));
+  const writingPct = score > 0 ? Math.min(100, Math.max(60, score)) : 0;
+  const status: 'Đã chấm tự động' | 'Cần kèm thêm' =
+    score < 90 ? 'Cần kèm thêm' : 'Đã chấm tự động';
+  const feedback =
+    reviewWords.length > 0
+      ? `Chấm điểm trên Server đạt ${score}/100đ (${correctCount}/${totalQuestions} câu đúng) · Cần ôn lại: ${reviewWords.join(', ')}.`
+      : `Hoàn thành xuất sắc bài tập (${score}/100đ — ${correctCount}/${totalQuestions} câu đúng), được chấm tự động trên Server.`;
+
+  return {
+    score,
+    correctCount,
+    totalQuestions,
+    quizScore: `${correctCount}/${totalQuestions} câu đúng`,
+    vocabScore: `${learnedVocab}/18 từ`,
+    writingScore: score > 0 ? `${writingPct}% độ chuẩn nét` : '',
+    reviewWords,
+    status,
+    feedback,
+  };
+}
+

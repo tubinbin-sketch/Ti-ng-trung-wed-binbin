@@ -17,6 +17,7 @@ import {
   autoGradeClassSession,
   awardStudentBonusPoints,
   filterClassroomStudents,
+  generateRandomStudentCode,
   generateStudentsCsvContent,
   StudentStatusFilter,
 } from '../utils/chineseEngine';
@@ -41,6 +42,7 @@ import {
   createNewTeacherClass,
   deleteTeacherStudentSlotFromFirestore,
   importLegacyBackupToFirestore,
+  resetTeacherStudentSlotInFirestore,
   saveTeacherAssignmentToFirestore,
   saveTeacherStudentSlotToFirestore,
 } from '../firebase';
@@ -350,6 +352,34 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     const updatedStudent = updated.find((s) => s.id === studentId);
     setActionBanner(
       `🎉 Đã cộng +${bonusPoints} điểm cho "${target.name}" (${reason})! Điểm mới: ${updatedStudent?.totalPoints ?? target.totalPoints}đ.`
+    );
+  };
+
+  const handleReissueStudentCode = async (student: ClassStudent) => {
+    const fallbackNewCode = generateRandomStudentCode('HV');
+    let issuedCode = fallbackNewCode;
+
+    if (classroomMode !== 'demo' && activeClassMeta?.classId) {
+      try {
+        const res = await resetTeacherStudentSlotInFirestore(
+          activeClassMeta.classId,
+          student.studentCode,
+          true
+        );
+        if (res.studentCode) {
+          issuedCode = res.studentCode;
+        }
+      } catch {
+        // Fallback to local code update
+      }
+    }
+
+    const updated = studentsList.map((st) =>
+      st.id === student.id ? { ...st, studentCode: issuedCode } : st
+    );
+    persistRosterAndSync(updated);
+    setActionBanner(
+      `🔑 Đã gỡ liên kết thiết bị cũ và cấp mã mới "${issuedCode}" cho học viên "${student.name}".`
     );
   };
 
@@ -684,6 +714,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               e?.stopPropagation();
               setStudentToDelete(st);
             }}
+            onReissueStudentCode={handleReissueStudentCode}
             onAwardBonusPoints={handleAwardBonusPoints}
             studentToDelete={studentToDelete}
             onCloseDeleteModal={() => setStudentToDelete(null)}

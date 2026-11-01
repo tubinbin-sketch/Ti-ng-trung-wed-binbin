@@ -13,12 +13,24 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function isTeacher() {
+      return isSignedIn() && request.auth.token.role == 'teacher';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
     function classDoc(classId) {
       return get(/databases/$(database)/documents/classes/$(classId));
     }
 
     function isClassTeacher(classId) {
-      return isSignedIn() &&
+      return isTeacher() &&
         exists(/databases/$(database)/documents/classes/$(classId)) &&
         classDoc(classId).data.teacherUid == request.auth.uid;
     }
@@ -32,24 +44,21 @@ service cloud.firestore {
       return isClassTeacher(classId) || isEnrolledStudent(classId);
     }
 
-    function isValidString(val, minLen, maxLen) {
-      return val is string && val.size() >= minLen && val.size() <= maxLen;
-    }
-
-    function isValidScore(val) {
-      return (val is int || val is float) && val >= 0 && val <= 100;
-    }
-
     // ===============================================================
     // 1. Teachers Collection: /teachers/{uid}
     // ===============================================================
     match /teachers/{uid} {
-      allow read: if isOwner(uid);
-      allow create: if isOwner(uid) &&
+      allow get: if isValidId(uid) && isOwner(uid) && isTeacher();
+      allow list: if false;
+      allow create: if isValidId(uid) &&
+        isOwner(uid) &&
+        isTeacher() &&
         request.resource.data.uid == uid &&
         request.resource.data.role == 'teacher' &&
         isValidString(request.resource.data.displayName, 1, 120);
-      allow update: if isOwner(uid) &&
+      allow update: if isValidId(uid) &&
+        isOwner(uid) &&
+        isTeacher() &&
         request.resource.data.uid == resource.data.uid &&
         request.resource.data.role == 'teacher' &&
         isValidString(request.resource.data.displayName, 1, 120);
@@ -57,153 +66,177 @@ service cloud.firestore {
     }
 
     // ===============================================================
-    // 2. Classes Collection: /classes/{classId}
+    // 2. Join Codes Collection: /joinCodes/{code}
+    // ===============================================================
+    match /joinCodes/{code} {
+      allow get: if isSignedIn() && isValidId(code);
+      allow list: if false;
+      allow create: if isTeacher() &&
+        isValidId(code) &&
+        code.size() >= 6 &&
+        !exists(/databases/$(database)/documents/joinCodes/$(code)) &&
+        request.resource.data.keys().hasAll(['classId']) &&
+        isValidString(request.resource.data.classId, 1, 128) &&
+        isClassTeacher(request.resource.data.classId);
+      allow update: if false;
+      allow delete: if isTeacher() &&
+        isValidId(code) &&
+        isClassTeacher(resource.data.classId);
+    }
+
+    // ===============================================================
+    // 3. Classes Collection: /classes/{classId}
     // ===============================================================
     match /classes/{classId} {
-      // Authenticated users can read/query classes by joinCode to join a class;
-      // teachers can manage only their own classes (teacherUid == request.auth.uid)
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      // Only members of the class (owning teacher or enrolled student) can get a class document.
+      allow get: if isValidId(classId) && isClassMember(classId);
+      // Only the owning teacher can list their own classes.
+      allow list: if isSignedIn() && resource.data.teacherUid == request.auth.uid;
 
-      allow create: if isSignedIn() &&
+      allow create: if isTeacher() &&
+        isValidId(classId) &&
         request.resource.data.teacherUid == request.auth.uid &&
         isValidString(request.resource.data.name, 1, 160) &&
         isValidString(request.resource.data.hskLevel, 1, 40) &&
-        isValidString(request.resource.data.joinCode, 3, 32);
+        isValidString(request.resource.data.joinCode, 6, 32);
 
-      allow update: if isSignedIn() &&
+      allow update: if isTeacher() &&
+        isValidId(classId) &&
         resource.data.teacherUid == request.auth.uid &&
         request.resource.data.teacherUid == resource.data.teacherUid &&
         isValidString(request.resource.data.name, 1, 160) &&
         isValidString(request.resource.data.hskLevel, 1, 40) &&
-        isValidString(request.resource.data.joinCode, 3, 32);
+        isValidString(request.resource.data.joinCode, 6, 32);
 
-      allow delete: if isSignedIn() &&
+      allow delete: if isTeacher() &&
+        isValidId(classId) &&
         resource.data.teacherUid == request.auth.uid;
 
       // =============================================================
-      // 2a. Students Subcollection: /classes/{classId}/students/{studentUid}
+      // 3a. Students Subcollection: /classes/{classId}/students/{studentUid}
       // =============================================================
       match /students/{studentUid} {
-        // Teacher of the class can read all students; a student can read their own record
-        // or read pre-registered studentCode slots to verify & claim their code.
-        allow get: if isClassTeacher(classId) ||
-          isOwner(studentUid) ||
-          (isSignedIn() && (!('studentUid' in resource.data) || resource.data.studentUid == '' || resource.data.studentUid == request.auth.uid));
-        allow list: if isClassTeacher(classId) || isSignedIn();
+        allow get: if isValidId(classId) &&
+          isValidId(studentUid) &&
+          (isClassTeacher(classId) || isOwner(studentUid));
+        // Only the teacher of the class can list the student roster.
+        allow list: if isValidId(classId) && isClassTeacher(classId);
 
-        allow create: if isClassTeacher(classId) ||
-          (isOwner(studentUid) &&
-            request.resource.data.studentUid == request.auth.uid &&
-            isValidString(request.resource.data.name, 1, 120) &&
-            isValidString(request.resource.data.studentCode, 2, 40) &&
-            isValidString(request.resource.data.joinedAt, 1, 64));
+        // Students CANNOT create their own student record (server POST /api/classes/join or teacher slot creation only).
+        allow create: if isValidId(classId) &&
+          isValidId(studentUid) &&
+          isClassTeacher(classId) &&
+          isValidString(request.resource.data.name, 1, 120) &&
+          isValidString(request.resource.data.studentCode, 6, 40);
 
-        allow update: if isClassTeacher(classId) ||
-          (isOwner(studentUid) &&
-            request.resource.data.studentCode == resource.data.studentCode &&
-            request.resource.data.joinedAt == resource.data.joinedAt &&
-            isValidString(request.resource.data.name, 1, 120)) ||
-          // Allow an authenticated student to bind their uid to an unclaimed pre-registered slot once
-          (isSignedIn() &&
-            (!('studentUid' in resource.data) || resource.data.studentUid == '') &&
-            request.resource.data.studentUid == request.auth.uid &&
-            request.resource.data.studentCode == resource.data.studentCode &&
-            request.resource.data.name == resource.data.name);
+        // Students can ONLY update their own 'name' field; teachers can update student records in their class.
+        allow update: if isValidId(classId) &&
+          isValidId(studentUid) &&
+          (
+            (isClassTeacher(classId) &&
+              isValidString(request.resource.data.name, 1, 120) &&
+              isValidString(request.resource.data.studentCode, 6, 40)) ||
+            (isOwner(studentUid) &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']) &&
+              isValidString(request.resource.data.name, 1, 120))
+          );
 
-        allow delete: if isClassTeacher(classId);
+        allow delete: if isValidId(classId) &&
+          isValidId(studentUid) &&
+          isClassTeacher(classId);
       }
 
       // =============================================================
-      // 2b. Decks Subcollection: /classes/{classId}/decks/{deckId}
+      // 3b. Decks Subcollection: /classes/{classId}/decks/{deckId}
       // =============================================================
       match /decks/{deckId} {
-        // Only the class teacher or enrolled students of this class can read decks
-        allow read: if isClassMember(classId);
-        // Only the owning class teacher can write decks
-        allow create, update: if isClassTeacher(classId) &&
+        allow read: if isValidId(classId) && isValidId(deckId) && isClassMember(classId);
+        allow create, update: if isValidId(classId) &&
+          isValidId(deckId) &&
+          isClassTeacher(classId) &&
           request.resource.data.teacherUid == request.auth.uid &&
           request.resource.data.slides is list;
-        allow delete: if isClassTeacher(classId);
+        allow delete: if isValidId(classId) && isValidId(deckId) && isClassTeacher(classId);
       }
 
       // =============================================================
-      // 2c. Assignments Subcollection: /classes/{classId}/assignments/{assignmentId}
+      // 3c. Assignments Subcollection: /classes/{classId}/assignments/{assignmentId}
       // =============================================================
       match /assignments/{assignmentId} {
-        // Only the class teacher or enrolled students of this class can read assignments
-        allow read: if isClassMember(classId);
-        // Only the owning class teacher can write assignments
-        allow create, update: if isClassTeacher(classId) &&
+        allow read: if isValidId(classId) && isValidId(assignmentId) && isClassMember(classId);
+        allow create, update: if isValidId(classId) &&
+          isValidId(assignmentId) &&
+          isClassTeacher(classId) &&
           request.resource.data.teacherUid == request.auth.uid &&
-          isValidString(request.resource.data.title, 1, 240);
-        allow delete: if isClassTeacher(classId);
+          isValidString(request.resource.data.title, 1, 240) &&
+          !('answerKey' in request.resource.data);
+        allow delete: if isValidId(classId) && isValidId(assignmentId) && isClassTeacher(classId);
       }
 
       // =============================================================
-      // 2d. Submissions Subcollection: /classes/{classId}/submissions/{submissionId}
+      // 3d. Answer Keys Subcollection: /classes/{classId}/answerKeys/{assignmentId}
+      // =============================================================
+      match /answerKeys/{assignmentId} {
+        // Strictly teacher-only! Students can never read or write answer keys.
+        allow read: if isValidId(classId) && isValidId(assignmentId) && isClassTeacher(classId);
+        allow create, update: if isValidId(classId) &&
+          isValidId(assignmentId) &&
+          isClassTeacher(classId) &&
+          request.resource.data.teacherUid == request.auth.uid;
+        allow delete: if isValidId(classId) && isValidId(assignmentId) && isClassTeacher(classId);
+      }
+
+      // =============================================================
+      // 3e. Submissions Subcollection: /classes/{classId}/submissions/{submissionId}
       // =============================================================
       match /submissions/{submissionId} {
         // Students can ONLY read their own submissions; Teacher can read all submissions in their class.
-        allow read: if isClassTeacher(classId) ||
-          (isSignedIn() && resource.data.studentUid == request.auth.uid);
+        allow read: if isValidId(classId) &&
+          isValidId(submissionId) &&
+          (isClassTeacher(classId) || (isSignedIn() && resource.data.studentUid == request.auth.uid));
 
-        // Students can ONLY create a submission with studentUid == request.auth.uid
-        // in a class they have joined, with a valid score (0..100).
-        allow create: if isEnrolledStudent(classId) &&
-          request.resource.data.studentUid == request.auth.uid &&
-          isValidString(request.resource.data.assignmentId, 1, 120) &&
-          isValidScore(request.resource.data.score) &&
-          request.resource.data.answers is map &&
-          isValidString(request.resource.data.submittedAt, 1, 64);
-
-        // Students CANNOT update or delete scores/submissions after submitting!
-        allow update: if false;
-        allow delete: if isClassTeacher(classId);
+        // Clients CANNOT create, update, or delete submissions directly (server POST /api/submissions only).
+        allow create, update, delete: if false;
       }
 
       // =============================================================
-      // 2e. Leaderboard Summary Subcollection: /classes/{classId}/leaderboard/{studentUid}
+      // 3f. Leaderboard Summary Subcollection: /classes/{classId}/leaderboard/{studentUid}
       // =============================================================
       match /leaderboard/{studentUid} {
-        // Readable by members of the class (exposes only name, studentCode, hskLevel, score, timeSeconds, streak)
-        allow read: if isClassMember(classId);
-
-        allow create, update: if isClassTeacher(classId) ||
-          (isOwner(studentUid) &&
-            isEnrolledStudent(classId) &&
-            request.resource.data.keys().hasOnly([
-              'studentUid',
-              'studentCode',
-              'name',
-              'hskLevel',
-              'score',
-              'timeSeconds',
-              'streak',
-              'updatedAt'
-            ]) &&
-            request.resource.data.studentUid == request.auth.uid &&
-            isValidString(request.resource.data.name, 1, 120) &&
-            isValidScore(request.resource.data.score));
-
-        allow delete: if isClassTeacher(classId);
+        allow read: if isValidId(classId) && isValidId(studentUid) && isClassMember(classId);
+        // Clients CANNOT write directly to leaderboard (server POST /api/submissions only).
+        allow create, update, delete: if false;
       }
     }
 
     // ===============================================================
-    // 3. Student Private SRS Progress: /users/{studentUid}/srs/{wordId}
+    // 4. Student Profile & Private SRS Progress: /users/{studentUid}
     // ===============================================================
-    match /users/{studentUid}/srs/{wordId} {
-      allow read: if isOwner(studentUid);
-      allow create, update: if isOwner(studentUid) &&
-        isValidString(request.resource.data.wordId, 1, 120) &&
-        isValidString(request.resource.data.hanzi, 1, 40) &&
-        request.resource.data.learned is bool;
-      allow delete: if isOwner(studentUid);
+    match /users/{studentUid} {
+      allow get: if isValidId(studentUid) && isOwner(studentUid);
+      allow list, create, update, delete: if false;
+
+      match /srs/{wordId} {
+        allow read: if isValidId(studentUid) && isValidId(wordId) && isOwner(studentUid);
+        allow create, update: if isValidId(studentUid) &&
+          isValidId(wordId) &&
+          isOwner(studentUid) &&
+          isValidString(request.resource.data.wordId, 1, 120) &&
+          isValidString(request.resource.data.hanzi, 1, 40) &&
+          request.resource.data.learned is bool;
+        allow delete: if isValidId(studentUid) && isValidId(wordId) && isOwner(studentUid);
+      }
     }
 
     // ===============================================================
-    // 4. Default Deny All Other Paths
+    // 5. Server-Only AI Usage Quota: /aiUsage/{usageId}
+    // ===============================================================
+    match /aiUsage/{usageId} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // 6. Default Deny All Other Paths
     // ===============================================================
     match /{document=**} {
       allow read, write: if false;
