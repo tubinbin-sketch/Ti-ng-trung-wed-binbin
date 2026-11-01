@@ -1467,7 +1467,9 @@ export async function hydrateSlideStrokesFromCDN(slide: VocabSlide): Promise<Voc
  * Calls server-side Gemini API (/api/hanzi/enrich) to enrich any arbitrary Chinese word
  * with accurate Pinyin, Hán Việt, Vietnamese meaning, radicals, and contextual example sentence.
  */
-export const GEMINI_API_TIMEOUT_MS = 20000;
+// Slightly longer than the server's total Gemini budget (22 s) so the server can
+// finish a fallback to another model before the browser gives up.
+export const GEMINI_API_TIMEOUT_MS = 26000;
 export const OFFLINE_FALLBACK_NOTICE = 'Đang dùng từ điển nội bộ do AI phản hồi chậm';
 
 export async function enrichVocabSlideWithAI(
@@ -3291,6 +3293,12 @@ export function generateBinBinSmartReply(
  * calls `/api/binbin/chat` (powered by `@google/genai` with `process.env.GEMINI_API_KEY`)
  * with a clean timeout so the UI never hangs.
  */
+/** One earlier chat turn sent to the server so BinBin can follow the conversation. */
+export interface BinBinHistoryTurn {
+  role: 'user' | 'model';
+  text: string;
+}
+
 export async function askBinBinPandaAI(
   actionType: BinBinActionType,
   userPrompt: string,
@@ -3299,7 +3307,8 @@ export async function askBinBinPandaAI(
     prompt?: string;
     grammarHint?: string;
     pinyinHint?: string;
-  } | null
+  } | null,
+  history: BinBinHistoryTurn[] = []
 ): Promise<BinBinReply> {
   const fallbackReply = generateBinBinSmartReply(
     actionType,
@@ -3339,6 +3348,7 @@ export async function askBinBinPandaAI(
             }
           : null,
         contextQuiz: contextQuiz || null,
+        history: history.slice(-6).map((t) => ({ role: t.role, text: t.text.slice(0, 800) })),
       }),
     });
     clearTimeout(timeoutId);

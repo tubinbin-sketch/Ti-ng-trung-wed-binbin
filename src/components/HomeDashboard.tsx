@@ -91,8 +91,8 @@ export function HomeDashboard({
   const isTeacher = userProfile.role === 'teacher';
 
   return (
-    <div className="space-y-6 animate-fade-in" data-testid="home-dashboard">
-      <div>
+    <div className="space-y-6" data-testid="home-dashboard">
+      <div className="animate-rise-in">
         <p className="text-sm text-ink-muted">{greetingForNow()},</p>
         <h2 className="text-2xl sm:text-[28px] font-semibold text-ink mt-0.5">
           {firstName(userProfile.name)}
@@ -103,7 +103,8 @@ export function HomeDashboard({
         {/* Continue lesson — the featured word */}
         {current && (
           <section
-            className="lg:col-span-2 rounded-3xl bg-surface border border-border shadow-xs overflow-hidden"
+            className="lg:col-span-2 rounded-3xl bg-surface border border-border shadow-xs overflow-hidden animate-rise-in"
+            style={{ '--stagger': 1 } as React.CSSProperties}
             aria-labelledby="continue-heading"
           >
             <div className="flex flex-col sm:flex-row">
@@ -183,7 +184,8 @@ export function HomeDashboard({
 
         {/* Progress */}
         <section
-          className="rounded-3xl bg-surface border border-border shadow-xs p-5 sm:p-6 flex flex-col"
+          className="rounded-3xl bg-surface border border-border shadow-xs p-5 sm:p-6 flex flex-col animate-rise-in"
+          style={{ '--stagger': 2 } as React.CSSProperties}
           aria-labelledby="progress-heading"
         >
           <h3 id="progress-heading" className="text-sm font-medium text-ink-muted">
@@ -201,7 +203,7 @@ export function HomeDashboard({
             aria-valuenow={percent}
             aria-label="Tỷ lệ từ đã thuộc"
           >
-            <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${percent}%` }} />
+            <div className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out" style={{ width: `${percent}%` }} />
           </div>
           <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl bg-surface-2 px-3 py-2.5">
@@ -217,7 +219,11 @@ export function HomeDashboard({
       </div>
 
       {/* Quick actions */}
-      <section aria-labelledby="practice-heading">
+      <section
+        aria-labelledby="practice-heading"
+        className="animate-rise-in"
+        style={{ '--stagger': 3 } as React.CSSProperties}
+      >
         <h3 id="practice-heading" className="text-base font-semibold text-ink mb-3">
           Luyện tập
         </h3>
@@ -267,7 +273,11 @@ export function HomeDashboard({
 
       {/* Words to review */}
       {toReview.length > 0 && (
-        <section aria-labelledby="review-heading">
+        <section
+          aria-labelledby="review-heading"
+          className="animate-rise-in"
+          style={{ '--stagger': 4 } as React.CSSProperties}
+        >
           <div className="flex items-baseline justify-between mb-3">
             <h3 id="review-heading" className="text-base font-semibold text-ink">
               Từ chưa thuộc
@@ -300,7 +310,11 @@ export function HomeDashboard({
       )}
 
       {isTeacher && (
-        <section aria-labelledby="teach-heading">
+        <section
+          aria-labelledby="teach-heading"
+          className="animate-rise-in"
+          style={{ '--stagger': 5 } as React.CSSProperties}
+        >
           <h3 id="teach-heading" className="text-base font-semibold text-ink mb-3">
             Giảng dạy
           </h3>

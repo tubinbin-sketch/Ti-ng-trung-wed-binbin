@@ -385,7 +385,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
         {isToolsDropdownOpen && (
           <div
             data-testid="classroom-tools-dropdown-menu"
-            className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-[min(360px,calc(100vw-2rem))] z-40 rounded-2xl bg-surface text-ink border border-border shadow-xl p-1.5 animate-fade-in"
+            className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-[min(360px,calc(100vw-2rem))] z-40 rounded-2xl bg-surface text-ink border border-border shadow-xl p-1.5 animate-pop-in"
           >
             <div className="flex items-center justify-between px-2.5 pt-1.5 pb-2">
               <span className="text-xs font-medium text-ink-muted">
@@ -657,14 +657,14 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
           ===================================================================== */}
       {isProjectorOpen && (
         <div
-          className="fixed inset-0 z-50 bg-[#122018]/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-8 text-white overflow-y-auto"
+          className="fixed inset-0 z-50 animate-backdrop-in bg-[#122018]/95 backdrop-blur-md flex flex-col justify-between p-4 sm:p-8 text-white overflow-y-auto"
           role="dialog"
           aria-modal="true"
           aria-label="Chế độ Trình chiếu Lớp học (Projector Mode)"
           data-testid="projector-mode-modal"
         >
           {/* Top Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/15 pb-4">
+          <div className="animate-sheet-in flex flex-wrap items-center justify-between gap-4 border-b border-white/15 pb-4">
             <div className="flex flex-wrap items-center gap-3">
               <span className="px-3 py-1 rounded-xl bg-highlight text-on-highlight text-xs font-bold uppercase">
                 🖥️ TRÌNH CHIẾU FULLSCREEN · MÁY CHIẾU LỚP HỌC
@@ -837,7 +837,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
           ===================================================================== */}
       {isLuckyModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 animate-backdrop-in bg-black/65 backdrop-blur-xs flex items-center justify-center p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Gọi tên học viên ngẫu nhiên"
@@ -846,7 +846,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-lg rounded-3xl bg-surface border-2 border-border-strong p-6 shadow-2xl space-y-4 text-ink"
+            className="animate-sheet-in w-full max-w-lg rounded-3xl bg-surface border-2 border-border-strong p-6 shadow-2xl space-y-4 text-ink"
           >
             <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
               <div>
@@ -941,7 +941,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
           ===================================================================== */}
       {isMiniGameOpen && currentMiniGameQ && (
         <div
-          className="fixed inset-0 z-50 bg-[#122018]/92 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+          className="fixed inset-0 z-50 animate-backdrop-in bg-[#122018]/92 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
           role="dialog"
           aria-modal="true"
           aria-label="Mini-Game Lớp Học 1-Click Quiz"
@@ -950,7 +950,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-4xl rounded-3xl bg-surface border-2 border-highlight shadow-2xl overflow-hidden text-ink"
+            className="animate-sheet-in w-full max-w-4xl rounded-3xl bg-surface border-2 border-highlight shadow-2xl overflow-hidden text-ink"
           >
             {/* Header */}
             <div className="px-5 py-4 bg-inverse text-white flex flex-wrap items-center justify-between gap-3">
@@ -1197,7 +1197,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
           ===================================================================== */}
       {isAssignSlideModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 animate-backdrop-in bg-black/65 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
           role="dialog"
           aria-modal="true"
           aria-label="Giao bài tập về nhà từ Slide này"
@@ -1206,7 +1206,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-2xl rounded-3xl bg-surface border-2 border-border-strong p-5 sm:p-6 shadow-2xl space-y-4 text-ink"
+            className="animate-sheet-in w-full max-w-2xl rounded-3xl bg-surface border-2 border-border-strong p-5 sm:p-6 shadow-2xl space-y-4 text-ink"
           >
             <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
               <div>
@@ -1325,7 +1325,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
           ===================================================================== */}
       {isLessonPlanOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+          className="fixed inset-0 z-50 animate-backdrop-in bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
           role="dialog"
           aria-modal="true"
           aria-label="Giáo án & Phiếu bài tập HSK 3.0"
@@ -1334,7 +1334,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-5xl bg-surface rounded-3xl border-2 border-border-strong shadow-2xl overflow-hidden flex flex-col max-h-[90vh] text-ink"
+            className="animate-sheet-in w-full max-w-5xl bg-surface rounded-3xl border-2 border-border-strong shadow-2xl overflow-hidden flex flex-col max-h-[90vh] text-ink"
           >
             {/* Header */}
             <div className="px-5 py-4 bg-inverse text-white flex flex-wrap items-center justify-between gap-3">
@@ -1455,7 +1455,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
           ===================================================================== */}
       {isDictationOpen && currentDictationItem && (
         <div
-          className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+          className="fixed inset-0 z-50 animate-backdrop-in bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
           role="dialog"
           aria-modal="true"
           aria-label="Phòng Đọc Chính Tả Nghe - Viết Trên Lớp (听写)"
@@ -1464,7 +1464,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-3xl rounded-3xl bg-surface-2 border-2 border-highlight shadow-2xl overflow-hidden text-ink"
+            className="animate-sheet-in w-full max-w-3xl rounded-3xl bg-surface-2 border-2 border-highlight shadow-2xl overflow-hidden text-ink"
           >
             {/* Header */}
             <div className="px-5 py-3.5 bg-primary text-on-primary flex flex-wrap items-center justify-between gap-3">

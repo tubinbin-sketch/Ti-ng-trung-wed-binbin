@@ -1932,7 +1932,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       setIsCardFlipped((f) => !f);
                     }
                   }}
-                  className="relative rounded-3xl bg-surface border border-border shadow-sm hover:shadow-md transition-shadow cursor-pointer min-h-[340px] sm:min-h-[380px] flex flex-col items-center justify-center px-6 py-10 text-center select-none"
+                  className="flip-scene relative rounded-3xl bg-surface border border-border shadow-sm hover:shadow-md transition-shadow cursor-pointer min-h-[340px] sm:min-h-[380px] flex flex-col items-center justify-center px-6 py-10 text-center select-none"
                 >
                   <span className="absolute top-4 left-4 text-xs font-medium px-2 py-1 rounded-md bg-primary-soft text-primary">
                     {currentHsk3Meta.hskLevelNormalized}
@@ -1949,33 +1949,38 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     <Volume2 className="w-5 h-5" />
                   </button>
 
-                  <div className="font-hanzi text-7xl sm:text-8xl text-ink leading-none">
-                    {currentSlide.hanzi}
-                  </div>
+                  <div
+                    key={`${currentSlide.id}-${isCardFlipped ? 'back' : 'front'}`}
+                    className="animate-flip-in w-full flex flex-col items-center"
+                  >
+                    <div className="font-hanzi text-7xl sm:text-8xl text-ink leading-none">
+                      {currentSlide.hanzi}
+                    </div>
 
-                  {isCardFlipped ? (
-                    <div className="mt-6 w-full max-w-md space-y-2 animate-fade-in">
-                      <div className="text-2xl font-semibold text-primary">{currentSlide.pinyin}</div>
-                      {currentSlide.hanViet && (
-                        <div className="text-sm text-ink-subtle">Hán Việt: {currentSlide.hanViet}</div>
-                      )}
-                      <div className="text-lg text-ink">{currentSlide.meaning}</div>
-                      {currentToneSandhi.spokenPinyin &&
-                        currentToneSandhi.spokenPinyin !== currentSlide.pinyin && (
-                          <div className="text-xs text-ink-muted">
-                            {currentToneSandhi.ruleTitle}: <strong className="text-ink">{currentToneSandhi.spokenPinyin}</strong>
+                    {isCardFlipped ? (
+                      <div className="mt-6 w-full max-w-md space-y-2 animate-fade-in">
+                        <div className="text-2xl font-semibold text-primary">{currentSlide.pinyin}</div>
+                        {currentSlide.hanViet && (
+                          <div className="text-sm text-ink-subtle">Hán Việt: {currentSlide.hanViet}</div>
+                        )}
+                        <div className="text-lg text-ink">{currentSlide.meaning}</div>
+                        {currentToneSandhi.spokenPinyin &&
+                          currentToneSandhi.spokenPinyin !== currentSlide.pinyin && (
+                            <div className="text-xs text-ink-muted">
+                              {currentToneSandhi.ruleTitle}: <strong className="text-ink">{currentToneSandhi.spokenPinyin}</strong>
+                            </div>
+                          )}
+                        {currentSlide.exampleHanzi && (
+                          <div className="mt-3 pt-3 border-t border-border text-sm text-ink-muted">
+                            <span className="font-hanzi text-base text-ink">{currentSlide.exampleHanzi}</span>
+                            {currentSlide.exampleMeaning && <div className="mt-0.5">{currentSlide.exampleMeaning}</div>}
                           </div>
                         )}
-                      {currentSlide.exampleHanzi && (
-                        <div className="mt-3 pt-3 border-t border-border text-sm text-ink-muted">
-                          <span className="font-hanzi text-base text-ink">{currentSlide.exampleHanzi}</span>
-                          {currentSlide.exampleMeaning && <div className="mt-0.5">{currentSlide.exampleMeaning}</div>}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="mt-6 text-sm text-ink-subtle">Nhẩm phiên âm và nghĩa, rồi bấm vào thẻ để lật</p>
-                  )}
+                      </div>
+                    ) : (
+                      <p className="mt-6 text-sm text-ink-subtle">Nhẩm phiên âm và nghĩa, rồi bấm vào thẻ để lật</p>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -3431,7 +3436,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               ================================================================= */}
           {isQuickEditModalOpen && (
             <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+              className="fixed inset-0 z-50 animate-backdrop-in flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
               role="dialog"
               aria-modal="true"
               data-testid="quick-edit-slide-modal"
@@ -3440,7 +3445,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               <form
                 onSubmit={handleSaveQuickEditSlide}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-lg rounded-3xl bg-surface-2 border border-highlight/70 shadow-2xl p-5 sm:p-6 space-y-3.5 text-ink"
+                className="animate-sheet-in w-full max-w-lg rounded-3xl bg-surface-2 border border-highlight/70 shadow-2xl p-5 sm:p-6 space-y-3.5 text-ink"
               >
                 <div className="flex items-start justify-between gap-3 pb-2.5 border-b border-primary/15">
                   <div>
@@ -3584,7 +3589,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               ================================================================= */}
           {isBatchImportModalOpen && (
             <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+              className="fixed inset-0 z-50 animate-backdrop-in flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
               role="dialog"
               aria-modal="true"
               data-testid="batch-import-modal"
@@ -3593,7 +3598,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               <form
                 onSubmit={handleConfirmBatchImport}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-2xl rounded-3xl bg-surface-2 border border-highlight/70 shadow-2xl p-5 sm:p-6 space-y-4 text-ink"
+                className="animate-sheet-in w-full max-w-2xl rounded-3xl bg-surface-2 border border-highlight/70 shadow-2xl p-5 sm:p-6 space-y-4 text-ink"
               >
                 <div className="flex items-start justify-between gap-3 pb-2.5 border-b border-primary/15">
                   <div>

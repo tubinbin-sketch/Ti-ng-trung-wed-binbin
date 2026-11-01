@@ -196,7 +196,7 @@ body {
   min-height: 100dvh;
   background-color: var(--token-canvas);
   color: var(--token-ink);
-  overflow-x: hidden;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: 'cv11', 'ss01';
@@ -204,7 +204,9 @@ body {
 
 #root {
   width: 100%;
-  overflow-x: hidden;
+  /* clip (not hidden): nothing can scroll the page sideways, not even
+     scrollIntoView/focus, and sticky headers keep working */
+  overflow-x: clip;
 }
 
 h1, h2, h3, h4 {
@@ -376,6 +378,129 @@ h1, h2, h3, h4 {
 
 .animate-fade-in {
   animation: fadeIn 0.18s ease-out both;
+}
+
+/* ============================================================================
+   Motion
+   One easing curve and three durations for the whole app, so movement feels
+   consistent: quick for feedback, a little longer for things that appear.
+   ============================================================================ */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+}
+
+/* Menus, popovers, chat bubbles: grow from their anchor */
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.animate-pop-in {
+  animation: popIn var(--dur-base) var(--ease-out) both;
+  transform-origin: top right;
+}
+
+/* Dialogs: dim the page, lift the sheet */
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheetIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.animate-backdrop-in { animation: backdropIn var(--dur-base) ease-out both; }
+.animate-sheet-in { animation: sheetIn var(--dur-slow) var(--ease-out) both; }
+
+/* Toasts slide in from the edge */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-toast-in { animation: toastIn var(--dur-slow) var(--ease-out) both; }
+
+/* Flashcard flip: each face turns in around the vertical axis */
+.flip-scene { perspective: 1200px; }
+@keyframes flipIn {
+  from { opacity: 0; transform: rotateY(-75deg); }
+  to { opacity: 1; transform: rotateY(0); }
+}
+.animate-flip-in {
+  animation: flipIn var(--dur-slow) var(--ease-out) both;
+  backface-visibility: hidden;
+}
+
+/* Staggered entrance for the home page sections (one orchestrated moment) */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-rise-in {
+  animation: riseIn 420ms var(--ease-out) both;
+  animation-delay: calc(var(--stagger, 0) * 60ms);
+}
+
+/* Loading placeholders */
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.skeleton {
+  border-radius: var(--radius-xl);
+  background: linear-gradient(
+    90deg,
+    var(--token-surface-2) 25%,
+    color-mix(in srgb, var(--token-surface-2) 55%, var(--token-surface)) 50%,
+    var(--token-surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* "BinBin is typing" dots */
+@keyframes typingDot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+.typing-dots { display: inline-flex; gap: 3px; }
+.typing-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--token-primary);
+  animation: typingDot 1s ease-in-out infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+/* Buttons and nav items: quick, consistent feedback */
+.app-nav-link,
+.app-tabbar-link {
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+.app-tabbar-link:active,
+.app-nav-link:active {
+  transform: scale(0.97);
+}
+.app-tabbar-link[aria-current="page"] svg {
+  animation: tabBounce var(--dur-slow) var(--ease-out);
+}
+@keyframes tabBounce {
+  0% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-2px) scale(1.08); }
+  100% { transform: none; }
+}
+
+/* Smooth colour change while switching theme (class added for ~300 ms) */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color var(--dur-slow) ease, border-color var(--dur-slow) ease,
+    color var(--dur-slow) ease, fill var(--dur-slow) ease !important;
 }
 
 /* ============================================================================
