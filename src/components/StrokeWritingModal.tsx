@@ -237,7 +237,7 @@ export const StrokeWritingModal: React.FC<StrokeWritingModalProps> = ({
       maxWidthClass="max-w-md"
       testId="stroke-writing-dialog"
     >
-      <div className="w-full rounded-3xl bg-canvas border-2 border-gold text-ink p-5 sm:p-6 shadow-2xl">
+      <div className="w-full rounded-3xl bg-canvas border-2 border-border-strong text-ink p-5 sm:p-6 shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 id="stroke-writing-modal-title" className="text-lg font-bold tracking-tight text-ink">
@@ -269,7 +269,7 @@ export const StrokeWritingModal: React.FC<StrokeWritingModalProps> = ({
                 onClick={() => setActiveCharIdx(idx)}
                 className={`w-10 h-10 rounded-xl font-['Noto_Sans_SC'] text-lg font-bold transition-colors cursor-pointer ${
                   activeCharIdx === idx
-                    ? 'bg-accent text-canvas'
+                    ? 'bg-accent text-on-primary'
                     : 'bg-surface text-ink border border-border hover:bg-primary/10'
                 }`}
               >
@@ -281,7 +281,7 @@ export const StrokeWritingModal: React.FC<StrokeWritingModalProps> = ({
           <button
             type="button"
             onClick={() => speakChinese(slide.hanzi, speechRate)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-primary text-canvas hover:opacity-95 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-primary text-on-primary hover:opacity-95 transition-colors cursor-pointer"
           >
             <Volume2 className="w-3.5 h-3.5" />
             <span>Nghe ({speechRate.toFixed(2).replace(/\.00$/, '.0')}x)</span>
@@ -307,7 +307,7 @@ export const StrokeWritingModal: React.FC<StrokeWritingModalProps> = ({
                 }}
                 className={`px-2 py-0.5 rounded font-semibold transition-colors cursor-pointer ${
                   Math.abs(strokeSpeedMs - item.ms) < 90
-                    ? 'bg-primary text-canvas'
+                    ? 'bg-primary text-on-primary'
                     : 'bg-canvas text-ink-muted hover:text-ink'
                 }`}
               >
@@ -336,7 +336,7 @@ export const StrokeWritingModal: React.FC<StrokeWritingModalProps> = ({
           </div>
         </div>
 
-        <div className="relative mx-auto w-64 h-64 rounded-2xl bg-[#111317] border-2 border-gold overflow-hidden select-none touch-none">
+        <div className="relative mx-auto w-64 h-64 rounded-2xl bg-[#111317] border-2 border-border-strong overflow-hidden select-none touch-none">
           <svg
             ref={svgBoxRef}
             viewBox="0 0 100 100"
@@ -424,7 +424,7 @@ export const StrokeWritingModal: React.FC<StrokeWritingModalProps> = ({
             onClick={handleStartAnimate}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
               mode === 'animate'
-                ? 'bg-primary text-canvas'
+                ? 'bg-primary text-on-primary'
                 : 'bg-surface text-ink border border-border'
             }`}
           >
@@ -440,7 +440,7 @@ export const StrokeWritingModal: React.FC<StrokeWritingModalProps> = ({
             }}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
               mode === 'practice'
-                ? 'bg-accent text-canvas'
+                ? 'bg-accent text-on-primary'
                 : 'bg-surface text-ink border border-border'
             }`}
           >
@@ -473,7 +473,7 @@ export const StrokeWritingModal: React.FC<StrokeWritingModalProps> = ({
             onClick={() => onToggleLearned(slide.id)}
             className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
               slide.learned
-                ? 'bg-primary text-canvas'
+                ? 'bg-primary text-on-primary'
                 : 'bg-surface text-ink border border-border'
             }`}
           >

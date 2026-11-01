@@ -82,7 +82,7 @@ export const AddVocabModal: React.FC<AddVocabModalProps> = ({
       >
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-gold">
+            <div className="text-xs font-bold text-gold">
               SOẠN GIÁO ÁN HÁN NGỮ · LƯU TRỮ TỰ ĐỘNG
             </div>
             <h3 id="add-vocab-modal-title" className="text-base sm:text-lg font-bold text-ink mt-0.5">
@@ -235,7 +235,7 @@ export const AddVocabModal: React.FC<AddVocabModalProps> = ({
           <button
             type="submit"
             data-testid="save-custom-vocab-btn"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:opacity-95 text-canvas text-xs font-bold shadow-xs cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:opacity-95 text-on-primary text-xs font-bold shadow-xs cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Lưu &amp; Tạo Slide Ngay</span>

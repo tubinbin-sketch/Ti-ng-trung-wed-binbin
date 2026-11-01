@@ -1,157 +1,316 @@
 @import "tailwindcss";
 
+/* ============================================================================
+   HANU HSK — Design system
+   One semantic token layer. Components only use these names
+   (bg-surface, text-ink, border-border, bg-primary …), never raw hex,
+   so every theme and dark mode is a single block of variables below.
+   ============================================================================ */
+
 @theme {
+  --font-sans: 'Be Vietnam Pro', 'Noto Sans SC', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-hanzi: 'Noto Serif SC', 'Songti SC', 'STSong', serif;
+
+  /* Slightly larger small sizes: the app leans heavily on text-xs */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
+
+  /* One radius hierarchy: controls 8–12px, cards 14px, sheets 18px */
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 0.875rem;
+  --radius-3xl: 1.125rem;
+
+  --shadow-xs: 0 1px 2px rgb(16 24 40 / 0.05);
+  --shadow-sm: 0 1px 3px rgb(16 24 40 / 0.07), 0 1px 2px rgb(16 24 40 / 0.04);
+  --shadow-md: 0 4px 10px -2px rgb(16 24 40 / 0.07), 0 2px 4px -2px rgb(16 24 40 / 0.04);
+  --shadow-lg: 0 12px 20px -6px rgb(16 24 40 / 0.09), 0 4px 8px -4px rgb(16 24 40 / 0.04);
+  --shadow-xl: 0 20px 28px -8px rgb(16 24 40 / 0.10), 0 6px 10px -6px rgb(16 24 40 / 0.04);
+  --shadow-2xl: 0 28px 48px -12px rgb(16 24 40 / 0.16);
+
   --color-canvas: var(--token-canvas);
   --color-surface: var(--token-surface);
+  --color-surface-2: var(--token-surface-2);
   --color-ink: var(--token-ink);
   --color-ink-muted: var(--token-ink-muted);
-  --color-primary: var(--token-primary);
-  --color-accent: var(--token-accent);
-  --color-gold: var(--token-gold);
+  --color-ink-subtle: var(--token-ink-subtle);
   --color-border: var(--token-border);
+  --color-border-strong: var(--token-border-strong);
+  --color-primary: var(--token-primary);
+  --color-primary-hover: var(--token-primary-hover);
+  --color-primary-soft: var(--token-primary-soft);
+  --color-on-primary: var(--token-on-primary);
+  --color-inverse: var(--token-inverse);
+  --color-inverse-hover: var(--token-inverse-hover);
+  --color-accent: var(--token-accent);
+  --color-accent-soft: var(--token-accent-soft);
+  --color-gold: var(--token-gold);
+  --color-highlight: var(--token-highlight);
+  --color-on-highlight: var(--token-on-highlight);
   --color-success: var(--token-success);
+  --color-success-soft: var(--token-success-soft);
   --color-warning: var(--token-warning);
   --color-danger: var(--token-danger);
   --color-focus: var(--token-focus);
 }
 
+/* ---------- Default theme: Ngọc bích (jade) — light ---------- */
 :root {
-  --s: max(0.55px, min(calc(100vw / 2048), calc(100vh / 1152)));
-
-  /* 12 Core Semantic Design Tokens (Oriental Rice Paper & Jade Identity) */
-  --token-canvas: #FAF7F0;
+  color-scheme: light;
+  --token-canvas: #F5F6F8;
   --token-surface: #FFFFFF;
-  --token-ink: #0F382E;
-  --token-ink-muted: #3A544B;
-  --token-primary: #0F5243;
-  --token-accent: #B8292F;
-  --token-gold: #6E5B1B;
-  --token-border: #D5DEC7;
-  --token-success: #065F46;
+  --token-surface-2: #F1F3F5;
+  --token-ink: #15181D;
+  --token-ink-muted: #545B68;
+  --token-ink-subtle: #868D99;
+  --token-border: #E3E6EA;
+  --token-border-strong: #CDD1D8;
+
+  --token-primary: #0D7A58;
+  --token-primary-hover: #0A6448;
+  --token-primary-soft: #E5F3ED;
+  --token-on-primary: #FFFFFF;
+
+  --token-inverse: #1B1E24;
+  --token-inverse-hover: #2B2F37;
+
+  --token-accent: #CF3A30;        /* seal red */
+  --token-accent-soft: #FCECEA;
+  --token-gold: #93600A;          /* readable amber for small labels */
+  --token-highlight: #F1B83A;     /* stars, streaks, "correct" glints */
+  --token-on-highlight: #1B1E24;
+
+  --token-success: #12804D;
+  --token-success-soft: #E7F5EE;
   --token-warning: #B45309;
-  --token-danger: #B91C1C;
-  --token-focus: #0F5243;
+  --token-danger: #C8312A;
+  --token-focus: #0D7A58;
 
-  --halora-bg: #F4EFE6;
-  --halora-ink: #0F382E;
-  --halora-ink-muted: #3A544B;
-  --halora-gold: #9B8A3E;
-  --halora-gold-bright: #C5B358;
-  --halora-jade-start: #0F5243;
-  --halora-jade-end: #166E5B;
-  --halora-cinnabar-start: #B8292F;
-  --halora-cinnabar-end: #961C21;
-  --halora-surface: rgba(255, 255, 255, 0.78);
-  --halora-surface-soft: rgba(250, 247, 240, 0.85);
-  --halora-pill-moss: rgba(15, 82, 67, 0.62);
-  --halora-glass-bg: rgba(255, 255, 255, 0.75);
-  --halora-glass-bg-strong: rgba(255, 255, 255, 0.86);
-  --halora-glass-border: rgba(255, 255, 255, 0.65);
-
-  --liquid-glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.62) 100%);
-  --liquid-glass-border: 1px solid rgba(255, 255, 255, 0.7);
-  --liquid-glass-shadow: 0 8px 30px rgba(15, 56, 46, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.85);
-
-  /* Dynamic Studio Theme Variables */
-  --theme-canvas: #FAF7F0;
-  --theme-surface: #FFFFFF;
-  --theme-ink: #0F382E;
-  --theme-ink-muted: #3A544B;
-  --theme-accent: #9B8A3E;
-  --theme-accent-bright: #C5B358;
-  --theme-banner: #0F5243;
-  --theme-tab-bar-bg: rgba(15, 82, 67, 0.07);
-  --theme-tab-bar-border: rgba(15, 82, 67, 0.14);
-  --theme-glass-bg: rgba(255, 255, 255, 0.75);
-  --theme-glass-border: rgba(255, 255, 255, 0.65);
+  /* legacy aliases still read by a few components */
+  --theme-canvas: var(--token-canvas);
+  --theme-surface: var(--token-surface);
+  --theme-ink: var(--token-ink);
+  --theme-ink-muted: var(--token-ink-muted);
+  --theme-accent: var(--token-gold);
+  --theme-accent-bright: var(--token-highlight);
+  --theme-banner: var(--token-inverse);
+  --theme-glass-bg: var(--token-surface);
+  --theme-glass-border: var(--token-border);
 }
 
+/* ---------- Alternate light themes (only the brand colour changes) ---------- */
+html[data-theme="warm-crimson"] {
+  --token-primary: #C2362C;
+  --token-primary-hover: #A42C23;
+  --token-primary-soft: #FBEAE8;
+  --token-focus: #C2362C;
+  --token-accent: #0D7A58;
+  --token-accent-soft: #E5F3ED;
+}
+
+html[data-theme="minimal-ink"] {
+  --token-primary: #1F2937;
+  --token-primary-hover: #111827;
+  --token-primary-soft: #EEF0F3;
+  --token-focus: #1F2937;
+}
+
+html[data-theme="classic-amber"] {
+  --token-canvas: #F7F5F1;
+  --token-surface-2: #F2EFEA;
+  --token-primary: #95580A;
+  --token-primary-hover: #7A4807;
+  --token-primary-soft: #FBF1E2;
+  --token-focus: #95580A;
+}
+
+/* ---------- Dark theme (Đêm) ---------- */
 html[data-theme="moon-night"] {
-  --token-canvas: #0E1713;
-  --token-surface: #182821;
-  --token-ink: #F0F5F1;
-  --token-ink-muted: #C2D4C9;
-  --token-primary: #1F8A70;
-  --token-accent: #E04F56;
-  --token-gold: #DFC660;
-  --token-border: #2C463B;
-  --token-success: #34D399;
-  --token-warning: #FBBF24;
-  --token-danger: #F87171;
-  --token-focus: #DFC660;
+  color-scheme: dark;
+  --token-canvas: #0E1013;
+  --token-surface: #16191E;
+  --token-surface-2: #1D2127;
+  --token-ink: #ECEEF1;
+  --token-ink-muted: #A7AEBA;
+  --token-ink-subtle: #747C88;
+  --token-border: #272B33;
+  --token-border-strong: #353A44;
 
-  --theme-canvas: #0E1713;
-  --theme-surface: #182821;
-  --theme-ink: #F0F5F1;
-  --theme-ink-muted: #C2D4C9;
+  --token-primary: #34BC8C;
+  --token-primary-hover: #4DCB9D;
+  --token-primary-soft: #132A21;
+  --token-on-primary: #05150F;
+
+  --token-inverse: #262A32;
+  --token-inverse-hover: #30353E;
+
+  --token-accent: #F0675D;
+  --token-accent-soft: #2E1715;
+  --token-gold: #E0A940;
+  --token-highlight: #F1B83A;
+  --token-on-highlight: #15181D;
+
+  --token-success: #3FC484;
+  --token-success-soft: #12271C;
+  --token-warning: #F0A33C;
+  --token-danger: #F26A60;
+  --token-focus: #34BC8C;
 }
 
-/* Global Accessible Keyboard Focus Ring (WCAG 2.1 AA) */
+/* Tailwind palette classes some components still use for tinted callouts.
+   Unlayered rules win over Tailwind's layered utilities without !important. */
+html[data-theme="moon-night"] :is(.bg-stone-50, .bg-stone-100, .bg-gray-50, .bg-gray-100, .bg-slate-50) {
+  background-color: var(--token-surface-2);
+}
+html[data-theme="moon-night"] :is(.bg-emerald-50, .bg-green-50) { background-color: var(--token-success-soft); }
+html[data-theme="moon-night"] :is(.bg-amber-50, .bg-yellow-50, .bg-orange-50) { background-color: #2A2111; }
+html[data-theme="moon-night"] :is(.bg-red-50, .bg-rose-50) { background-color: var(--token-accent-soft); }
+html[data-theme="moon-night"] :is(.text-stone-500, .text-stone-600, .text-stone-700, .text-gray-500, .text-gray-600, .text-gray-700) {
+  color: var(--token-ink-muted);
+}
+html[data-theme="moon-night"] :is(.text-stone-800, .text-stone-900, .text-gray-800, .text-gray-900) { color: var(--token-ink); }
+html[data-theme="moon-night"] :is(.text-emerald-700, .text-emerald-800, .text-emerald-900) { color: var(--token-success); }
+html[data-theme="moon-night"] :is(.text-amber-700, .text-amber-800, .text-amber-900) { color: var(--token-gold); }
+html[data-theme="moon-night"] :is(.border-stone-200, .border-stone-300, .border-gray-200, .border-gray-300) { border-color: var(--token-border); }
+html[data-theme="moon-night"] :is(input, select, textarea) {
+  background-color: var(--token-surface-2);
+  border-color: var(--token-border-strong);
+  color: var(--token-ink);
+}
+
+/* ============================================================================
+   Base
+   ============================================================================ */
+html {
+  scroll-behavior: smooth;
+  background-color: var(--token-canvas);
+  color: var(--token-ink);
+  font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--token-canvas);
+  color: var(--token-ink);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+#root {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 {
+  text-wrap: balance;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--token-primary) 22%, transparent);
+}
+
+/* Keyboard focus (WCAG 2.1 AA) */
 :focus-visible {
-  outline: 2px solid var(--token-focus, #0F5243);
+  outline: 2px solid var(--token-focus);
   outline-offset: 2px;
 }
 
-/* Calligraphy / Hanzi Font for Mi Zi Ge & Featured Characters */
+/* Thin, quiet scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--token-border-strong) transparent;
+}
+
+/* Hanzi display face for Mi Zi Ge and featured characters */
 .font-hanzi-calligraphy {
-  font-family: 'KaiTi', 'STKaiti', 'Kaiti SC', 'Noto Sans SC', serif;
+  font-family: 'KaiTi', 'STKaiti', 'Kaiti SC', var(--font-hanzi);
 }
 
-/* Modern Oriental Liquid Glass Card & Surface */
-.oriental-liquid-glass {
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  background: var(--theme-glass-bg, rgba(255, 255, 255, 0.75));
-  border: 1px solid var(--theme-glass-border, rgba(255, 255, 255, 0.65));
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+.font-hanzi {
+  font-family: var(--font-hanzi);
 }
 
-html[data-theme="moon-night"] .oriental-liquid-glass {
-  background: rgba(24, 40, 33, 0.92);
-  border-color: rgba(223, 198, 96, 0.32);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  color: #F0F5F1;
+/* ============================================================================
+   App shell
+   ============================================================================ */
+.app-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-xl);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--token-ink-muted);
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.oriental-liquid-glass:hover {
-  border-color: rgba(197, 179, 88, 0.55);
-  box-shadow: 0 12px 36px rgba(15, 82, 67, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+.app-nav-link:hover {
+  background-color: var(--token-surface-2);
+  color: var(--token-ink);
 }
 
-/* Primary Jade & Cinnabar Gradient Buttons */
-.btn-oriental-jade {
-  background: linear-gradient(135deg, #0F5243 0%, #166E5B 100%);
-  color: #FAF7F0;
-  box-shadow: 0 4px 14px rgba(15, 82, 67, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+.app-nav-link[aria-current="page"] {
+  background-color: var(--token-primary-soft);
+  color: var(--token-primary);
+  font-weight: 600;
 }
 
-.btn-oriental-jade:hover {
-  background: linear-gradient(135deg, #12604F 0%, #1B7D68 100%);
-  box-shadow: 0 6px 20px rgba(15, 82, 67, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+.app-nav-link svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
 }
 
-.btn-oriental-jade:active {
-  transform: scale(0.95);
+.app-tabbar-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--token-ink-subtle);
 }
 
-.btn-oriental-cinnabar {
-  background: linear-gradient(135deg, #B8292F 0%, #961C21 100%);
-  color: #FAF7F0;
-  box-shadow: 0 4px 14px rgba(184, 41, 47, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+.app-tabbar-link[aria-current="page"] {
+  color: var(--token-primary);
+  font-weight: 600;
 }
 
-.btn-oriental-cinnabar:hover {
-  background: linear-gradient(135deg, #C93238 0%, #A82228 100%);
-  box-shadow: 0 6px 20px rgba(184, 41, 47, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+.app-tabbar-link svg {
+  width: 1.375rem;
+  height: 1.375rem;
 }
 
-.btn-oriental-cinnabar:active {
-  transform: scale(0.95);
+/* The seal: the one decorative mark in the product */
+.app-seal {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: var(--token-accent);
+  color: #fff;
+  font-family: var(--font-hanzi);
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1;
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.22);
 }
 
+/* ============================================================================
+   Feedback & small effects still used by the exercises
+   ============================================================================ */
 @keyframes tactileShake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-4px); }
@@ -160,13 +319,9 @@ html[data-theme="moon-night"] .oriental-liquid-glass {
   80% { transform: translateX(3px); }
 }
 
-@keyframes jadeSparklePulse {
-  0%, 100% {
-    box-shadow: 0 4px 16px rgba(15, 82, 67, 0.22), 0 0 0 1px rgba(197, 179, 88, 0.5);
-  }
-  50% {
-    box-shadow: 0 6px 24px rgba(22, 110, 91, 0.38), 0 0 0 2px rgba(197, 179, 88, 0.85);
-  }
+@keyframes correctPulse {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--token-success) 55%, transparent); }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--token-success) 35%, transparent); }
 }
 
 .tactile-pill-wrong {
@@ -174,768 +329,14 @@ html[data-theme="moon-night"] .oriental-liquid-glass {
 }
 
 .tactile-pill-correct {
-  animation: jadeSparklePulse 1.8s ease-in-out infinite;
-}
-
-.liquid-glass-hover {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-.liquid-glass-hover::before {
-  content: '';
-  position: absolute;
-  top: -150%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
-  transform: rotate(30deg);
-  transition: all 0.5s ease;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.liquid-glass-hover:hover::before {
-  top: -50%;
-  opacity: 1;
-}
-
-html {
-  scroll-behavior: smooth;
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-  box-sizing: border-box;
-  background-color: var(--token-canvas, #FAF7F0);
-  color: var(--token-ink, #0F382E);
-  font-family: 'Plus Jakarta Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
-}
-
-body {
-  margin: 0;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  background: linear-gradient(135deg, #FAF7F0 0%, #F4EFE6 50%, #EAE3D5 100%);
-  background-attachment: fixed;
-  color: var(--token-ink, #0F382E);
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
-}
-
-#root {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow-x: hidden;
-}
-
-html[data-theme="moon-night"] body {
-  background: linear-gradient(135deg, #0E1713 0%, #13201B 50%, #182821 100%);
-  color: #F0F5F1;
-}
-
-/* Comprehensive Dark-mode surface overrides when Moon Night theme is active */
-html[data-theme="moon-night"] main section,
-html[data-theme="moon-night"] [role="dialog"] > div,
-html[data-theme="moon-night"] [class*="bg-white"],
-html[data-theme="moon-night"] [class*="bg-surface"],
-html[data-theme="moon-night"] [class*="bg-canvas"],
-html[data-theme="moon-night"] [class*="bg-stone-50"],
-html[data-theme="moon-night"] [class*="bg-stone-100"],
-html[data-theme="moon-night"] [class*="bg-emerald-50"],
-html[data-theme="moon-night"] [class*="bg-amber-50"] {
-  background-color: #182821 !important;
-  border-color: rgba(223, 198, 96, 0.28) !important;
-  color: #F0F5F1 !important;
-}
-
-html[data-theme="moon-night"] input,
-html[data-theme="moon-night"] select,
-html[data-theme="moon-night"] textarea {
-  background-color: #111D18 !important;
-  border-color: rgba(223, 198, 96, 0.35) !important;
-  color: #F0F5F1 !important;
-}
-
-html[data-theme="moon-night"] [class*="text-stone-"],
-html[data-theme="moon-night"] [class*="text-emerald-9"],
-html[data-theme="moon-night"] [class*="text-amber-9"],
-html[data-theme="moon-night"] [class*="text-ink"] {
-  color: #F0F5F1 !important;
-}
-
-/* Global orphan-word prevention on all headings */
-h1,
-h2,
-h3,
-h4 {
-  text-wrap: balance;
-}
-
-/* Display geometric light font for metrics (400/500/600) */
-.font-metric-display {
-  font-family: 'Plus Jakarta Sans', 'Noto Sans SC', sans-serif;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ============================================================================
-   HANU × 阮文受 HERO STAGE — Compact Editorial Banner Layout
-   ============================================================================ */
-.halora-stage {
-  position: relative;
-  width: 100%;
-  min-height: 420px;
-  max-height: 560px;
-  background-color: #CBCFB8;
-  color: #1E3227;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: calc(28 * var(--s)) calc(52 * var(--s));
-  box-sizing: border-box;
-}
-
-/* Center visual container anchored to bottom edge */
-.halora-visual-stage {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 5;
-  overflow: hidden;
-}
-
-.halora-visual-media-wrap {
-  position: relative;
-  width: min(100vw, 1440px);
-  height: 100%;
-  max-height: 540px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.halora-dragon-canvas {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(86vw, calc(860 * var(--s)));
-  height: min(86vh, calc(860 * var(--s)));
-  z-index: 6;
-  pointer-events: none;
-}
-
-@keyframes haloraCloudFloatSlow {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(14px, -6px, 0);
-  }
-}
-
-@keyframes haloraCloudFloatFast {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(-16px, 5px, 0);
-  }
-}
-
-@keyframes haloraDragonLevitate {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) rotate(0deg);
-  }
-  50% {
-    transform: translate3d(0, -9px, 0) rotate(0.6deg);
-  }
-}
-
-@keyframes haloraPearlBreathing {
-  0%,
-  100% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 12px rgba(245, 226, 150, 0.45));
-  }
-  50% {
-    transform: scale(1.055);
-    filter: drop-shadow(0 0 24px rgba(212, 175, 55, 0.85));
-  }
-}
-
-.halora-cloud-drift-slow {
-  animation: haloraCloudFloatSlow 9s ease-in-out infinite;
-}
-
-.halora-cloud-drift-fast {
-  animation: haloraCloudFloatFast 7.5s ease-in-out infinite;
-}
-
-.halora-dragon-levitating {
-  animation: haloraDragonLevitate 7s ease-in-out infinite;
-  transform-origin: 960px 540px;
-}
-
-.halora-pearl-glowing {
-  animation: haloraPearlBreathing 4s ease-in-out infinite;
-  transform-origin: center;
-}
-
-@keyframes haloraFretworkSpin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.halora-fretwork-rotating {
-  animation: haloraFretworkSpin 140s linear infinite;
-  transform-origin: 975px 535px;
-}
-
-@keyframes haloraBambooSway {
-  0%,
-  100% {
-    transform: rotate(0deg);
-  }
-  50% {
-    transform: rotate(2.4deg);
-  }
-}
-
-@keyframes haloraBambooSwayAlt {
-  0%,
-  100% {
-    transform: rotate(0deg);
-  }
-  50% {
-    transform: rotate(-2.2deg);
-  }
-}
-
-@keyframes haloraPandaWave {
-  0%,
-  100% {
-    transform: rotate(0deg) translateY(0px);
-  }
-  50% {
-    transform: rotate(-8deg) translateY(-4px);
-  }
-}
-
-@keyframes haloraPandaBreathe {
-  0%,
-  100% {
-    transform: translateY(0px) scale(1);
-  }
-  50% {
-    transform: translateY(-5px) scale(1.012);
-  }
-}
-
-@keyframes haloraPandaBlink {
-  0%,
-  44%,
-  48%,
-  94%,
-  98%,
-  100% {
-    transform: scaleY(1);
-  }
-  46%,
-  96% {
-    transform: scaleY(0.08);
-  }
-}
-
-@keyframes haloraLeafDrift {
-  0% {
-    transform: translate3d(0, -10px, 0) rotate(0deg);
-    opacity: 0;
-  }
-  20% {
-    opacity: 0.85;
-  }
-  80% {
-    opacity: 0.85;
-  }
-  100% {
-    transform: translate3d(38px, 110px, 0) rotate(42deg);
-    opacity: 0;
-  }
-}
-
-.halora-bamboo-sway {
-  animation: haloraBambooSway 5.5s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: bottom center;
-}
-
-.halora-bamboo-sway-alt {
-  animation: haloraBambooSwayAlt 6.2s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: bottom center;
-}
-
-.halora-panda-breathe {
-  animation: haloraPandaBreathe 4.8s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: bottom center;
-}
-
-.halora-panda-wave {
-  animation: haloraPandaWave 2.8s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: right bottom;
-}
-
-.halora-panda-blink {
-  animation: haloraPandaBlink 5.2s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.halora-leaf-drift-1 {
-  animation: haloraLeafDrift 7.5s ease-in-out infinite;
-}
-
-.halora-leaf-drift-2 {
-  animation: haloraLeafDrift 9s ease-in-out 2.5s infinite;
-}
-
-.halora-leaf-drift-3 {
-  animation: haloraLeafDrift 8.2s ease-in-out 4.8s infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .halora-fretwork-rotating,
-  .halora-dragon-levitating,
-  .halora-pearl-glowing,
-  .halora-cloud-drift-slow,
-  .halora-cloud-drift-fast,
-  .halora-bamboo-sway,
-  .halora-bamboo-sway-alt,
-  .halora-panda-breathe,
-  .halora-panda-wave,
-  .halora-panda-blink,
-  .halora-leaf-drift-1,
-  .halora-leaf-drift-2,
-  .halora-leaf-drift-3 {
-    animation: none !important;
-  }
-}
-
-/* Header scaled to --s */
-.halora-header {
-  position: relative;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: calc(28 * var(--s));
-  width: 100%;
-}
-
-.halora-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(12 * var(--s));
-  font-size: calc(32 * var(--s));
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: #1E3227;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.halora-nav {
-  display: flex;
-  align-items: center;
-  gap: calc(36 * var(--s));
-}
-
-.halora-nav-link {
-  font-size: calc(21 * var(--s));
-  font-weight: 500;
-  color: #1E3227;
-  text-decoration: none;
-  white-space: nowrap;
-  background: transparent;
-  border: none;
-  padding: calc(6 * var(--s)) 0;
-  cursor: pointer;
-  position: relative;
-}
-
-.halora-nav-link::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1.5px;
-  background-color: #1E3227;
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.halora-nav-link:hover::after {
-  transform: scaleX(1);
-}
-
-.halora-header-actions {
-  display: flex;
-  align-items: center;
-  gap: calc(14 * var(--s));
-}
-
-.halora-pill-cart {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(10 * var(--s));
-  padding: calc(14 * var(--s)) calc(24 * var(--s));
-  border-radius: 9999px;
-  background-color: rgba(62, 86, 70, 0.52);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: #F4F6EE;
-  font-size: calc(19 * var(--s));
-  font-weight: 500;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.halora-pill-dark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: calc(10 * var(--s));
-  padding: calc(15 * var(--s)) calc(26 * var(--s));
-  border-radius: 9999px;
-  background-color: #1E3227;
-  color: #F4F6EE;
-  font-size: calc(19 * var(--s));
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-  white-space: nowrap;
-  text-decoration: none;
-}
-
-/* Main 3-Zone Grid inside Hero Stage: Left column strictly max 375px */
-.halora-hero-main {
-  position: relative;
-  z-index: 10;
-  flex: 1;
-  display: grid;
-  grid-template-columns: minmax(280px, 375px) 1fr auto;
-  align-items: center;
-  gap: calc(32 * var(--s));
-  width: 100%;
-  margin: auto 0;
-  pointer-events: none;
-}
-
-.halora-copy-col {
-  pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  max-width: 375px;
-}
-
-.halora-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(10 * var(--s));
-  font-size: calc(15.5 * var(--s));
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: #3F5447;
-  margin-bottom: calc(18 * var(--s));
-}
-
-.halora-kicker-dot {
-  width: calc(9 * var(--s));
-  height: calc(9 * var(--s));
-  min-width: 6px;
-  min-height: 6px;
-  border-radius: 9999px;
-  background-color: #1E3227;
-  flex-shrink: 0;
-}
-
-.halora-headline {
-  font-size: clamp(2.1rem, calc(54 * var(--s)), 3.15rem);
-  line-height: 1.1;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  color: #1E3227;
-  margin: 0 0 calc(20 * var(--s)) 0;
-  max-width: 420px;
-  text-wrap: balance;
-}
-
-.halora-headline-mask {
-  display: block;
-  overflow: hidden;
-  padding-bottom: 0.05em;
-}
-
-.halora-headline-line {
-  display: block;
-}
-
-.halora-body-copy {
-  font-size: calc(19.5 * var(--s));
-  line-height: 1.55;
-  color: #3F5447;
-  margin: 0 0 calc(30 * var(--s)) 0;
-  max-width: 420px;
-}
-
-/* Right Metric Glass Cards: 222x160s, radius 20s, zero drop-shadow */
-.halora-metrics-col {
-  pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  gap: calc(20 * var(--s));
-  align-items: flex-end;
-}
-
-.halora-glass-card {
-  width: calc(222 * var(--s));
-  min-width: 162px;
-  height: calc(160 * var(--s));
-  min-height: 112px;
-  border-radius: calc(20 * var(--s));
-  background: var(--halora-glass-bg);
-  border: 1px solid var(--halora-glass-border);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  padding: calc(20 * var(--s)) calc(22 * var(--s));
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  text-align: left;
-  cursor: pointer;
-  box-shadow: none;
-  transition: background-color 0.18s ease, border-color 0.18s ease;
-}
-
-.halora-glass-card:hover {
-  background: rgba(255, 255, 255, 0.68);
-  border-color: rgba(155, 138, 62, 0.55);
-}
-
-.halora-card-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: calc(14.5 * var(--s));
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #3F5447;
-  white-space: nowrap;
-}
-
-.halora-card-value {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: calc(42 * var(--s));
-  font-weight: 500;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  color: #1E3227;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.halora-card-sub {
-  font-size: calc(13.5 * var(--s));
-  font-weight: 600;
-  letter-spacing: 0.045em;
-  text-transform: uppercase;
-  color: #3F5447;
-  white-space: nowrap;
-}
-
-.halora-card-sub.is-gold {
-  color: #9B8A3E;
-}
-
-/* Equal 2-Column Studio Tool Tab Bar (Teacher 2 Tabs / Student 2 Tabs) */
-.studio-tab-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  padding: 6px;
-  border-radius: 16px;
-  background-color: var(--theme-tab-bar-bg);
-  border: 1px solid var(--theme-tab-bar-border);
-  width: 100%;
-}
-
-/* Hamburger button hidden above 820px */
-.halora-hamburger-btn {
-  display: none;
-  width: 44px;
-  height: 44px;
-  border-radius: 9999px;
-  background-color: rgba(62, 86, 70, 0.52);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(30, 50, 39, 0.18);
-  color: #1E3227;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-/* Landscape below 1200px: flexible 3-zone grid (text | dragon | cards) */
-@media (max-width: 1200px) and (orientation: landscape) {
-  .halora-hero-main {
-    grid-template-columns: 1.15fr 0.9fr auto;
-    gap: 16px;
-  }
-}
-
-/* Below 820px: Links and pills fold into a light sage menu panel behind circular hamburger button */
-@media (max-width: 820px) {
-  .halora-nav,
-  .halora-header-actions {
-    display: none;
-  }
-  .halora-hamburger-btn {
-    display: inline-flex;
-  }
-}
-
-@media (max-width: 560px) {
-  .studio-tab-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Portrait mode: text first, then 3 cards in a single row, then hand filling remaining height */
-@media (orientation: portrait) {
-  .halora-stage {
-    padding: 20px 20px 0 20px;
-    justify-content: flex-start;
-  }
-
-  .halora-hero-main {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 18px;
-    margin: 16px 0 0 0;
-    flex: 0 0 auto;
-  }
-
-  .halora-copy-col {
-    max-width: 100%;
-  }
-
-  .halora-metrics-col {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: stretch;
-    gap: 10px;
-    width: 100%;
-  }
-
-  .halora-glass-card {
-    flex: 1 1 0;
-    min-width: 0;
-    width: auto;
-    height: 112px;
-    padding: 12px 14px;
-  }
-
-  .halora-visual-stage {
-    position: relative;
-    flex: 1 1 320px;
-    min-height: 300px;
-    width: 100%;
-    margin-top: 8px;
-  }
-
-  .halora-visual-media-wrap {
-    width: 100%;
-    height: 100%;
-    min-height: 300px;
-  }
-
-  .halora-hanzi-badge-1 {
-    top: 16%;
-    left: 8%;
-  }
-  .halora-hanzi-badge-2 {
-    top: 12%;
-    left: 56%;
-  }
-  .halora-hanzi-badge-3 {
-    top: 54%;
-    left: 8%;
-  }
-  .halora-red-seal-btn {
-    top: 62%;
-    left: 56%;
-  }
-}
-
-/* Reduced motion compliance: no intro, no transitions, no particle canvas */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-  .halora-dragon-canvas {
-    display: none !important;
-  }
-}
-
-.example-sentence-container {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 100%;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, background-color 0.25s ease;
-}
-
-.example-sentence-container:hover {
-  transform: scale(1.015);
-  box-shadow: 0 8px 24px -4px rgba(30, 50, 39, 0.12), 0 2px 6px -1px rgba(155, 138, 62, 0.1);
-  border-color: rgba(155, 138, 62, 0.45);
-  background-color: rgba(255, 255, 255, 0.65);
+  animation: correctPulse 1.6s ease-in-out infinite;
 }
 
 .example-sentence-line {
   display: flex;
-  flex-wrap: nowrap;     /* Không bao giờ ngắt quãng xuống dòng */
-  white-space: nowrap;   /* Giữ nguyên một dòng duy nhất */
-  overflow-x: auto;      /* Cho phép cuộn ngang nhẹ nếu màn hình hẹp */
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow-x: auto;
   align-items: center;
   gap: 8px;
 }
@@ -948,12 +349,8 @@ h4 {
 }
 
 @keyframes soundwavePulse {
-  0%, 100% {
-    transform: scaleY(0.35);
-  }
-  50% {
-    transform: scaleY(1);
-  }
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
 }
 
 .tts-soundwave-bar {
@@ -961,19 +358,39 @@ h4 {
   width: 2px;
   height: 10px;
   border-radius: 9999px;
-  background-color: #C5B358;
+  background-color: var(--token-primary);
   animation: soundwavePulse 0.55s ease-in-out infinite;
 }
 
-.tts-soundwave-bar:nth-child(2) {
-  animation-delay: 0.15s;
+.tts-soundwave-bar:nth-child(2) { animation-delay: 0.15s; }
+.tts-soundwave-bar:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
 }
 
-.tts-soundwave-bar:nth-child(3) {
-  animation-delay: 0.3s;
+.animate-fade-in {
+  animation: fadeIn 0.18s ease-out both;
 }
 
-/* Standardized A4 Print Stylesheet for Mi Zi Ge (米字格) & Exercise Worksheet */
+/* ============================================================================
+   Reduced motion
+   ============================================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+   A4 print sheet for Mi Zi Ge (米字格) worksheets
+   ============================================================================ */
 @media print {
   @page {
     size: A4 portrait;
@@ -982,14 +399,17 @@ h4 {
 
   body {
     background: #ffffff !important;
-    color: #1E3227 !important;
+    color: #15181D !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
   header,
   footer,
+  nav,
   .no-print,
+  [data-testid="app-sidebar"],
+  [data-testid="app-tabbar"],
   [data-testid="binbin-floating-launcher"],
   [data-testid="binbin-floating-window"],
   [data-testid="live-teaching-toolkit-bar"],
@@ -1014,73 +434,3 @@ h4 {
     background: #ffffff !important;
   }
 }
-
-
-@keyframes soundwavePulse {
-  0%, 100% {
-    transform: scaleY(0.35);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}
-
-.tts-soundwave-bar {
-  display: inline-block;
-  width: 2px;
-  height: 10px;
-  border-radius: 9999px;
-  background-color: #C5B358;
-  animation: soundwavePulse 0.55s ease-in-out infinite;
-}
-
-.tts-soundwave-bar:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.tts-soundwave-bar:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-/* Standardized A4 Print Stylesheet for Mi Zi Ge (米字格) & Exercise Worksheet */
-@media print {
-  @page {
-    size: A4 portrait;
-    margin: 10mm;
-  }
-
-  body {
-    background: #ffffff !important;
-    color: #1E3227 !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  header,
-  footer,
-  .no-print,
-  [data-testid="binbin-floating-launcher"],
-  [data-testid="binbin-floating-window"],
-  [data-testid="live-teaching-toolkit-bar"],
-  [data-testid="teacher-ai-vocab-search-section"],
-  [data-testid="hsk3-filter-panel"],
-  [data-testid="horizontal-vocab-pill-strip"],
-  [data-testid="keyboard-shortcuts-bar"] {
-    display: none !important;
-  }
-
-  .print-a4-worksheet {
-    display: block !important;
-    position: static !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    max-height: none !important;
-    overflow: visible !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: #ffffff !important;
-  }
-}
-

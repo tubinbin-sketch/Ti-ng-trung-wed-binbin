@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useSyncExternalStore } from 'react';
+import React, { createContext, useContext, useRef, useSyncExternalStore } from 'react';
 import type { BinBinSlidePayload } from '../utils/chineseEngine';
 import type { UploadedAssignmentPackage } from '../utils/assignmentParser';
 import type { ActiveClassroomSession, ClassroomDataMode, SyncStatus } from '../utils/storageService';
@@ -177,13 +177,34 @@ export const AppStoreProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   return <AppStoreContext.Provider value={appStore}>{children}</AppStoreContext.Provider>;
 };
 
+function shallowEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  const ka = Object.keys(a as object);
+  const kb = Object.keys(b as object);
+  if (ka.length !== kb.length) return false;
+  return ka.every((k) =>
+    Object.is((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])
+  );
+}
+
+/**
+ * Subscribe to a slice of the app bus. Selectors may return a fresh object
+ * literal; the result is cached and only replaced when a field changes,
+ * which useSyncExternalStore requires (otherwise React 19 loops forever).
+ */
 export function useAppStoreSelector<T>(selector: (state: AppBusState) => T): T {
   const store = useContext(AppStoreContext);
-  return useSyncExternalStore(
-    store.subscribe,
-    () => selector(store.getState()),
-    () => selector(store.getState())
-  );
+  const cacheRef = useRef<{ value: T } | null>(null);
+  const getSnapshot = () => {
+    const next = selector(store.getState());
+    if (cacheRef.current && shallowEqual(cacheRef.current.value, next)) {
+      return cacheRef.current.value;
+    }
+    cacheRef.current = { value: next };
+    return next;
+  };
+  return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
 }
 
 export function useAppStoreActions() {

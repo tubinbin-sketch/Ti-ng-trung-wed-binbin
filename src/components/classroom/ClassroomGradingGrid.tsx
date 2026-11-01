@@ -89,7 +89,7 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
               return (
                 <div
                   key={st.id || st.name}
-                  className="rounded-xl bg-canvas border border-border hover:border-gold/60 p-4 space-y-2 shadow-2xs relative group transition-all"
+                  className="rounded-xl bg-canvas border border-border hover:border-border-strong p-4 space-y-2 shadow-2xs relative group transition-all"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -188,7 +188,7 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
                           'Phát biểu xây dựng bài trên lớp'
                         )
                       }
-                      className="px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary text-ink hover:text-white border border-gold/50 text-xs font-bold transition-all shrink-0 cursor-pointer"
+                      className="px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary text-ink hover:text-on-primary border border-border-strong text-xs font-bold transition-all shrink-0 cursor-pointer"
                     >
                       +5đ thưởng
                     </button>

@@ -176,17 +176,17 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
     )?.score ?? 2;
 
   return (
-    <div className="rounded-3xl bg-[rgba(255,255,255,0.45)] backdrop-blur-md border border-[rgba(30,50,39,0.15)] text-[#1E3227] p-5 md:p-7 shadow-xs">
+    <div className="rounded-3xl bg-surface/45 backdrop-blur-md border border-border text-ink p-5 md:p-7 shadow-xs">
       {/* Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-[rgba(30,50,39,0.15)]">
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-border">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setGameMode('sentence')}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors whitespace-nowrap ${
               gameMode === 'sentence'
-                ? 'bg-[#1E3227] text-white'
-                : 'bg-[#E7ECD9] text-[#3F5447] hover:bg-[#DCE3CA]'
+                ? 'bg-inverse text-white'
+                : 'bg-primary-soft text-ink-muted hover:bg-surface-2'
             }`}
           >
             Game 1: Sắp xếp từ thành câu
@@ -196,8 +196,8 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
             onClick={() => setGameMode('multiple-choice')}
             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-colors whitespace-nowrap ${
               gameMode === 'multiple-choice'
-                ? 'bg-[#1E3227] text-white'
-                : 'bg-[#E7ECD9] text-[#3F5447] hover:bg-[#DCE3CA]'
+                ? 'bg-inverse text-white'
+                : 'bg-primary-soft text-ink-muted hover:bg-surface-2'
             }`}
           >
             Game 2: Trắc nghiệm từ vựng &amp; Ngữ pháp ({mcItems.length} câu)
@@ -205,12 +205,12 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
         </div>
 
         <div className="flex items-center gap-3 text-xs">
-          <span className="text-[#3F5447]">
+          <span className="text-ink-muted">
             Học sinh đang thi:{' '}
-            <strong className="text-[#1E3227]">{studentName}</strong>
+            <strong className="text-ink">{studentName}</strong>
           </span>
           <span aria-hidden="true">·</span>
-          <span className="font-semibold text-[#9B8A3E] tabular-nums">
+          <span className="font-semibold text-gold tabular-nums">
             {currentStudentScore} điểm
           </span>
         </div>
@@ -219,41 +219,41 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
       {gameMode === 'sentence' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6 items-start">
           {/* Left: Interactive Sentence Rearrangement Card (matching 00:36-00:48 in video) */}
-          <div className="lg:col-span-7 rounded-2xl bg-white border border-[#D5DEC7] p-6">
-            <div className="flex items-center justify-between text-xs text-[#3F5447] mb-3">
-              <span className="font-semibold text-[#1E3227]">
+          <div className="lg:col-span-7 rounded-2xl bg-surface border border-border p-6">
+            <div className="flex items-center justify-between text-xs text-ink-muted mb-3">
+              <span className="font-semibold text-ink">
                 Game 1: Sắp xếp câu · Câu {(currentIdx % SENTENCE_QUIZ_ITEMS.length) + 1}/{SENTENCE_QUIZ_ITEMS.length}
               </span>
-              <span className="text-[#9B8A3E] font-medium">+1 điểm / câu đúng</span>
+              <span className="text-gold font-medium">+1 điểm / câu đúng</span>
             </div>
 
             {/* Prompt Box */}
-            <div className="rounded-2xl bg-[#FDF6F6] border border-[#F3D2D2] p-5 text-center">
-              <p className="text-xs uppercase tracking-wider text-[#9B5151] font-semibold">
+            <div className="rounded-2xl bg-accent-soft border border-[#F3D2D2] p-5 text-center">
+              <p className="text-xs text-[#9B5151] font-semibold">
                 Yêu cầu sắp xếp câu
               </p>
               <h4
-                className="text-xl sm:text-2xl font-bold text-[#1E3227] mt-1"
+                className="text-xl sm:text-2xl font-bold text-ink mt-1"
                 data-testid="sentence-quiz-prompt"
               >
                 Sắp xếp thành “{currentSentenceItem.vietnamesePrompt}”
               </h4>
-              <p className="text-xs text-[#6B7280] mt-1">
+              <p className="text-xs text-ink-muted mt-1">
                 {currentSentenceItem.grammarPoint}
               </p>
             </div>
 
             {/* Selected Answer Slot Area */}
             <div className="mt-5">
-              <p className="text-xs text-[#3F5447] mb-2 text-center">
+              <p className="text-xs text-ink-muted mb-2 text-center">
                 Câu trả lời của bạn (bấm vào từ để bỏ chọn):
               </p>
               <div
-                className="min-h-16 rounded-2xl bg-[#F4F6EE] border-2 border-dashed border-[#BFC8B0] p-3 flex flex-wrap items-center justify-center gap-2.5"
+                className="min-h-16 rounded-2xl bg-surface-2 border-2 border-dashed border-border p-3 flex flex-wrap items-center justify-center gap-2.5"
                 data-testid="sentence-selected-slots"
               >
                 {selectedTokens.length === 0 ? (
-                  <span className="text-xs text-[#7B8B7F]">
+                  <span className="text-xs text-ink-muted">
                     Bấm các thẻ từ bên dưới theo đúng thứ tự ngữ pháp tiếng Trung...
                   </span>
                 ) : (
@@ -273,15 +273,15 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
 
             {/* Word Bank Tiles */}
             <div className="mt-4">
-              <p className="text-xs text-[#3F5447] mb-2 text-center">
+              <p className="text-xs text-ink-muted mb-2 text-center">
                 Bấm các từ bên dưới theo thứ tự:
               </p>
               <div
-                className="flex flex-wrap items-center justify-center gap-2.5 min-h-12 rounded-xl bg-[#FAFBF7] border border-[#E5E9DC] p-2.5"
+                className="flex flex-wrap items-center justify-center gap-2.5 min-h-12 rounded-xl bg-surface border border-border p-2.5"
                 data-testid="sentence-word-bank"
               >
                 {availableTokens.length === 0 ? (
-                  <span className="text-xs text-[#6B7280]">
+                  <span className="text-xs text-ink-muted">
                     Đã đưa hết từ lên khung trả lời — bấm “Trả lời” hoặc “Câu tiếp theo”.
                   </span>
                 ) : (
@@ -290,7 +290,7 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                       key={`avail-${token}-${idx}`}
                       type="button"
                       onClick={() => handlePickToken(token, idx)}
-                      className="px-4 py-2 rounded-xl bg-white border-2 border-[#6366F1] text-[#312E81] font-['Noto_Sans_SC'] text-base font-medium hover:bg-[#EEF2FF] transition-colors"
+                      className="px-4 py-2 rounded-xl bg-surface border-2 border-[#6366F1] text-[#312E81] font-['Noto_Sans_SC'] text-base font-medium hover:bg-[#EEF2FF] transition-colors"
                     >
                       {token}
                     </button>
@@ -304,8 +304,8 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
               <div
                 className={`mt-5 p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs font-medium ${
                   feedback.status === 'correct'
-                    ? 'bg-[#ECFDF5] border-[#6EE7B7] text-[#065F46]'
-                    : 'bg-[#FEF2F2] border-[#FCA5A5] text-[#991B1B]'
+                    ? 'bg-success-soft border-[#6EE7B7] text-success'
+                    : 'bg-accent-soft border-[#FCA5A5] text-[#991B1B]'
                 }`}
                 data-testid="sentence-quiz-feedback"
               >
@@ -321,12 +321,12 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
             )}
 
             {/* Submit & Next Controls */}
-            <div className="mt-5 pt-4 border-t border-[#E5E9DC] flex flex-wrap items-center justify-between gap-2">
+            <div className="mt-5 pt-4 border-t border-border flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => loadSentenceQuestion(currentIdx)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-[#EEF1E6] text-[#3F5447] hover:bg-[#E1E7D4] transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-surface-2 text-ink-muted hover:bg-surface-2 transition-colors"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   Xếp lại
@@ -334,7 +334,7 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                 <button
                   type="button"
                   onClick={handleAutoSolveDemo}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-[#F4EFE0] text-[#7D6B24] hover:bg-[#EAE1C8] transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-surface-2 text-gold hover:bg-surface-2 transition-colors"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   Ghép mẫu đúng
@@ -345,14 +345,14 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                 <button
                   type="button"
                   onClick={handleSubmitSentence}
-                  className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-[#E05A47] hover:bg-[#C94A38] text-white transition-colors whitespace-nowrap"
+                  className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-accent hover:bg-accent text-on-primary transition-colors whitespace-nowrap"
                 >
                   Trả lời
                 </button>
                 <button
                   type="button"
                   onClick={() => loadSentenceQuestion(currentIdx + 1)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-[#1E3227] hover:bg-[#2B4637] text-white transition-colors whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-inverse hover:bg-inverse-hover text-white transition-colors whitespace-nowrap"
                 >
                   Câu tiếp theo
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -362,10 +362,10 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
           </div>
 
           {/* Right: Live Leaderboard ("Bảng xếp hạng" matching 00:43 & 00:48 in video) */}
-          <div className="lg:col-span-5 rounded-2xl bg-[#1E3227] text-[#F3F5EC] p-6">
+          <div className="lg:col-span-5 rounded-2xl bg-inverse text-white p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-[#EAB308]" />
+                <Trophy className="w-5 h-5 text-highlight" />
                 <h4 className="text-base font-semibold">Bảng xếp hạng trực tuyến</h4>
               </div>
               <span className="text-xs text-[#CBCFB8] tabular-nums">
@@ -379,15 +379,15 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                   key={entry.id}
                   className={`flex items-center justify-between p-3.5 rounded-xl border ${
                     idx === 0
-                      ? 'bg-[#2B4637] border-[#9B8A3E]'
+                      ? 'bg-inverse-hover border-border-strong'
                       : 'bg-[#243B2E] border-[#355242]'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="w-6 text-center font-bold text-sm text-[#EAB308] tabular-nums">
+                    <span className="w-6 text-center font-bold text-sm text-highlight tabular-nums">
                       #{idx + 1}
                     </span>
-                    <div className="w-8 h-8 rounded-full bg-[#9B8A3E] text-[#1E3227] flex items-center justify-center text-xs font-bold">
+                    <div className="w-8 h-8 rounded-full bg-gold text-ink flex items-center justify-center text-xs font-bold">
                       {entry.avatarCode}
                     </div>
                     <div>
@@ -421,7 +421,7 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                 type="text"
                 value={studentName}
                 onChange={(e) => setStudentName(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-[#15241C] border border-[#3B5947] text-xs text-white focus:outline-none focus:border-[#9B8A3E]"
+                className="w-full px-3 py-2 rounded-xl bg-[#15241C] border border-[#3B5947] text-xs text-white focus:outline-none focus:border-border-strong"
               />
             </div>
           </div>
@@ -430,9 +430,9 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
         /* Mode 2: Multiple Choice & Teacher 1-Click Quiz Editor (matching 00:49-00:52 in video) */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
           {/* Left: Playable Multiple Choice Card */}
-          <div className="lg:col-span-7 rounded-2xl bg-white border border-[#D5DEC7] p-6">
+          <div className="lg:col-span-7 rounded-2xl bg-surface border border-border p-6">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-semibold text-[#3F5447]">
+              <span className="text-xs font-semibold text-ink-muted">
                 Thẻ câu hỏi {activeMcIdx + 1} / {mcItems.length}
               </span>
               <div className="flex items-center gap-2">
@@ -446,8 +446,8 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                     }}
                     className={`px-2.5 py-1 rounded-md text-xs font-medium ${
                       idx === activeMcIdx
-                        ? 'bg-[#1E3227] text-white'
-                        : 'bg-[#EEF1E6] text-[#3F5447]'
+                        ? 'bg-inverse text-white'
+                        : 'bg-surface-2 text-ink-muted'
                     }`}
                   >
                     Câu {idx + 1}
@@ -456,12 +456,12 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-[#F4F6EE] border border-[#DCE2CE]">
+            <div className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-surface-2 border border-border">
               <div>
-                <h4 className="text-xl font-bold text-[#1E3227]">
+                <h4 className="text-xl font-bold text-ink">
                   {currentMc.question}
                 </h4>
-                <p className="text-xs text-[#3F5447] mt-0.5">
+                <p className="text-xs text-ink-muted mt-0.5">
                   Phiên âm: {currentMc.pinyinFocus}
                 </p>
               </div>
@@ -469,7 +469,7 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                 type="button"
                 onClick={() => speakChinese(currentMc.hanziFocus)}
                 aria-label={`Phát âm ${currentMc.hanziFocus}`}
-                className="p-2.5 rounded-xl bg-[#1E3227] text-white hover:bg-[#2B4637]"
+                className="p-2.5 rounded-xl bg-inverse text-white hover:bg-inverse-hover"
               >
                 <Volume2 className="w-4 h-4" />
               </button>
@@ -498,9 +498,9 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                     className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left text-sm font-medium transition-colors ${
                       isPicked
                         ? opt.isCorrect
-                          ? 'bg-[#ECFDF5] border-[#10B981] text-[#065F46]'
-                          : 'bg-[#FEF2F2] border-[#EF4444] text-[#991B1B]'
-                        : 'bg-[#FAFBF7] border-[#D5DEC7] text-[#1E3227] hover:border-[#9B8A3E]'
+                          ? 'bg-success-soft border-[#10B981] text-success'
+                          : 'bg-accent-soft border-[#EF4444] text-[#991B1B]'
+                        : 'bg-surface border-border text-ink hover:border-border-strong'
                     }`}
                   >
                     <span>
@@ -532,11 +532,11 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
           </div>
 
           {/* Right: 1-Click Teacher Question Creator ("Thêm hình / Thêm câu hỏi") */}
-          <div className="lg:col-span-5 rounded-2xl bg-white border border-[#D5DEC7] p-6">
-            <h4 className="text-base font-bold text-[#1E3227]">
+          <div className="lg:col-span-5 rounded-2xl bg-surface border border-border p-6">
+            <h4 className="text-base font-bold text-ink">
               Soạn nhanh thẻ Quiz mới (Dành cho Giáo viên)
             </h4>
-            <p className="text-xs text-[#3F5447] mt-1">
+            <p className="text-xs text-ink-muted mt-1">
               Nhập từ vựng tiếng Trung để hệ thống tự động tạo phương án nhiễu và gắn ngữ pháp.
             </p>
 
@@ -544,7 +544,7 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
               <div>
                 <label
                   htmlFor="mc-word-input"
-                  className="block text-xs font-medium text-[#1E3227] mb-1"
+                  className="block text-xs font-medium text-ink mb-1"
                 >
                   Từ vựng chữ Hán *
                 </label>
@@ -554,14 +554,14 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                   value={newQuestionWord}
                   onChange={(e) => setNewQuestionWord(e.target.value)}
                   placeholder="Ví dụ: 聪明 (cōngmíng)"
-                  className="w-full px-3.5 py-2 rounded-xl bg-[#FAFBF7] border border-[#C5CFB4] text-sm text-[#1E3227] focus:outline-none focus:border-[#1E3227]"
+                  className="w-full px-3.5 py-2 rounded-xl bg-surface border border-border text-sm text-ink focus:outline-none focus:border-ink"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="mc-meaning-input"
-                  className="block text-xs font-medium text-[#1E3227] mb-1"
+                  className="block text-xs font-medium text-ink mb-1"
                 >
                   Đáp án nghĩa tiếng Việt đúng *
                 </label>
@@ -571,14 +571,14 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                   value={newQuestionMeaning}
                   onChange={(e) => setNewQuestionMeaning(e.target.value)}
                   placeholder="Ví dụ: thông minh, lanh lợi"
-                  className="w-full px-3.5 py-2 rounded-xl bg-[#FAFBF7] border border-[#C5CFB4] text-sm text-[#1E3227] focus:outline-none focus:border-[#1E3227]"
+                  className="w-full px-3.5 py-2 rounded-xl bg-surface border border-border text-sm text-ink focus:outline-none focus:border-ink"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="mc-grammar-input"
-                  className="block text-xs font-medium text-[#1E3227] mb-1"
+                  className="block text-xs font-medium text-ink mb-1"
                 >
                   Ghi chú ngữ pháp / cấu trúc (Tùy chọn)
                 </label>
@@ -588,17 +588,17 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                   value={newQuestionGrammar}
                   onChange={(e) => setNewQuestionGrammar(e.target.value)}
                   placeholder="Ví dụ: 很 + Tính từ (rất thông minh)"
-                  className="w-full px-3.5 py-2 rounded-xl bg-[#FAFBF7] border border-[#C5CFB4] text-sm text-[#1E3227] focus:outline-none focus:border-[#1E3227]"
+                  className="w-full px-3.5 py-2 rounded-xl bg-surface border border-border text-sm text-ink focus:outline-none focus:border-ink"
                 />
               </div>
 
               {builderError && (
-                <p className="text-xs text-[#DC2626] font-medium">{builderError}</p>
+                <p className="text-xs text-accent font-medium">{builderError}</p>
               )}
 
               <button
                 type="submit"
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] text-white text-xs font-semibold transition-colors"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-inverse hover:bg-inverse-hover text-white text-xs font-semibold transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Tạo thẻ Quiz tự động

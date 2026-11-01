@@ -64,7 +64,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
       <div className="rounded-2xl bg-surface/90 border border-border shadow-2xs p-5 sm:p-6 space-y-5">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-xl bg-primary text-white text-xs font-bold flex items-center justify-center">
+            <span className="w-7 h-7 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center justify-center">
               C
             </span>
             <h3 className="text-sm sm:text-base font-bold text-ink">
@@ -74,7 +74,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
           <span className="text-xs text-gold font-semibold">15 điểm / câu</span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-canvas border border-gold/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="p-4 rounded-2xl bg-canvas border border-border-strong flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Camera className="w-5 h-5 text-primary" />
@@ -101,7 +101,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
               type="button"
               disabled={isSubmitted}
               onClick={() => fileInputRef.current?.click()}
-              className="px-3.5 py-2 rounded-xl bg-surface border border-gold/40 hover:bg-primary/10 text-xs font-bold text-ink flex items-center gap-1.5 transition-all cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-surface border border-border-strong hover:bg-primary/10 text-xs font-bold text-ink flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5 text-gold" />
               <span>{uploadedHomeworkFile ? 'Đổi ảnh/file khác' : 'Chụp / Tải ảnh lên'}</span>
@@ -185,10 +185,10 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
                           playGentleChime(783.99, 0.18);
                           onRecordSpeechScore(q.id, hasTarget ? 97 : 92);
                         }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary/90 cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 cursor-pointer"
                       >
                         <Mic className="w-3 h-3 text-gold" />
-                        <span>🎙️ Luyện nói chấm phát âm</span>
+                        <span>Luyện nói chấm phát âm</span>
                       </button>
 
                       {partCSpeechScores[q.id] && (
@@ -206,13 +206,13 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
                 </div>
 
                 {isSubmitted && (
-                  <div className="p-4 rounded-xl bg-surface border border-gold/40 text-xs space-y-3">
+                  <div className="p-4 rounded-xl bg-surface border border-border-strong text-xs space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 font-bold text-ink">
                         <Sparkles className="w-4 h-4 text-gold" />
                         <span>Trợ Giảng 彬彬 &amp; Thầy Nguyễn Văn Thụ Chấm Sửa:</span>
                       </div>
-                      <span className="px-2.5 py-0.5 rounded-md bg-primary text-white font-bold text-xs">
+                      <span className="px-2.5 py-0.5 rounded-md bg-primary text-on-primary font-bold text-xs">
                         {hasTarget && isGoodLength
                           ? '+15/15 điểm (Xuất sắc)'
                           : hasTarget || isGoodLength || uploadedHomeworkFile
@@ -234,8 +234,8 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
                       )}
                     </div>
 
-                    <div className="p-3 rounded-lg bg-primary/10 border border-gold/30 text-ink space-y-1">
-                      <div className="flex items-center justify-between text-xs text-gold font-bold uppercase tracking-wider">
+                    <div className="p-3 rounded-lg bg-primary/10 border border-border-strong text-ink space-y-1">
+                      <div className="flex items-center justify-between text-xs text-gold font-bold">
                         <span>Câu Mẫu Chuẩn Của Giáo Viên (<span lang="zh-CN">范句</span>):</span>
                         <button
                           type="button"
@@ -297,25 +297,25 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
                     type="button"
                     data-testid={`listening-play-btn-${lc.id}`}
                     onClick={() => speakChinese(lc.audioText)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white text-xs font-bold cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-on-primary text-xs font-bold cursor-pointer"
                   >
                     <Headphones className="w-3.5 h-3.5 text-gold" />
-                    <span>🔊 Nghe phát âm câu #{idx + 1}</span>
+                    <span>Nghe phát âm câu #{idx + 1}</span>
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {lc.options.map((opt) => {
                     const picked = selectedAnswer === opt;
                     const isOptCorrect = opt.startsWith(lc.correctHanzi);
-                    let btnStyle = 'bg-surface text-ink border-border hover:border-gold';
+                    let btnStyle = 'bg-surface text-ink border-border hover:border-border-strong';
                     if (isSubmitted) {
                       if (isOptCorrect) {
-                        btnStyle = 'bg-primary text-white border-gold font-bold';
+                        btnStyle = 'bg-primary text-on-primary border-transparent font-bold';
                       } else if (picked && !isOptCorrect) {
-                        btnStyle = 'bg-accent text-white border-accent font-bold';
+                        btnStyle = 'bg-accent text-on-primary border-accent font-bold';
                       }
                     } else if (picked) {
-                      btnStyle = 'bg-primary text-white border-gold';
+                      btnStyle = 'bg-primary text-on-primary border-transparent';
                     }
 
                     return (
@@ -386,7 +386,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
                   }}
                   className={`px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                     acc
-                      ? 'bg-primary text-white border-gold'
+                      ? 'bg-primary text-on-primary border-transparent'
                       : 'bg-surface text-ink border-border hover:border-primary'
                   }`}
                 >
@@ -408,7 +408,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
       >
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
           <div className="flex items-center gap-2.5">
-            <span className="w-7 h-7 rounded-xl bg-accent text-white text-xs font-bold flex items-center justify-center">
+            <span className="w-7 h-7 rounded-xl bg-accent text-on-primary text-xs font-bold flex items-center justify-center">
               E
             </span>
             <div>
@@ -420,7 +420,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
               </p>
             </div>
           </div>
-          <span className="px-2.5 py-1 rounded-xl bg-primary text-white text-xs font-bold">
+          <span className="px-2.5 py-1 rounded-xl bg-primary text-on-primary text-xs font-bold">
             Chấm ngữ pháp tức thì
           </span>
         </div>
@@ -444,7 +444,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
                       <span className="px-2.5 py-0.5 rounded-lg bg-primary/10 text-primary text-xs font-bold">
                         Bài dịch #{idx + 1} · {tr.hskLevel}
                       </span>
-                      <span lang="zh-CN" className="px-2.5 py-0.5 rounded-lg bg-primary text-white text-xs font-bold font-['Noto_Sans_SC']">
+                      <span lang="zh-CN" className="px-2.5 py-0.5 rounded-lg bg-primary text-on-primary text-xs font-bold font-['Noto_Sans_SC']">
                         Từ khóa bắt buộc: {tr.targetKeyword} ({tr.targetPinyin})
                       </span>
                     </div>
@@ -456,14 +456,14 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
                   <button
                     type="button"
                     onClick={() => speakChinese(tr.modelChinese)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface border border-border text-xs font-bold text-ink hover:border-gold cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface border border-border text-xs font-bold text-ink hover:border-border-strong cursor-pointer"
                   >
                     <Volume2 className="w-3.5 h-3.5 text-gold" />
                     <span>Nghe phát âm mẫu</span>
                   </button>
                 </div>
 
-                <div className="p-2.5 rounded-xl bg-surface border border-gold/35 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="p-2.5 rounded-xl bg-surface border border-border-strong flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="font-bold text-ink-muted">
                     📐 Công thức Ngữ pháp HSK 3.0 gợi ý:
                   </span>
@@ -524,7 +524,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
                       onSetTranslationEvaluation(tr.id, evaluated);
                       playGentleChime(evaluated.passed ? 783.99 : 440, 0.2);
                     }}
-                    className="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold whitespace-nowrap cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold whitespace-nowrap cursor-pointer"
                   >
                     ✨ Chấm điểm Ngữ pháp HSK 3.0
                   </button>
@@ -570,7 +570,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
       {!isSubmitted && (
         <div
           data-testid="sticky-submit-assignment-bar"
-          className="sticky bottom-4 z-20 p-3 sm:px-5 sm:py-3.5 rounded-2xl bg-primary text-white border border-gold/40 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3"
+          className="sticky bottom-4 z-20 p-3 sm:px-5 sm:py-3.5 rounded-2xl bg-primary text-on-primary border border-transparent shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3"
         >
           <div className="flex items-center gap-2.5 text-xs">
             <Sparkles className="w-4 h-4 text-gold shrink-0" />

@@ -246,23 +246,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     <div
       role={standalonePage ? 'region' : undefined}
       aria-labelledby="auth-modal-title"
-      className="relative w-full max-w-2xl mx-auto rounded-3xl overflow-hidden shadow-2xl border border-border bg-canvas text-ink"
+      className="relative w-full max-w-2xl mx-auto rounded-3xl overflow-hidden shadow-2xl border border-border bg-surface-2 text-ink"
     >
       {/* Top Header Banner */}
-      <div className="px-6 py-4 flex items-center justify-between border-b border-border/30 bg-primary text-canvas">
+      <div className="px-6 py-4 flex items-center justify-between border-b border-border bg-surface text-ink">
         <div className="flex items-center gap-3">
           <div
             lang="zh-CN"
-            className="w-10 h-10 rounded-xl bg-surface/15 border border-surface/30 flex items-center justify-center text-canvas font-bold text-lg"
+            className="app-seal !w-10 !h-10"
           >
             汉
           </div>
           <div>
-            <div className="text-xs font-bold uppercase tracking-widest text-canvas/90">
-              HANU × <span lang="zh-CN">阮文受</span> · CỔNG XÁC THỰC FIREBASE (AUTH + FIRESTORE)
+            <div className="text-xs text-ink-muted">
+              HANU × <span lang="zh-CN">阮文受</span>
             </div>
-            <h2 id="auth-modal-title" className="text-lg font-extrabold text-canvas">
-              Đăng Nhập Lớp Học &amp; Quản Trị Giảng Viên
+            <h2 id="auth-modal-title" className="text-lg font-semibold text-ink">
+              Đăng nhập
             </h2>
           </div>
         </div>
@@ -271,7 +271,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Đóng cửa sổ đăng nhập"
-            className="w-8 h-8 rounded-full bg-surface/15 hover:bg-surface/25 flex items-center justify-center text-canvas transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-canvas"
+            className="w-8 h-8 rounded-full hover:bg-surface-2 flex items-center justify-center text-ink-muted transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-primary"
           >
             <X className="w-4 h-4" />
           </button>
@@ -284,9 +284,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="rounded-2xl p-5 bg-surface border border-border shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold bg-primary/10 text-primary">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
                 <GraduationCap className="w-3.5 h-3.5" />
-                DÀNH CHO HỌC VIÊN
+                Học viên
               </span>
               {currentRole === 'student' && (
                 <span className="inline-flex items-center gap-1 text-xs font-bold text-success">
@@ -295,18 +295,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               )}
             </div>
 
-            <h3 className="text-base font-extrabold text-ink mb-1">
-              Vào Lớp Bằng Mã Lớp + Mã Học Sinh
+            <h3 className="text-base font-semibold text-ink mb-1">
+              Vào lớp bằng mã
             </h3>
             <p className="text-sm text-ink-muted mb-4 leading-relaxed">
-              Mỗi học viên có định danh <code className="font-mono font-bold">uid</code> riêng trên Firebase, bảo mật tiến độ SRS và điểm bài tập cá nhân.
+              Nhập mã lớp và mã học viên giáo viên đã gửi cho bạn. Tiến độ và điểm số được lưu riêng cho từng người.
             </p>
 
             <form onSubmit={(e) => handleStudentJoinSubmit(e, false)} className="space-y-3">
               <div>
                 <label
                   htmlFor="join-code-input"
-                  className="block text-xs font-bold uppercase tracking-wider text-ink-muted mb-1"
+                  className="block text-xs font-bold text-ink-muted mb-1"
                 >
                   1. Mã lớp học (do Giáo viên cấp):
                 </label>
@@ -330,7 +330,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div>
                 <label
                   htmlFor="student-code-input"
-                  className="block text-xs font-bold uppercase tracking-wider text-ink-muted mb-1"
+                  className="block text-xs font-bold text-ink-muted mb-1"
                 >
                   2. Mã học sinh của riêng bạn:
                 </label>
@@ -360,21 +360,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={isStudentLoading}
-                className="w-full py-2.5 rounded-xl font-extrabold text-sm text-canvas bg-primary hover:opacity-95 shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                className="w-full py-2.5 rounded-xl font-semibold text-sm text-on-primary bg-primary hover:opacity-95 shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
                 {isStudentLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Sparkles className="w-4 h-4" />
                 )}
-                <span>Vào Lớp Bằng Mã Học Sinh</span>
+                <span>Vào lớp</span>
               </button>
 
               <button
                 type="button"
                 disabled={isStudentLoading}
                 onClick={(e) => handleStudentJoinSubmit(e, true)}
-                className="w-full py-2 rounded-xl font-extrabold text-xs text-primary bg-primary/10 hover:bg-primary/15 border border-primary/30 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                className="w-full py-2 rounded-xl font-semibold text-xs text-primary bg-primary/10 hover:bg-primary/15 border border-primary/30 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
                 <LogIn className="w-4 h-4" />
                 <span>Đăng nhập Google &amp; Tham gia lớp</span>
@@ -411,7 +411,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       setIsStudentLoading(false);
                     }
                   }}
-                  className="w-full py-1.5 rounded-xl font-bold text-xs text-ink bg-canvas hover:bg-gold/15 border border-gold/50 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
+                  className="w-full py-1.5 rounded-xl font-bold text-xs text-ink bg-canvas hover:bg-gold/15 border border-border-strong transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-gold" />
                   <span>Liên kết Google (Giữ tiến độ khi đổi máy)</span>
@@ -422,7 +422,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <div className="mt-3 pt-2.5 border-t border-border flex items-center justify-between text-xs text-ink-muted">
             <span>Học viên hiện tại:</span>
-            <span className="font-extrabold text-primary">{studentName}</span>
+            <span className="font-semibold text-primary">{studentName}</span>
           </div>
         </div>
 
@@ -430,9 +430,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="rounded-2xl p-5 bg-surface border border-border shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold bg-gold/15 text-gold">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-surface-2 text-ink-muted">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                DÀNH CHO GIẢNG VIÊN
+                Giáo viên
               </span>
               {currentRole === 'teacher' && (
                 <span className="inline-flex items-center gap-1 text-xs font-bold text-gold">
@@ -441,11 +441,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               )}
             </div>
 
-            <h3 className="text-base font-extrabold text-ink mb-1">
-              Giảng Viên Đăng Nhập Google
+            <h3 className="text-base font-semibold text-ink mb-1">
+              Đăng nhập bằng Google
             </h3>
             <p className="text-sm text-ink-muted mb-4 leading-relaxed">
-              Sử dụng tài khoản Google (Firebase Auth) để tạo lớp học riêng tại <code>/giao-vien</code>, quản lý mã học sinh, soạn bài giảng và giao bài tập trên Cloud Firestore.
+              Tạo lớp, cấp mã cho học viên, soạn bài giảng và giao bài tập — dữ liệu lớp gắn với tài khoản Google của bạn.
             </p>
 
             {teacherError && (
@@ -462,42 +462,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               type="button"
               onClick={handleTeacherGoogleLogin}
               disabled={isTeacherLoading}
-              className="w-full py-3 rounded-xl font-extrabold text-sm text-canvas bg-accent hover:opacity-95 shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              className="w-full py-3 rounded-xl font-semibold text-sm text-white bg-inverse hover:bg-inverse-hover shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >
               {isTeacherLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <ShieldCheck className="w-4 h-4" />
               )}
-              <span>Đăng nhập Giảng viên bằng Google</span>
+              <span>Tiếp tục với Google</span>
             </button>
           </div>
 
           {/* Demo Mode Box */}
           <div className="mt-5 pt-4 border-t border-border">
-            <div className="text-xs font-extrabold uppercase tracking-wider text-ink mb-1.5 flex items-center gap-1.5">
+            <div className="text-xs font-semibold text-ink mb-1.5 flex items-center gap-1.5">
               <PlayCircle className="w-4 h-4 text-gold" />
-              <span>Chế độ trải nghiệm nhanh (Không ghi lên Server)</span>
+              <span>Dùng thử không cần tài khoản</span>
             </div>
             <p className="text-xs text-ink-muted mb-2.5">
-              Chạy dữ liệu mẫu cục bộ trên trình duyệt để xem nhanh giao diện Học viên &amp; Giáo viên:
+              Xem nhanh giao diện với dữ liệu mẫu. Không có gì được lưu lên máy chủ.
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 data-testid="demo-mode-student-btn"
                 onClick={() => handleActivateDemo('student')}
-                className="py-2 px-2.5 rounded-xl font-extrabold text-xs bg-canvas hover:bg-primary/10 text-primary border border-border transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                className="py-2 px-2.5 rounded-xl font-semibold text-xs bg-canvas hover:bg-primary/10 text-primary border border-border transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
-                Xem bản demo (HS)
+                Học viên mẫu
               </button>
               <button
                 type="button"
                 data-testid="demo-mode-teacher-btn"
                 onClick={() => handleActivateDemo('teacher')}
-                className="py-2 px-2.5 rounded-xl font-extrabold text-xs bg-canvas hover:bg-accent/10 text-accent border border-border transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                className="py-2 px-2.5 rounded-xl font-semibold text-xs bg-canvas hover:bg-accent/10 text-accent border border-border transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
-                Xem bản demo (GV)
+                Giáo viên mẫu
               </button>
             </div>
           </div>

@@ -33,7 +33,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           {icon}
         </div>
       )}
-      <div className="text-xs font-extrabold uppercase tracking-wider text-gold">
+      <div className="text-xs font-semibold text-gold">
         {badge}
       </div>
       <h3 className="text-lg sm:text-xl font-bold text-ink">{title}</h3>
@@ -46,7 +46,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
             <button
               type="button"
               onClick={onAction}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:opacity-95 text-canvas text-sm font-bold shadow-xs transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:opacity-95 text-on-primary text-sm font-bold shadow-xs transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >
               <span>{actionLabel}</span>
             </button>

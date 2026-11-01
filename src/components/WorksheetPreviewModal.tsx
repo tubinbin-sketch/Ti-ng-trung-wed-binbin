@@ -22,13 +22,13 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
       maxWidthClass="max-w-4xl"
       testId="worksheet-a4-modal"
     >
-      <div className="w-full bg-surface rounded-3xl border-2 border-gold shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="w-full bg-surface rounded-3xl border-2 border-border-strong shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Modal Action Bar */}
-        <div className="px-5 py-3.5 bg-primary text-canvas flex flex-wrap items-center justify-between gap-3">
+        <div className="px-5 py-3.5 bg-primary text-on-primary flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <Printer className="w-4 h-4 shrink-0" />
             <span id="worksheet-modal-title" className="text-xs sm:text-sm font-bold">
-              🖨️ Bản Xem Trước Trang A4 — Phiếu Tập Viết Chữ Hán (<span lang="zh-CN">米字格</span> · {slides.length} từ vựng)
+              Bản Xem Trước Trang A4 — Phiếu Tập Viết Chữ Hán (<span lang="zh-CN">米字格</span> · {slides.length} từ vựng)
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -36,7 +36,7 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
               type="button"
               data-testid="print-worksheet-confirm-btn"
               onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-canvas text-ink text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-canvas"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-canvas text-ink text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-primary"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>In ngay / Lưu PDF (A4)</span>
@@ -45,7 +45,7 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
               type="button"
               data-testid="close-worksheet-modal-btn"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-xl bg-surface/15 hover:bg-surface/25 text-canvas text-xs font-semibold cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-canvas"
+              className="px-3 py-1.5 rounded-xl bg-surface/15 hover:bg-surface/25 text-on-primary text-xs font-semibold cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-primary"
             >
               Đóng
             </button>
@@ -57,7 +57,7 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
           {/* 1. Tiêu đề lớp học HANU × 阮文受 */}
           <div className="border-b-2 border-primary pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
             <div>
-              <div className="text-xs font-bold uppercase tracking-widest text-gold">
+              <div className="text-xs font-bold text-gold">
                 HANU × <span lang="zh-CN">阮文受</span> · GIÁO ÁN THỰC HÀNH HÁN TỰ CHUẨN HSK 3.0
               </div>
               <h2 className="text-xl font-bold text-ink mt-0.5">
@@ -72,7 +72,7 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
 
           {/* 2. Bảng tổng hợp từ vựng */}
           <div data-testid="worksheet-vocab-summary-table" className="space-y-1.5">
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-ink">
+            <h3 className="text-xs font-semibold text-ink">
               PHẦN I. BẢNG TỔNG HỢP TỪ VỰNG TRỌNG TÂM ({slides.length} TỪ CHUẨN HSK 3.0)
             </h3>
             <div className="overflow-x-auto rounded-xl border border-border bg-surface">
@@ -105,7 +105,7 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
 
           {/* 3. Hàng ô Mễ Tự Cách */}
           <div className="space-y-2.5">
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-ink">
+            <h3 className="text-xs font-semibold text-ink">
               PHẦN II. LUYỆN VIẾT CHỮ HÁN TRÊN Ô MỄ TỰ CÁCH (<span lang="zh-CN">米字格描红与临摹</span>)
             </h3>
             {slides.map((s, idx) => (
@@ -141,7 +141,7 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
                     return (
                       <div
                         key={`mzg-${idx}-${boxIdx}`}
-                        className="relative w-12 h-12 shrink-0 bg-canvas border border-gold"
+                        className="relative w-12 h-12 shrink-0 bg-canvas border border-border-strong"
                       >
                         <svg viewBox="0 0 100 100" className="w-full h-full">
                           <line x1="0" y1="50" x2="100" y2="50" stroke="#C5B358" strokeWidth="1" strokeDasharray="3 3" strokeOpacity="0.6" />
@@ -175,7 +175,7 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
             data-testid="worksheet-practice-exercises-section"
             className="p-4 rounded-2xl bg-surface border border-border space-y-2.5"
           >
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-ink">
+            <h3 className="text-xs font-semibold text-ink">
               PHẦN III. BÀI TẬP TỰ LUYỆN &amp; DỊCH CÂU CHUẨN HSK 3.0 (<span lang="zh-CN">课后综合练习</span>)
             </h3>
             <div className="space-y-2 text-xs text-ink">

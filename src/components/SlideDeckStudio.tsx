@@ -668,7 +668,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
           <React.Fragment key={`part-${idx}`}>
             <span>{part}</span>
             {idx < parts.length - 1 && (
-              <span className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[#C5B358]/30 text-[#1E3227] border border-[#9B8A3E] font-bold shadow-2xs">
+              <span className="px-1.5 py-0.5 mx-0.5 rounded-md bg-highlight/30 text-ink border border-border-strong font-bold shadow-2xs">
                 {targetWord}
               </span>
             )}
@@ -1506,7 +1506,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               ================================================================= */}
           <div
             data-testid="teacher-ai-vocab-search-section"
-            className="w-full max-w-full box-border rounded-xl backdrop-blur-xl bg-white/85 border border-white/70 shadow-[0_6px_24px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 px-3 py-1.5 transition-all duration-300"
+            className="w-full max-w-full box-border rounded-xl backdrop-blur-xl bg-surface/85 border border-white/70 shadow-[0_6px_24px_rgb(0,0,0,0.04)] hover:border-highlight/50 px-3 py-1.5 transition-all duration-300"
           >
             <div className="w-full max-w-full box-border flex flex-wrap items-center justify-between gap-1.5">
               {/* Single Unified Toolbar Row: Learned Badge / Search + Filter + Action Buttons */}
@@ -1516,7 +1516,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     onSubmit={handleUnifiedSearchSubmit}
                     className="relative flex-1 min-w-[180px] max-w-full"
                   >
-                    <Search className="w-3.5 h-3.5 text-[#3A544B] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Search className="w-3.5 h-3.5 text-ink-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="text"
                       value={vocabSearchQuery}
@@ -1527,12 +1527,12 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         }
                       }}
                       placeholder="Tìm hoặc thêm nhanh từ vựng (VD: 温暖, 龙, ấm áp)..."
-                      className="w-full pl-8 pr-2.5 py-1 rounded-xl bg-white border border-[#0F5243]/20 focus:border-[#0F5243] focus:outline-none text-xs sm:text-sm font-medium text-[#0F382E]"
+                      className="w-full pl-8 pr-2.5 py-1 rounded-xl bg-surface border border-primary/20 focus:border-primary focus:outline-none text-xs sm:text-sm font-medium text-ink"
                     />
                   </form>
                 ) : (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#0F5243]/10 text-[#0F5243] text-xs sm:text-sm font-bold whitespace-nowrap shrink-0">
-                    <BookOpen className="w-3.5 h-3.5 text-[#9B8A3E] shrink-0" />
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary/10 text-primary text-xs sm:text-sm font-bold whitespace-nowrap shrink-0">
+                    <BookOpen className="w-3.5 h-3.5 text-gold shrink-0" />
                     <span>Đã thuộc {learnedCount}/{slides.length} từ</span>
                   </span>
                 )}
@@ -1586,10 +1586,10 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   type="button"
                   data-testid="open-measure-word-drill-btn"
                   onClick={() => setIsMeasureWordModalOpen(true)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/50 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border-strong/50 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
                   title="Luyện chuyên đề Lượng từ & Kết hợp Danh từ HSK 3.0 (量词搭配)"
                 >
-                  <Puzzle className="w-3.5 h-3.5 text-[#9B8A3E] shrink-0" />
+                  <Puzzle className="w-3.5 h-3.5 text-gold shrink-0" />
                   <span>Lượng từ HSK</span>
                 </button>
 
@@ -1597,10 +1597,10 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   type="button"
                   data-testid="toolbar-open-worksheet-modal-btn"
                   onClick={() => setIsWorksheetModalOpen(true)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/50 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border-strong/50 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
                   title="In phiếu luyện viết chữ Hán A4 (PDF) chuẩn Ô Mễ Tự Cách"
                 >
-                  <Printer className="w-3.5 h-3.5 text-[#9B8A3E] shrink-0" />
+                  <Printer className="w-3.5 h-3.5 text-gold shrink-0" />
                   <span>In phiếu A4</span>
                 </button>
 
@@ -1608,10 +1608,10 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   type="button"
                   data-testid="open-add-vocab-modal-btn"
                   onClick={handleOpenAddVocabModal}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] border border-[#C5B358]/50 text-xs sm:text-sm font-bold shadow-[0_2px_10px_rgba(15,82,67,0.22)] transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary hover:bg-primary text-on-primary border border-highlight/50 text-xs sm:text-sm font-bold shadow-[0_2px_10px_rgba(15,82,67,0.22)] transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
                   title="Thêm từ vựng mới vào bộ thẻ học tập"
                 >
-                  <Plus className="w-3.5 h-3.5 text-[#C5B358] shrink-0" />
+                  <Plus className="w-3.5 h-3.5 text-highlight shrink-0" />
                   <span>Thêm từ</span>
                 </button>
 
@@ -1620,9 +1620,9 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   data-testid="open-batch-import-modal-btn"
                   onClick={() => setIsBatchImportModalOpen(true)}
                   title="Nhập danh sách từ vựng / bài khóa hàng loạt (Batch Import)"
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/45 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border-strong/45 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
                 >
-                  <ClipboardList className="w-3.5 h-3.5 text-[#9B8A3E] shrink-0" />
+                  <ClipboardList className="w-3.5 h-3.5 text-gold shrink-0" />
                   <span className="hidden xl:inline">Nhập bài khóa</span>
                 </button>
 
@@ -1639,10 +1639,10 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     type="button"
                     data-testid="lesson-save-load-menu-btn"
                     onClick={() => setIsLessonFileMenuOpen((v) => !v)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/45 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border-strong/45 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
                     title="Xuất hoặc Nhập dữ liệu học tập & bài giảng (.json)"
                   >
-                    <Save className="w-3.5 h-3.5 text-[#9B8A3E] shrink-0" />
+                    <Save className="w-3.5 h-3.5 text-gold shrink-0" />
                     <span className="hidden xl:inline">Lưu / Nạp</span>
                   </button>
                 </div>
@@ -1655,11 +1655,11 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       onClick={() => setIsAiDrawerOpen((o) => !o)}
                       className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap border ${
                         isAiDrawerOpen
-                          ? 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] border-[#C5B358]/50 shadow-xs'
-                          : 'bg-white hover:bg-[#FAF7F0] text-[#0F382E] border-[#9B8A3E]/45'
+                          ? 'bg-primary text-on-primary border-highlight/50 shadow-xs'
+                          : 'bg-surface hover:bg-surface-2 text-ink border-border-strong/45'
                       }`}
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-[#C5B358] shrink-0" />
+                      <Sparkles className="w-3.5 h-3.5 text-highlight shrink-0" />
                       <span>Kho từ gợi ý</span>
                     </button>
 
@@ -1686,10 +1686,10 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
             {isLessonFileMenuOpen && (
               <div
                 data-testid="lesson-save-load-dropdown"
-                className="mt-2.5 pt-2.5 border-t border-[rgba(30,50,39,0.12)] flex flex-wrap items-center justify-between gap-2 animate-fade-in"
+                className="mt-2.5 pt-2.5 border-t border-border flex flex-wrap items-center justify-between gap-2 animate-fade-in"
               >
-                <span className="text-sm font-bold text-[#0F382E] inline-flex items-center gap-1.5">
-                  <Save className="w-4 h-4 text-[#9B8A3E]" />
+                <span className="text-sm font-bold text-ink inline-flex items-center gap-1.5">
+                  <Save className="w-4 h-4 text-gold" />
                   <span>Quản lý dữ liệu bài giảng ({slides.length} thẻ từ vựng · Tự động lưu bền vững):</span>
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1697,7 +1697,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     type="button"
                     data-testid="export-lesson-json-btn"
                     onClick={handleExportLessonJson}
-                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-sm font-bold shadow-2xs cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl bg-primary text-on-primary text-sm font-bold shadow-2xs cursor-pointer"
                   >
                     Xuất file bài giảng (.json)
                   </button>
@@ -1705,7 +1705,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     type="button"
                     data-testid="import-lesson-json-btn"
                     onClick={() => lessonFileInputRef.current?.click()}
-                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#0F5243]/25 text-sm font-bold cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-primary/25 text-sm font-bold cursor-pointer"
                   >
                     Nạp file bài giảng
                   </button>
@@ -1725,11 +1725,11 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
             {showShortcutsHint && (
               <div
                 data-testid="toolbar-shortcuts-popover"
-                className="mt-2.5 pt-2.5 border-t border-[rgba(30,50,39,0.12)] flex flex-wrap items-center justify-between gap-2 text-sm text-[#0F382E]"
+                className="mt-2.5 pt-2.5 border-t border-border flex flex-wrap items-center justify-between gap-2 text-sm text-ink"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-[#0F5243] inline-flex items-center gap-1">
-                    <Keyboard className="w-4 h-4 text-[#9B8A3E]" />
+                  <span className="font-bold text-primary inline-flex items-center gap-1">
+                    <Keyboard className="w-4 h-4 text-gold" />
                     <span>Phím tắt đứng lớp:</span>
                   </span>
                   <span><strong>[←] / [→]</strong>: Chuyển thẻ từ</span>
@@ -1743,7 +1743,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowShortcutsHint(false)}
-                  className="text-sm font-bold text-[#9B8A3E] hover:text-[#0F382E] cursor-pointer"
+                  className="text-sm font-bold text-gold hover:text-ink cursor-pointer"
                 >
                   Đóng
                 </button>
@@ -1754,7 +1754,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
             {isAiDrawerOpen && (
               <div
                 data-testid="ai-suggestions-drawer-content"
-                className="mt-2.5 pt-2.5 border-t border-[rgba(30,50,39,0.12)] space-y-2.5"
+                className="mt-2.5 pt-2.5 border-t border-border space-y-2.5"
               >
                 <div className="flex flex-wrap items-center justify-between gap-1.5">
                   <div
@@ -1769,20 +1769,20 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         onClick={() => setVocabSearchTopic(tab.id)}
                         className={`px-3 py-1 rounded-full text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
                           vocabSearchTopic === tab.id
-                            ? 'bg-[#1E3227] text-[#FAFBF7]'
-                            : 'bg-white text-[#3F5447] border border-[#9B8A3E]/35 hover:border-[#9B8A3E] hover:text-[#1E3227]'
+                            ? 'bg-inverse text-white'
+                            : 'bg-surface text-ink-muted border border-border-strong/35 hover:border-border-strong hover:text-ink'
                         }`}
                       >
                         {tab.label}
                       </button>
                     ))}
                     {isSearchingAI && (
-                      <span className="text-sm text-[#9B8A3E] font-semibold ml-1">
+                      <span className="text-sm text-gold font-semibold ml-1">
                         Đang lọc...
                       </span>
                     )}
                   </div>
-                  <span className="text-sm font-bold text-[#0F5243] px-2.5 py-0.5 rounded-full bg-[#E6EFEA] border border-[#0F5243]/15">
+                  <span className="text-sm font-bold text-primary px-2.5 py-0.5 rounded-full bg-primary-soft border border-primary/15">
                     Gia Sư Hán Ngữ Trực Tuyến · Chuẩn HSK 3.0
                   </span>
                 </div>
@@ -1796,22 +1796,22 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         handleSelectSuggestedVocab(item);
                         setToastMessage(`Đã chọn slide cho "${item.hanzi}"`);
                       }}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-[rgba(30,50,39,0.14)] hover:border-[#9B8A3E] text-left transition-all cursor-pointer"
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-surface border border-border hover:border-border-strong text-left transition-all cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-lg bg-[#FAFBF7] border border-[#9B8A3E]/25 flex items-center justify-center font-['Noto_Sans_SC'] font-bold text-base text-[#1E3227] shrink-0">
+                        <div className="w-9 h-9 rounded-lg bg-surface border border-border-strong/25 flex items-center justify-center font-['Noto_Sans_SC'] font-bold text-base text-ink shrink-0">
                           {item.hanzi}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-bold text-[#9B8A3E] truncate">
+                          <div className="text-sm font-bold text-gold truncate">
                             {item.pinyin} · {item.hanViet}
                           </div>
-                          <div className="text-sm font-semibold text-[#1E3227] truncate">
+                          <div className="text-sm font-semibold text-ink truncate">
                             {item.meaning}
                           </div>
                         </div>
                       </div>
-                      <div className="w-7 h-7 rounded-full bg-[#1E3227]/8 flex items-center justify-center text-[#1E3227] shrink-0">
+                      <div className="w-7 h-7 rounded-full bg-inverse/8 flex items-center justify-center text-ink shrink-0">
                         <Plus className="w-4 h-4" />
                       </div>
                     </button>
@@ -1827,17 +1827,17 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               TIER 3: HORIZONTAL SCROLLABLE VOCABULARY STRIP + PAGE SWITCHER
               ================================================================= */}
           <div className="w-full max-w-full box-border flex items-center gap-1.5 min-w-0">
-            <div className="inline-flex items-center rounded-xl bg-white/90 border border-[rgba(30,50,39,0.16)] p-0.5 shrink-0 shadow-2xs">
+            <div className="inline-flex items-center rounded-xl bg-surface/90 border border-border p-0.5 shrink-0 shadow-2xs">
               <button
                 type="button"
                 onClick={handlePrev}
                 aria-label="Slide trước"
                 title="Từ trước (Phím tắt: ←)"
-                className="p-1 rounded-lg text-[#1E3227] hover:bg-[#E7ECD9] transition-colors cursor-pointer"
+                className="p-1 rounded-lg text-ink hover:bg-primary-soft transition-colors cursor-pointer"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
-              <span className="px-1.5 text-xs sm:text-sm font-bold text-[#1E3227] tabular-nums whitespace-nowrap">
+              <span className="px-1.5 text-xs sm:text-sm font-bold text-ink tabular-nums whitespace-nowrap">
                 {activeSlideIndex + 1}/{slides.length}
               </span>
               <button
@@ -1845,7 +1845,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                 onClick={handleNext}
                 aria-label="Slide tiếp theo"
                 title="Từ tiếp theo (Phím tắt: →)"
-                className="p-1 rounded-lg text-[#1E3227] hover:bg-[#E7ECD9] transition-colors cursor-pointer"
+                className="p-1 rounded-lg text-ink hover:bg-primary-soft transition-colors cursor-pointer"
               >
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
@@ -1874,20 +1874,20 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     }}
                     className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 border cursor-pointer ${
                       isActive
-                        ? 'bg-[#1E3227] border-[#9B8A3E] text-[#FAFBF7] shadow-2xs'
-                        : 'bg-white/90 border-[rgba(30,50,39,0.14)] text-[#3F5447] hover:text-[#1E3227] hover:bg-[#FAFBF7] hover:border-[#9B8A3E]'
+                        ? 'bg-inverse border-border-strong text-white shadow-2xs'
+                        : 'bg-surface/90 border-border text-ink-muted hover:text-ink hover:bg-surface hover:border-border-strong'
                     }`}
                   >
                     <span
                       className={`text-xs sm:text-sm font-bold tabular-nums ${
-                        isActive ? 'text-[#C5B358]' : 'text-[#5F7266]'
+                        isActive ? 'text-highlight' : 'text-ink-muted'
                       }`}
                     >
                       {idx + 1}
                     </span>
                     <span
                       className={`font-['Noto_Sans_SC'] text-sm sm:text-base font-bold ${
-                        isActive ? 'text-[#FAFBF7]' : 'text-[#1E3227]'
+                        isActive ? 'text-white' : 'text-ink'
                       }`}
                     >
                       {s.hanzi}
@@ -1900,7 +1900,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         />
                         <Check
                           className={`w-3.5 h-3.5 ${
-                            isActive ? 'text-[#C5B358]' : 'text-[#1E3227]'
+                            isActive ? 'text-highlight' : 'text-ink'
                           }`}
                         />
                       </span>
@@ -1920,13 +1920,13 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch"
             >
               {/* Left 7 Cols: Interactive Flip Flashcard + 3 SRS Rating Buttons */}
-              <div className="lg:col-span-7 rounded-2xl bg-[#FAFBF7] border-2 border-[#9B8A3E]/55 p-5 flex flex-col justify-between shadow-xs space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[rgba(30,50,39,0.12)] pb-3">
+              <div className="lg:col-span-7 rounded-2xl bg-surface border-2 border-border-strong/55 p-5 flex flex-col justify-between shadow-xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
                   <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1 rounded-lg bg-[#1E3227] text-[#C5B358] text-xs font-extrabold">
+                    <span className="px-2.5 py-1 rounded-lg bg-inverse text-highlight text-xs font-semibold">
                       🃏 Flashcard Lật Thẻ · {currentHsk3Meta.hskLevelNormalized}
                     </span>
-                    <span className="text-xs font-bold text-[#3F5447]">
+                    <span className="text-xs font-bold text-ink-muted">
                       Thẻ {activeSlideIndex + 1}/{slides.length}
                     </span>
                   </div>
@@ -1934,18 +1934,18 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     <button
                       type="button"
                       onClick={() => speakChinese(currentSlide.hanzi, speechRate)}
-                      className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-[#1E3227] text-[#FAFBF7] text-xs font-bold cursor-pointer"
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-inverse text-white text-xs font-bold cursor-pointer"
                     >
-                      <Volume2 className="w-3.5 h-3.5 text-[#C5B358]" />
+                      <Volume2 className="w-3.5 h-3.5 text-highlight" />
                       <span>Nghe âm</span>
                     </button>
                     <button
                       type="button"
                       data-testid="flashcard-flip-toggle-btn"
                       onClick={() => setIsCardFlipped((f) => !f)}
-                      className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-[#E7ECD9] text-[#1E3227] text-xs font-bold border border-[#9B8A3E]/40 cursor-pointer"
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-primary-soft text-ink text-xs font-bold border border-border-strong/40 cursor-pointer"
                     >
-                      <RefreshCw className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                      <RefreshCw className="w-3.5 h-3.5 text-gold" />
                       <span>{isCardFlipped ? 'Xem mặt trước' : 'Lật xem đáp án'}</span>
                     </button>
                   </div>
@@ -1954,42 +1954,42 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                 {/* Main Flippable Card Surface */}
                 <div
                   onClick={() => setIsCardFlipped((f) => !f)}
-                  className="my-1 p-6 rounded-2xl bg-white border-2 border-dashed border-[#9B8A3E]/60 hover:border-[#1E3227] transition-all cursor-pointer text-center space-y-3 min-h-[220px] flex flex-col items-center justify-center"
+                  className="my-1 p-6 rounded-2xl bg-surface border-2 border-dashed border-border-strong/60 hover:border-ink transition-all cursor-pointer text-center space-y-3 min-h-[220px] flex flex-col items-center justify-center"
                 >
-                  <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E]">
+                  <div className="text-xs font-bold text-gold">
                     {isCardFlipped
                       ? 'MẶT SAU: PHIÊN ÂM · HÁN VIỆT · NGHĨA & CÂU VÍ DỤ'
                       : 'MẶT TRƯỚC: NHÌN CHỮ HÁN ĐOÁN ÂM & NGHĨA (BẤM ĐỂ LẬT THẺ)'}
                   </div>
-                  <div className="font-['Noto_Sans_SC'] text-6xl sm:text-7xl font-bold text-[#1E3227] leading-none">
+                  <div className="font-['Noto_Sans_SC'] text-6xl sm:text-7xl font-bold text-ink leading-none">
                     {currentSlide.hanzi}
                   </div>
 
                   {isCardFlipped ? (
-                    <div className="space-y-1.5 pt-2 border-t border-[rgba(30,50,39,0.1)] w-full max-w-md">
-                      <div className="text-xl font-bold text-[#9B8A3E]">
-                        {currentSlide.pinyin} · <span className="text-[#1E3227] uppercase">{currentSlide.hanViet}</span>
+                    <div className="space-y-1.5 pt-2 border-t border-border w-full max-w-md">
+                      <div className="text-xl font-bold text-gold">
+                        {currentSlide.pinyin} · <span className="text-ink uppercase">{currentSlide.hanViet}</span>
                       </div>
-                      <div className="text-base font-extrabold text-[#1E3227]">
+                      <div className="text-base font-semibold text-ink">
                         Nghĩa: {currentSlide.meaning}
                       </div>
-                      <div className="text-xs text-[#3F5447] bg-[#F4F6EE] px-3 py-1.5 rounded-xl">
+                      <div className="text-xs text-ink-muted bg-surface-2 px-3 py-1.5 rounded-xl">
                         🎵 {currentToneSandhi.ruleTitle}: <strong>{currentToneSandhi.spokenPinyin}</strong>
                       </div>
-                      <div className="text-xs text-[#1E3227] font-['Noto_Sans_SC'] pt-1">
+                      <div className="text-xs text-ink font-['Noto_Sans_SC'] pt-1">
                         Ví dụ: <strong>{currentSlide.exampleHanzi}</strong> ({currentSlide.exampleMeaning})
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-[#3F5447]">
+                    <p className="text-xs text-ink-muted">
                       Hãy tự nhẩm Pinyin, nghĩa tiếng Việt và cấu trúc câu trước khi bấm lật thẻ
                     </p>
                   )}
                 </div>
 
                 {/* 4 Spaced Repetition Rating Buttons */}
-                <div className="space-y-2 pt-2 border-t border-[rgba(30,50,39,0.12)]">
-                  <div className="text-xs font-bold text-[#3F5447] text-center">
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <div className="text-xs font-bold text-ink-muted text-center">
                     Đánh giá mức độ ghi nhớ (Spaced Repetition — Tự động phân phối chu kỳ ôn tập):
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -2021,7 +2021,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       type="button"
                       data-testid="srs-rate-mastered-btn"
                       onClick={() => handleRateCurrentWordSrs('mastered')}
-                      className="py-2.5 px-2 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] border border-[#9B8A3E] text-[#FAFBF7] text-xs font-bold transition-all cursor-pointer text-center shadow-2xs"
+                      className="py-2.5 px-2 rounded-xl bg-inverse hover:bg-inverse-hover border border-border-strong text-white text-xs font-bold transition-all cursor-pointer text-center shadow-2xs"
                     >
                       🌟 Thuộc làu (4 ngày)
                     </button>
@@ -2032,33 +2032,33 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               {/* Right 5 Cols: Personal Mistake Notebook ("Sổ tay từ hay quên / 错题本") */}
               <div
                 data-testid="student-mistake-notebook-panel"
-                className="lg:col-span-5 rounded-2xl bg-[#FAFBF7] border-2 border-[#1E3227]/20 p-5 flex flex-col justify-between shadow-xs space-y-3"
+                className="lg:col-span-5 rounded-2xl bg-surface border-2 border-ink/20 p-5 flex flex-col justify-between shadow-xs space-y-3"
               >
                 <div className="space-y-2.5">
-                  <div className="flex items-center justify-between gap-2 border-b border-[rgba(30,50,39,0.12)] pb-2.5">
+                  <div className="flex items-center justify-between gap-2 border-b border-border pb-2.5">
                     <div>
-                      <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E]">
+                      <div className="text-xs font-bold text-gold">
                         SPACED REPETITION · CÁ NHÂN HÓA
                       </div>
-                      <h4 className="text-sm sm:text-base font-bold text-[#1E3227]">
+                      <h4 className="text-sm sm:text-base font-bold text-ink">
                         📓 Sổ tay từ hay quên (错题本)
                       </h4>
                     </div>
                     <span
                       data-testid="mistake-notebook-count"
-                      className="px-2.5 py-1 rounded-xl bg-[#1E3227] text-[#C5B358] text-xs font-extrabold tabular-nums"
+                      className="px-2.5 py-1 rounded-xl bg-inverse text-highlight text-xs font-semibold tabular-nums"
                     >
                       {mistakeNotebookList.length} từ cần ôn
                     </span>
                   </div>
 
-                  <p className="text-xs text-[#3F5447]">
+                  <p className="text-xs text-ink-muted">
                     Các từ bạn bấm <strong>“😰 Chưa nhớ”</strong> hoặc <strong>“🤔 Hơi nhớ”</strong> được tự động tổng hợp tại đây để ôn tập trọng tâm trước khi làm bài.
                   </p>
 
                   <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
                     {mistakeNotebookList.length === 0 ? (
-                      <div className="p-4 rounded-xl bg-[#E7ECD9]/60 border border-[#1E3227]/15 text-xs text-[#1E3227] text-center font-semibold">
+                      <div className="p-4 rounded-xl bg-primary-soft/60 border border-ink/15 text-xs text-ink text-center font-semibold">
                         🎉 Tuyệt vời! Hiện tại không có từ nào trong Sổ tay từ hay quên.
                       </div>
                     ) : (
@@ -2070,7 +2070,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           <div
                             key={item.slideId}
                             data-testid={`mistake-word-${item.hanzi}`}
-                            className="p-2.5 rounded-xl bg-white border border-[rgba(30,50,39,0.14)] flex items-center justify-between gap-2 hover:border-[#9B8A3E] transition-all"
+                            className="p-2.5 rounded-xl bg-surface border border-border flex items-center justify-between gap-2 hover:border-border-strong transition-all"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
                               <button
@@ -2079,15 +2079,15 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                   if (slideIdx !== -1) handleSelectSlide(slideIdx);
                                   speakChinese(item.hanzi, speechRate);
                                 }}
-                                className="min-w-[38px] px-2 h-9 rounded-xl bg-[#1E3227] text-[#C5B358] font-['Noto_Sans_SC'] font-bold text-sm flex items-center justify-center shrink-0 cursor-pointer whitespace-nowrap"
+                                className="min-w-[38px] px-2 h-9 rounded-xl bg-inverse text-highlight font-['Noto_Sans_SC'] font-bold text-sm flex items-center justify-center shrink-0 cursor-pointer whitespace-nowrap"
                               >
                                 {item.hanzi}
                               </button>
                               <div className="min-w-0">
-                                <div className="text-xs font-bold text-[#1E3227] truncate">
-                                  {item.pinyin} · <span className="text-[#9B8A3E]">{item.meaning}</span>
+                                <div className="text-xs font-bold text-ink truncate">
+                                  {item.pinyin} · <span className="text-gold">{item.meaning}</span>
                                 </div>
-                                <div className="text-xs text-[#3F5447]">
+                                <div className="text-xs text-ink-muted">
                                   {item.rating === 'again'
                                     ? '😰 Chưa nhớ · Cần ôn ngay'
                                     : '🤔 Hơi nhớ · Ôn củng cố'}
@@ -2102,7 +2102,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                   if (slideIdx !== -1) handleSelectSlide(slideIdx);
                                   speakChinese(item.hanzi, speechRate);
                                 }}
-                                className="px-2.5 py-1 rounded-lg bg-[#E7ECD9] hover:bg-[#dce3c8] text-[#1E3227] text-xs font-bold cursor-pointer"
+                                className="px-2.5 py-1 rounded-lg bg-primary-soft hover:bg-surface-2 text-ink text-xs font-bold cursor-pointer"
                               >
                                 Ôn ngay
                               </button>
@@ -2114,12 +2114,12 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-2.5 border-t border-[rgba(30,50,39,0.12)] flex flex-wrap items-center justify-between gap-2">
+                <div className="pt-2.5 border-t border-border flex flex-wrap items-center justify-between gap-2">
                   {onChangeStudentStudyMode && (
                     <button
                       type="button"
                       onClick={() => onChangeStudentStudyMode('writing')}
-                      className="px-3 py-1.5 rounded-xl bg-white border border-[rgba(30,50,39,0.2)] text-[#1E3227] text-xs font-bold hover:bg-[#E7ECD9] cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-surface border border-border text-ink text-xs font-bold hover:bg-primary-soft cursor-pointer"
                     >
                       📖 Chuyển sang Luyện viết chữ Mễ
                     </button>
@@ -2128,7 +2128,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     <button
                       type="button"
                       onClick={onSwitchToStudentHomework}
-                      className="px-3 py-1.5 rounded-xl bg-[#1E3227] text-[#FAFBF7] text-xs font-bold hover:bg-[#2B4637] cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-inverse text-white text-xs font-bold hover:bg-inverse-hover cursor-pointer"
                     >
                       ✍️ Làm Bài Tập 5 Kỹ Năng HSK 3.0 →
                     </button>
@@ -2144,15 +2144,15 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
           {(roleMode !== 'student' || studentStudyMode !== 'flashcard') && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2.5 items-stretch">
             {/* COLUMN 1 (lg:col-span-4): Main Vocabulary Card on the Left */}
-            <div className="md:col-span-1 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-white/80 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 p-3 sm:p-3.5 flex flex-col justify-between transition-all duration-300">
+            <div className="md:col-span-1 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-surface/80 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-highlight/50 p-3 sm:p-3.5 flex flex-col justify-between transition-all duration-300">
               <div className="space-y-2">
                 {/* Top Badges: [HSK X] + [Từ loại] + [Chữ viết tay / Nhận diện] */}
                 <div className="flex flex-wrap items-center justify-between gap-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-xs sm:text-sm font-extrabold tracking-wide shadow-2xs">
+                    <span className="px-2 py-0.5 rounded-lg bg-primary text-on-primary text-xs sm:text-sm font-semibold tracking-wide shadow-2xs">
                       {currentHsk3Meta.hskLevelNormalized}
                     </span>
-                    <span className="px-2 py-0.5 rounded-lg bg-[#FAF7F0] border border-[#9B8A3E]/40 text-[#0F382E] text-xs sm:text-sm font-bold">
+                    <span className="px-2 py-0.5 rounded-lg bg-surface-2 border border-border-strong/40 text-ink text-xs sm:text-sm font-bold">
                       {currentSlide.partOfSpeech}
                     </span>
                   </div>
@@ -2161,11 +2161,11 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     data-testid="hsk3-char-category-badge"
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-xs sm:text-sm font-bold ${
                       currentHsk3Meta.charCategory === 'handwriting'
-                        ? 'bg-[#0F5243]/10 border-[#0F5243]/25 text-[#0F5243]'
-                        : 'bg-[#FAF7F0] border-[#9B8A3E]/45 text-[#0F382E]'
+                        ? 'bg-primary/10 border-primary/25 text-primary'
+                        : 'bg-surface-2 border-border-strong/45 text-ink'
                     }`}
                   >
-                    <Edit3 className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                    <Edit3 className="w-3.5 h-3.5 text-gold" />
                     <span>
                       {currentHsk3Meta.charCategory === 'handwriting'
                         ? 'Chữ viết tay'
@@ -2179,36 +2179,36 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   <div className="py-1 text-center space-y-1.5">
                     <div className="inline-flex items-center justify-center">
                       <span
-                        className="font-hanzi-calligraphy text-5xl sm:text-6xl font-bold tracking-wide text-[#0F382E] select-all leading-none py-0.5"
+                        className="font-hanzi-calligraphy text-5xl sm:text-6xl font-bold tracking-wide text-ink select-all leading-none py-0.5"
                         data-testid="active-slide-hanzi"
                       >
                         {currentSlide.hanzi}
                       </span>
                     </div>
 
-                    <div className="text-sm sm:text-base font-bold text-[#0F382E] flex flex-wrap items-center justify-center gap-1.5 leading-snug">
+                    <div className="text-sm sm:text-base font-bold text-ink flex flex-wrap items-center justify-center gap-1.5 leading-snug">
                       {showPinyin && (
-                        <span className="text-[#9B8A3E] tracking-wide" data-testid="active-slide-pinyin">
+                        <span className="text-gold tracking-wide" data-testid="active-slide-pinyin">
                           {currentSlide.pinyin}
                         </span>
                       )}
-                      <span className="text-[#9B8A3E]/60">·</span>
-                      <span className="text-[#0F382E] uppercase tracking-wide" data-testid="active-slide-hanviet">
+                      <span className="text-gold/60">·</span>
+                      <span className="text-ink" data-testid="active-slide-hanviet">
                         [{currentSlide.hanViet}]
                       </span>
                     </div>
 
                     {/* Prominent Vietnamese Meaning & Usage Note directly below Pinyin */}
                     {showMeaning && (
-                      <div className="p-2 rounded-xl bg-[#FAF7F0] border border-[#0F5243]/15 space-y-0.5">
+                      <div className="p-2 rounded-xl bg-surface-2 border border-primary/15 space-y-0.5">
                         <div
-                          className="text-sm sm:text-base font-extrabold text-[#0F5243]"
+                          className="text-sm sm:text-base font-semibold text-primary"
                           data-testid="active-slide-meaning"
                         >
                           {currentSlide.meaning}
                         </div>
                         {currentSlide.usageNote && (
-                          <p className="text-xs sm:text-sm text-[#3A544B] leading-snug line-clamp-2">
+                          <p className="text-xs sm:text-sm text-ink-muted leading-snug line-clamp-2">
                             {currentSlide.usageNote}
                           </p>
                         )}
@@ -2218,12 +2218,12 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     {/* Primary Example Sentence Box right underneath Meaning to balance Column 1 height */}
                     <div
                       data-testid="col1-inline-example-row"
-                      className="p-2.5 rounded-xl bg-white border border-[#9B8A3E]/35 text-left space-y-1 shadow-2xs"
+                      className="p-2.5 rounded-xl bg-surface border border-border-strong/35 text-left space-y-1 shadow-2xs"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span
                           data-testid="col1-inline-example-hanzi"
-                          className="font-['Noto_Sans_SC'] text-base font-bold text-[#0F382E]"
+                          className="font-['Noto_Sans_SC'] text-base font-bold text-ink"
                         >
                           {renderHighlightedExample(currentSlide.exampleHanzi, currentSlide.hanzi)}
                         </span>
@@ -2231,31 +2231,31 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           type="button"
                           data-testid="col1-inline-listen-example-btn"
                           onClick={() => speakChinese(currentSlide.exampleHanzi, speechRate)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] text-sm font-bold shrink-0 cursor-pointer transition-all duration-300 active:scale-95"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary hover:bg-primary text-on-primary text-sm font-bold shrink-0 cursor-pointer transition-all duration-300 active:scale-95"
                         >
-                          <Volume2 className="w-3.5 h-3.5 text-[#C5B358]" />
+                          <Volume2 className="w-3.5 h-3.5 text-highlight" />
                           <span>Nghe câu</span>
                         </button>
                       </div>
                       {showPinyin && (
-                        <div className="text-sm font-medium text-[#9B8A3E]">
+                        <div className="text-sm font-medium text-gold">
                           {currentSlide.examplePinyin}
                         </div>
                       )}
                       {showMeaning && (
-                        <div className="text-sm text-[#3A544B] italic">
+                        <div className="text-sm text-ink-muted italic">
                           {currentSlide.exampleMeaning}
                         </div>
                       )}
                     </div>
                   </div>
                 ) : (
-                  <div className="my-2 text-center p-4 rounded-xl bg-[#F4F6EE] border border-dashed border-[#9B8A3E] space-y-2">
-                    <p className="text-sm uppercase tracking-wider text-[#9B8A3E] font-bold">
+                  <div className="my-2 text-center p-4 rounded-xl bg-surface-2 border border-dashed border-border-strong space-y-2">
+                    <p className="text-sm text-gold font-bold">
                       Chế độ kiểm tra nhớ từ
                     </p>
                     <p
-                      className="font-['Noto_Sans_SC'] text-6xl font-bold text-[#1E3227] my-2"
+                      className="font-['Noto_Sans_SC'] text-6xl font-bold text-ink my-2"
                       data-testid="active-slide-hanzi"
                     >
                       {currentSlide.hanzi}
@@ -2263,7 +2263,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     <button
                       type="button"
                       onClick={() => setIsCardFlipped(false)}
-                      className="mt-1 px-3.5 py-1.5 rounded-xl bg-[#1E3227] text-[#FAFBF7] text-sm font-semibold cursor-pointer"
+                      className="mt-1 px-3.5 py-1.5 rounded-xl bg-inverse text-white text-sm font-semibold cursor-pointer"
                     >
                       Hiện đáp án
                     </button>
@@ -2273,16 +2273,16 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                 {/* Control Buttons Row */}
                 <div
                   data-testid="col1-card-controls-row"
-                  className="flex flex-wrap items-center justify-between gap-1.5 py-2 border-y border-[rgba(30,50,39,0.12)]"
+                  className="flex flex-wrap items-center justify-between gap-1.5 py-2 border-y border-border"
                 >
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       data-testid="pronounce-active-word-btn"
                       onClick={() => speakChinese(currentSlide.hanzi, speechRate)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] text-sm font-bold shadow-[0_2px_10px_rgba(15,82,67,0.22)] transition-all duration-300 active:scale-95 cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary text-on-primary text-sm font-bold shadow-[0_2px_10px_rgba(15,82,67,0.22)] transition-all duration-300 active:scale-95 cursor-pointer"
                     >
-                      <Volume2 className="w-4 h-4 text-[#C5B358]" />
+                      <Volume2 className="w-4 h-4 text-highlight" />
                       <span>Phát âm</span>
                       {isTtsSpeaking && (
                         <span
@@ -2299,9 +2299,9 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     <button
                       type="button"
                       onClick={() => speakChinese(currentSlide.hanzi, 0.55)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] text-sm font-semibold border border-[#0F5243]/15 transition-all duration-300 active:scale-95 cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-surface hover:bg-surface-2 text-ink text-sm font-semibold border border-primary/15 transition-all duration-300 active:scale-95 cursor-pointer"
                     >
-                      <Rewind className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                      <Rewind className="w-3.5 h-3.5 text-gold" />
                       <span>Chậm</span>
                     </button>
                   </div>
@@ -2313,18 +2313,18 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         data-testid="quick-edit-slide-btn"
                         onClick={handleOpenQuickEditModal}
                         title="Sửa nhanh Nghĩa, Câu ví dụ, Pinyin & Tạo ảnh minh họa theo ngữ cảnh"
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#FAF7F0] hover:bg-white text-[#0F382E] text-sm font-bold border border-[#C5B358]/60 transition-all duration-300 active:scale-95 cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-ink text-sm font-bold border border-highlight/60 transition-all duration-300 active:scale-95 cursor-pointer"
                       >
-                        <Edit3 className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                        <Edit3 className="w-3.5 h-3.5 text-gold" />
                         <span>Sửa thẻ</span>
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={() => setIsCardFlipped((f) => !f)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] text-sm font-semibold border border-[#0F5243]/15 transition-all duration-300 active:scale-95 cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-surface hover:bg-surface-2 text-ink text-sm font-semibold border border-primary/15 transition-all duration-300 active:scale-95 cursor-pointer"
                     >
-                      <RefreshCw className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                      <RefreshCw className="w-3.5 h-3.5 text-gold" />
                       <span>Lật thẻ</span>
                     </button>
                     <button
@@ -2332,8 +2332,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       onClick={() => onToggleLearned(currentSlide.id)}
                       className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-sm font-bold border transition-all duration-300 active:scale-95 cursor-pointer ${
                         currentSlide.learned
-                          ? 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] border-[#0F5243] text-[#FAF7F0] shadow-2xs'
-                          : 'bg-white border-[#0F5243]/15 text-[#3A544B] hover:text-[#0F5243]'
+                          ? 'bg-primary border-primary text-on-primary shadow-2xs'
+                          : 'bg-surface border-primary/15 text-ink-muted hover:text-primary'
                       }`}
                     >
                       {currentSlide.learned && <Check className="w-3.5 h-3.5" />}
@@ -2343,8 +2343,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                 </div>
 
                 {/* 3-Tab Accordion Box: [Chiết tự] vs [Ngữ pháp] vs [Ví dụ & Hội thoại] */}
-                <div className="rounded-xl bg-[#F4F6EE] border border-[rgba(30,50,39,0.12)] p-2">
-                  <div className="flex items-center gap-1 p-0.5 rounded-lg bg-[#E7ECD9] mb-1">
+                <div className="rounded-xl bg-surface-2 border border-border p-2">
+                  <div className="flex items-center gap-1 p-0.5 rounded-lg bg-primary-soft mb-1">
                     <button
                       type="button"
                       data-testid="col1-tab-radical"
@@ -2358,8 +2358,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       }}
                       className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                         col1ActiveTab === 'radical' && isCol1AccordionOpen
-                          ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
-                          : 'text-[#3F5447] hover:text-[#1E3227]'
+                          ? 'bg-inverse text-white shadow-2xs'
+                          : 'text-ink-muted hover:text-ink'
                       }`}
                     >
                       <Puzzle className="w-3.5 h-3.5 shrink-0" />
@@ -2378,8 +2378,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       }}
                       className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                         col1ActiveTab === 'grammar' && isCol1AccordionOpen
-                          ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
-                          : 'text-[#3F5447] hover:text-[#1E3227]'
+                          ? 'bg-inverse text-white shadow-2xs'
+                          : 'text-ink-muted hover:text-ink'
                       }`}
                     >
                       <Compass className="w-3.5 h-3.5 shrink-0" />
@@ -2398,8 +2398,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       }}
                       className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                         col1ActiveTab === 'example' && isCol1AccordionOpen
-                          ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
-                          : 'text-[#3F5447] hover:text-[#1E3227]'
+                          ? 'bg-inverse text-white shadow-2xs'
+                          : 'text-ink-muted hover:text-ink'
                       }`}
                     >
                       <MessageSquare className="w-3.5 h-3.5 shrink-0" />
@@ -2418,8 +2418,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       }}
                       className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-md text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
                         col1ActiveTab === 'collocations' && isCol1AccordionOpen
-                          ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
-                          : 'text-[#3F5447] hover:text-[#1E3227]'
+                          ? 'bg-inverse text-white shadow-2xs'
+                          : 'text-ink-muted hover:text-ink'
                       }`}
                     >
                       <BookOpen className="w-3.5 h-3.5 shrink-0" />
@@ -2433,17 +2433,17 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         {currentSlide.characters.map((ch, idx) => (
                           <div
                             key={`rad-breakdown-${ch.char}-${idx}`}
-                            className="flex items-center justify-between text-sm bg-white px-2.5 py-1.5 rounded-lg border border-[rgba(30,50,39,0.1)]"
+                            className="flex items-center justify-between text-sm bg-surface px-2.5 py-1.5 rounded-lg border border-border"
                           >
                             <div className="flex items-center gap-1.5">
-                              <span className="font-['Noto_Sans_SC'] text-base font-bold text-[#1E3227]">
+                              <span className="font-['Noto_Sans_SC'] text-base font-bold text-ink">
                                 {ch.char}
                               </span>
-                              <span className="text-[#9B8A3E] font-semibold text-sm">({ch.pinyin})</span>
+                              <span className="text-gold font-semibold text-sm">({ch.pinyin})</span>
                             </div>
-                            <span className="text-[#3F5447] text-sm">
-                              Bộ: <strong className="text-[#1E3227]">{ch.radical}</strong> ·{' '}
-                              <span className="font-bold text-[#9B8A3E]">{ch.strokeCount} nét</span>
+                            <span className="text-ink-muted text-sm">
+                              Bộ: <strong className="text-ink">{ch.radical}</strong> ·{' '}
+                              <span className="font-bold text-gold">{ch.strokeCount} nét</span>
                             </span>
                           </div>
                         ))}
@@ -2451,25 +2451,25 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     ) : col1ActiveTab === 'grammar' ? (
                       <div
                         data-testid="hsk3-grammar-point-box"
-                        className="space-y-1.5 bg-white p-2.5 rounded-lg border border-[#9B8A3E]/40 my-1"
+                        className="space-y-1.5 bg-surface p-2.5 rounded-lg border border-border-strong/40 my-1"
                       >
                         <div
                           data-testid="hsk3-grammar-formula"
-                          className="px-2.5 py-1 rounded-md bg-[#1E3227] text-[#C5B358] font-mono text-sm font-bold tracking-wide"
+                          className="px-2.5 py-1 rounded-md bg-inverse text-highlight font-mono text-sm font-bold tracking-wide"
                         >
                           {currentHsk3Meta.grammarFormula}
                         </div>
-                        <p className="text-sm text-[#3F5447] leading-snug">
+                        <p className="text-sm text-ink-muted leading-snug">
                           {currentHsk3Meta.synonymDistinction}
                         </p>
                       </div>
                     ) : col1ActiveTab === 'collocations' ? (
                       <div
                         data-testid="col1-collocations-panel"
-                        className="space-y-2 bg-white p-2.5 rounded-lg border border-[#9B8A3E]/40 my-1 text-left"
+                        className="space-y-2 bg-surface p-2.5 rounded-lg border border-border-strong/40 my-1 text-left"
                       >
                         <div>
-                          <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E] mb-1">
+                          <div className="text-xs font-bold text-gold mb-1">
                             Cụm từ cố định HSK (常用搭配):
                           </div>
                           <div className="space-y-1">
@@ -2482,15 +2482,15 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                               <div
                                 key={`colloc-${idx}`}
                                 onClick={() => speakChinese(colloc.hanzi, speechRate)}
-                                className="flex items-center justify-between p-1.5 rounded-lg bg-[#F4F6EE] hover:bg-[#E7ECD9] cursor-pointer transition-colors"
+                                className="flex items-center justify-between p-1.5 rounded-lg bg-surface-2 hover:bg-primary-soft cursor-pointer transition-colors"
                               >
                                 <div className="flex items-center gap-1.5">
-                                  <span className="font-['Noto_Sans_SC'] font-bold text-[#1E3227] text-sm">
+                                  <span className="font-['Noto_Sans_SC'] font-bold text-ink text-sm">
                                     {colloc.hanzi}
                                   </span>
-                                  <span className="text-[#9B8A3E] font-mono text-xs">({colloc.pinyin})</span>
+                                  <span className="text-gold font-mono text-xs">({colloc.pinyin})</span>
                                 </div>
-                                <span className="text-xs text-[#3F5447] font-medium">{colloc.meaning}</span>
+                                <span className="text-xs text-ink-muted font-medium">{colloc.meaning}</span>
                               </div>
                             ))}
                           </div>
@@ -2504,17 +2504,17 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           );
                           if (!syn) return null;
                           return (
-                            <div className="pt-2 border-t border-[rgba(30,50,39,0.1)]">
-                              <div className="text-xs font-bold uppercase tracking-wider text-[#B8292F] mb-0.5">
+                            <div className="pt-2 border-t border-border">
+                              <div className="text-xs font-bold text-accent mb-0.5">
                                 {syn.title}
                               </div>
-                              <div className="text-xs text-[#3F5447] leading-relaxed mb-1">
+                              <div className="text-xs text-ink-muted leading-relaxed mb-1">
                                 {syn.summary}
                               </div>
                               {syn.items && syn.items.length > 0 && (
                                 <div className="space-y-1">
                                   {syn.items.map((item, idx) => (
-                                    <div key={`syn-item-${idx}`} className="bg-[#FAF7F0] p-1.5 rounded-md border border-[#9B8A3E]/20 text-xs text-[#1E3227]">
+                                    <div key={`syn-item-${idx}`} className="bg-surface-2 p-1.5 rounded-md border border-border-strong/20 text-xs text-ink">
                                       <strong>{item.word} ({item.pinyin}):</strong> {item.nuance}
                                     </div>
                                   ))}
@@ -2527,17 +2527,17 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     ) : (
                       <div
                         data-testid="col1-example-dialogue-panel"
-                        className="space-y-1.5 bg-white p-2.5 rounded-lg border border-[#9B8A3E]/40 my-1 text-left"
+                        className="space-y-1.5 bg-surface p-2.5 rounded-lg border border-border-strong/40 my-1 text-left"
                       >
                         <div className="space-y-1 max-h-[140px] overflow-y-auto pr-0.5">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm font-bold text-[#9B8A3E]">
+                            <span className="text-sm font-bold text-gold">
                               Hội thoại ngữ cảnh (课文)
                             </span>
                             <button
                               type="button"
                               onClick={handlePlayContextualDialogue}
-                              className="text-sm font-bold text-[#1E3227] hover:text-[#C84B31] cursor-pointer"
+                              className="text-sm font-bold text-ink hover:text-accent cursor-pointer"
                             >
                               {isPlayingDialogue ? 'Dừng đọc' : 'Nghe hội thoại'}
                             </button>
@@ -2546,14 +2546,14 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                             <div
                               key={`col1-turn-${idx}`}
                               onClick={() => speakChinese(turn.hanziLine, speechRate)}
-                              className="p-2 rounded-lg bg-[#F4F6EE] hover:bg-[#E7ECD9] text-sm cursor-pointer transition-colors"
+                              className="p-2 rounded-lg bg-surface-2 hover:bg-primary-soft text-sm cursor-pointer transition-colors"
                             >
-                              <span className="font-bold text-[#9B8A3E] mr-1">{turn.speaker}:</span>
-                              <span className="font-['Noto_Sans_SC'] font-bold text-[#1E3227]">
+                              <span className="font-bold text-gold mr-1">{turn.speaker}:</span>
+                              <span className="font-['Noto_Sans_SC'] font-bold text-ink">
                                 {turn.hanziLine}
                               </span>
                               {(showMeaning || showVietnamese) && (
-                                <span className="block text-sm text-[#3F5447] italic">
+                                <span className="block text-sm text-ink-muted italic">
                                   {turn.meaningLine}
                                 </span>
                               )}
@@ -2572,20 +2572,20 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         data-testid="tone-sandhi-info-toggle"
                         onClick={() => setShowToneSandhiInfo((v) => !v)}
                         title={currentToneSandhi.explanationVi}
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-white hover:bg-[#FAFBF7] border border-[#9B8A3E]/35 flex items-center justify-between gap-1.5 text-left transition-colors cursor-pointer"
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface border border-border-strong/35 flex items-center justify-between gap-1.5 text-left transition-colors cursor-pointer"
                       >
-                        <span className="text-sm font-bold text-[#1E3227]">
+                        <span className="text-sm font-bold text-ink">
                           Biến điệu: {currentToneSandhi.ruleTitle.replace(/^Biến điệu\s*/i, '')}
                         </span>
                         <span className="inline-flex items-center gap-1 shrink-0">
-                          <span className="px-1.5 py-0.5 rounded bg-[#E7ECD9] text-[#1E3227] font-mono text-sm font-bold">
+                          <span className="px-1.5 py-0.5 rounded bg-primary-soft text-ink font-mono text-sm font-bold">
                             {currentToneSandhi.spokenPinyin.replace(/\s*\(.*?\)\s*/g, '')}
                           </span>
-                          <Info className="w-4 h-4 text-[#9B8A3E]" />
+                          <Info className="w-4 h-4 text-gold" />
                         </span>
                       </button>
                       {showToneSandhiInfo && (
-                        <p className="mt-1 px-2.5 py-1.5 rounded-lg bg-white/95 border border-[#9B8A3E]/30 text-sm text-[#3F5447] leading-snug">
+                        <p className="mt-1 px-2.5 py-1.5 rounded-lg bg-surface/95 border border-border-strong/30 text-sm text-ink-muted leading-snug">
                           {currentToneSandhi.explanationVi}
                         </p>
                       )}
@@ -2597,31 +2597,31 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
             {/* COLUMN 2 (lg:col-span-4): Mi Zi Ge Canvas */}
             <div
-              className="md:col-span-1 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-white/80 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 p-4 flex flex-col justify-between transition-all duration-300"
+              className="md:col-span-1 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-surface/80 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-highlight/50 p-4 flex flex-col justify-between transition-all duration-300"
               data-testid="inline-stroke-panel"
             >
               {/* Top Meta Header */}
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <div className="text-sm font-bold uppercase tracking-wider text-[#0F382E]">
+                  <div className="text-sm font-bold text-ink">
                     Ô Mễ Tự Cách (米字格)
                   </div>
                   <div
-                    className="text-sm text-[#3A544B]"
+                    className="text-sm text-ink-muted"
                     data-testid="inline-stroke-meta"
                   >
-                    Chữ <strong className="text-[#0F382E] font-hanzi-calligraphy text-base">{currentChar.char}</strong> · Bộ:{' '}
-                    <strong className="text-[#0F382E]">{currentChar.radical}</strong> ·{' '}
-                    <strong className="text-[#9B8A3E] tabular-nums" data-testid="inline-stroke-counter">
+                    Chữ <strong className="text-ink font-hanzi-calligraphy text-base">{currentChar.char}</strong> · Bộ:{' '}
+                    <strong className="text-ink">{currentChar.radical}</strong> ·{' '}
+                    <strong className="text-gold tabular-nums" data-testid="inline-stroke-counter">
                       {currentProgressCount}/{totalStrokes} nét
                     </strong>
                   </div>
                 </div>
 
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#0F5243]/10 border border-[#0F5243]/20 text-[#0F5243] text-sm font-bold tabular-nums">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-primary/10 border border-primary/20 text-primary text-sm font-bold tabular-nums">
                   {practiceAccuracy !== null ? (
                     <>
-                      <Award className="w-4 h-4 text-[#9B8A3E]" />
+                      <Award className="w-4 h-4 text-gold" />
                       <span>{practiceAccuracy}%</span>
                     </>
                   ) : inlineStrokeMode === 'animate' ? (
@@ -2634,7 +2634,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
               {/* Centered Mi Zi Ge (米字格) Canvas with Ebony/Gold Frame & Cinnabar Dashed Grid */}
               <div className="my-1.5 sm:my-2 flex flex-col items-center justify-center">
-                <div className="relative mx-auto w-32 h-32 xs:w-40 xs:h-40 sm:w-48 sm:h-48 md:w-52 md:h-52 rounded-2xl bg-[#FAF7F0] border-2 border-[#0F382E]/85 ring-2 ring-[#C5B358]/60 overflow-hidden select-none touch-none shadow-[inset_0_2px_12px_rgba(184,41,47,0.06)]">
+                <div className="relative mx-auto w-32 h-32 xs:w-40 xs:h-40 sm:w-48 sm:h-48 md:w-52 md:h-52 rounded-2xl bg-surface-2 border-2 border-ink/85 ring-2 ring-highlight/60 overflow-hidden select-none touch-none shadow-[inset_0_2px_12px_rgba(184,41,47,0.06)]">
                   <svg
                     ref={inlineSvgRef}
                     viewBox="0 0 100 100"
@@ -2909,11 +2909,11 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                 {practiceEvalDetail && (
                   <div
                     data-testid="stroke-practice-feedback-card"
-                    className="mt-2 w-full p-2.5 rounded-xl bg-[#F4F6EE] border border-[#9B8A3E]/50 text-xs sm:text-sm space-y-1"
+                    className="mt-2 w-full p-2.5 rounded-xl bg-surface-2 border border-border-strong/50 text-xs sm:text-sm space-y-1"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-[#1E3227] tabular-nums inline-flex items-center gap-1.5">
-                        <Award className="w-4 h-4 text-[#9B8A3E]" />
+                      <span className="font-bold text-ink tabular-nums inline-flex items-center gap-1.5">
+                        <Award className="w-4 h-4 text-gold" />
                         <span>{practiceEvalDetail.accuracy}% · {practiceEvalDetail.gradeLabel}</span>
                       </span>
                       <div className="flex items-center gap-0.5" title={`${practiceEvalDetail.stars || 1} sao`}>
@@ -2934,7 +2934,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         <span>⚠️ Lưu ý: Bạn đang kéo ngược hướng bút thuận (Quy tắc: từ trái qua phải, từ trên xuống dưới)!</span>
                       </div>
                     )}
-                    <div className="text-[#3F5447] text-xs leading-snug">
+                    <div className="text-ink-muted text-xs leading-snug">
                       {practiceEvalDetail.feedback}
                     </div>
                   </div>
@@ -2942,7 +2942,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               </div>
 
               {/* Compact Control Row Beneath Canvas: [Chạy nét] [Viết thử] [🙈 Ẩn chữ mẫu (听写)] [💡 Gợi ý 1 nét] [Xóa] + Character Tabs */}
-              <div className="pt-3 border-t border-[rgba(30,50,39,0.12)] flex flex-wrap items-center justify-between gap-1.5">
+              <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-1.5">
                 <div className="flex flex-wrap items-center gap-1">
                   <button
                     type="button"
@@ -2953,11 +2953,11 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     }}
                     className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
                       inlineStrokeMode === 'animate'
-                        ? 'bg-[#1E3227] text-[#FAFBF7]'
-                        : 'bg-[#F4F6EE] text-[#1E3227] border border-[rgba(30,50,39,0.15)] hover:bg-[#E7ECD9]'
+                        ? 'bg-inverse text-white'
+                        : 'bg-surface-2 text-ink border border-border hover:bg-primary-soft'
                     }`}
                   >
-                    <Play className="w-3.5 h-3.5 text-[#C5B358]" />
+                    <Play className="w-3.5 h-3.5 text-highlight" />
                     <span>Chạy nét</span>
                   </button>
 
@@ -2965,9 +2965,9 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     type="button"
                     data-testid="inline-practice-stroke-btn"
                     onClick={handleSimulateInlineStroke}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-[#F4F6EE] text-[#1E3227] border border-[#9B8A3E]/50 hover:bg-[#E7ECD9] transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-surface-2 text-ink border border-border-strong/50 hover:bg-primary-soft transition-colors cursor-pointer"
                   >
-                    <Edit3 className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                    <Edit3 className="w-3.5 h-3.5 text-gold" />
                     <span>Viết thử</span>
                   </button>
 
@@ -2982,8 +2982,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     title="Chế độ Nghe viết / Ẩn nét mẫu (听写 - Dictation Mode)"
                     className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
                       hideGuideStrokes
-                        ? 'bg-[#0F5243] text-[#FAF7F0] border-[#C5B358]'
-                        : 'bg-white text-[#1E3227] border-[rgba(30,50,39,0.18)] hover:bg-[#F4F6EE]'
+                        ? 'bg-primary text-on-primary border-highlight'
+                        : 'bg-surface text-ink border-border hover:bg-surface-2'
                     }`}
                   >
                     {hideGuideStrokes ? (
@@ -2993,7 +2993,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       </>
                     ) : (
                       <>
-                        <EyeOff className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                        <EyeOff className="w-3.5 h-3.5 text-gold" />
                         <span>Ẩn chữ mẫu</span>
                       </>
                     )}
@@ -3020,7 +3020,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       setPracticeEvalDetail(null);
                       setHintStrokeFlashIdx(null);
                     }}
-                    className="inline-flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs sm:text-sm font-semibold bg-white text-[#3F5447] border border-[rgba(30,50,39,0.15)] hover:text-[#1E3227] transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs sm:text-sm font-semibold bg-surface text-ink-muted border border-border hover:text-ink transition-colors cursor-pointer"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Xóa</span>
@@ -3040,8 +3040,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       }}
                       className={`w-8 h-8 rounded-lg font-hanzi-calligraphy text-base font-bold transition-all duration-300 active:scale-95 border cursor-pointer ${
                         activeCharIdx === idx
-                          ? 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] border-[#C5B358] shadow-2xs'
-                          : 'bg-white text-[#0F382E] border-[#0F5243]/15 hover:bg-[#FAF7F0]'
+                          ? 'bg-primary text-on-primary border-highlight shadow-2xs'
+                          : 'bg-surface text-ink border-primary/15 hover:bg-surface-2'
                       }`}
                     >
                       {ch.char}
@@ -3052,7 +3052,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     type="button"
                     data-testid="open-print-worksheet-btn"
                     onClick={() => setIsWorksheetModalOpen(true)}
-                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#C5B358] border border-[#C5B358]/50 transition-all duration-300 active:scale-95 cursor-pointer"
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-primary hover:bg-primary text-highlight border border-highlight/50 transition-all duration-300 active:scale-95 cursor-pointer"
                     title="In phiếu tập viết (A4)"
                   >
                     <Printer className="w-4 h-4" />
@@ -3063,12 +3063,12 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
             {/* COLUMN 3 (md:col-span-2 lg:col-span-4): ROUNDED ILLUSTRATION FRAME + CONTEXT EXAMPLE CARD */}
             <div
-              className="md:col-span-2 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-white/80 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 p-4 grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-col justify-between gap-3 transition-all duration-300"
+              className="md:col-span-2 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-surface/80 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-highlight/50 p-4 grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-col justify-between gap-3 transition-all duration-300"
               data-testid="scene-and-example-column"
             >
               {/* Visual Illustration Card */}
               <div
-                className="aspect-[400/220] w-full rounded-2xl overflow-hidden border border-[rgba(30,50,39,0.18)] bg-[#18221D] shadow-xs"
+                className="aspect-[400/220] w-full rounded-2xl overflow-hidden border border-border bg-[#18221D] shadow-xs"
                 data-testid="inline-slide-illustration"
               >
                 <SlideIllustration
@@ -3093,11 +3093,11 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
               {/* THẺ VÍ DỤ NGỮ CẢNH & HỘI THOẠI BÀI KHÓA THỰC TẾ (情境对话 & 课文) */}
               <div
-                className="flex-1 rounded-xl bg-[#F4F6EE] border border-[rgba(30,50,39,0.12)] p-3 flex flex-col justify-between gap-2"
+                className="flex-1 rounded-xl bg-surface-2 border border-border p-3 flex flex-col justify-between gap-2"
                 data-testid="scene-example-card"
               >
                 {/* 2-Tab Header: [Câu ví dụ mẫu] vs [Hội thoại ngữ cảnh (课文)] */}
-                <div className="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-[#E7ECD9]">
+                <div className="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-primary-soft">
                   <button
                     type="button"
                     data-testid="col3-tab-example"
@@ -3107,8 +3107,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     }}
                     className={`inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-sm font-bold transition-all cursor-pointer ${
                       col3ActiveTab === 'example'
-                        ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
-                        : 'text-[#3F5447] hover:text-[#1E3227]'
+                        ? 'bg-inverse text-white shadow-2xs'
+                        : 'text-ink-muted hover:text-ink'
                     }`}
                   >
                     <FileText className="w-3.5 h-3.5 shrink-0" />
@@ -3120,8 +3120,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     onClick={() => setCol3ActiveTab('dialogue')}
                     className={`inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-sm font-bold transition-all cursor-pointer ${
                       col3ActiveTab === 'dialogue'
-                        ? 'bg-[#1E3227] text-[#FAFBF7] shadow-2xs'
-                        : 'text-[#3F5447] hover:text-[#1E3227]'
+                        ? 'bg-inverse text-white shadow-2xs'
+                        : 'text-ink-muted hover:text-ink'
                     }`}
                   >
                     <MessageSquare className="w-3.5 h-3.5 shrink-0" />
@@ -3135,7 +3135,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       {/* Dòng 1: Câu ví dụ tiếng Trung */}
                       <div className="example-sentence-line flex items-center gap-2 overflow-x-auto whitespace-nowrap">
                         <span
-                          className="font-['Noto_Sans_SC'] text-lg sm:text-xl font-bold text-[#1E3227]"
+                          className="font-['Noto_Sans_SC'] text-lg sm:text-xl font-bold text-ink"
                           data-testid="scene-example-hanzi"
                         >
                           {renderHighlightedExample(currentSlide.exampleHanzi, currentSlide.hanzi)}
@@ -3144,36 +3144,36 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
                       {/* Dòng 2: Phiên âm Pinyin */}
                       {showPinyin && (
-                        <div className="text-sm text-[#9B8A3E] font-medium tracking-wide">
+                        <div className="text-sm text-gold font-medium tracking-wide">
                           {currentSlide.examplePinyin}
                         </div>
                       )}
 
                       {/* Dòng 3: Nghĩa tiếng Việt */}
                       {(showMeaning || showVietnamese) && (
-                        <div className="text-sm text-[#1E3227]/85 italic">
+                        <div className="text-sm text-ink/85 italic">
                           {currentSlide.exampleMeaning}
                         </div>
                       )}
                     </div>
 
-                    <div className="space-y-2 pt-2 border-t border-[rgba(30,50,39,0.12)]">
+                    <div className="space-y-2 pt-2 border-t border-border">
                       {/* Dòng nút Nghe câu, Đọc chậm và Đọc thử */}
                       <div className="example-actions-row flex flex-wrap items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => speakChinese(currentSlide.exampleHanzi, speechRate)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#1E3227] hover:bg-[#2B4637] text-white rounded-xl text-sm font-bold transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-inverse hover:bg-inverse-hover text-white rounded-xl text-sm font-bold transition-all cursor-pointer"
                         >
-                          <Volume2 className="w-4 h-4 text-[#C5B358]" />
+                          <Volume2 className="w-4 h-4 text-highlight" />
                           <span>Nghe câu</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => speakChinese(currentSlide.exampleHanzi, 0.55)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white text-[#1E3227] border border-[rgba(30,50,39,0.15)] rounded-xl text-sm font-semibold hover:bg-[#E7ECD9] transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-surface text-ink border border-border rounded-xl text-sm font-semibold hover:bg-primary-soft transition-all cursor-pointer"
                         >
-                          <Rewind className="w-3.5 h-3.5 text-[#9B8A3E]" />
+                          <Rewind className="w-3.5 h-3.5 text-gold" />
                           <span>Chậm</span>
                         </button>
                         <button
@@ -3181,8 +3181,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           onClick={handleStartSpeechPractice}
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
                             isPracticingSpeech
-                              ? 'bg-[#C84B31] text-white animate-pulse'
-                              : 'bg-white hover:bg-[#FAFBF7] text-[#1E3227] border border-[#9B8A3E]/60 hover:border-[#1E3227]'
+                              ? 'bg-accent text-on-primary animate-pulse'
+                              : 'bg-surface hover:bg-surface text-ink border border-border-strong/60 hover:border-ink'
                           }`}
                           title="Nói tiếng Trung câu ví dụ để hệ thống chấm điểm phát âm zh-CN"
                         >
@@ -3193,7 +3193,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                             </>
                           ) : (
                             <>
-                              <Mic className="w-4 h-4 text-[#C84B31]" />
+                              <Mic className="w-4 h-4 text-accent" />
                               <span>Đọc thử</span>
                             </>
                           )}
@@ -3202,14 +3202,14 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
                       {/* Listening Indicator */}
                       {isPracticingSpeech && (
-                        <div className="p-2.5 rounded-xl bg-white border border-[#C84B31]/40 text-sm text-[#1E3227] flex items-center justify-between gap-2">
+                        <div className="p-2.5 rounded-xl bg-surface border border-accent/40 text-sm text-ink flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-2 h-2 rounded-full bg-[#C84B31] animate-ping shrink-0" />
-                            <span className="font-semibold text-sm text-[#1E3227] truncate">
+                            <span className="w-2 h-2 rounded-full bg-accent animate-ping shrink-0" />
+                            <span className="font-semibold text-sm text-ink truncate">
                               Hãy đọc: "{currentSlide.exampleHanzi}"
                             </span>
                           </div>
-                          <span className="text-sm text-[#C84B31] font-bold shrink-0">
+                          <span className="text-sm text-accent font-bold shrink-0">
                             Nói ngay...
                           </span>
                         </div>
@@ -3219,32 +3219,32 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       {speechResult && (
                         <div
                           data-testid="speech-eval-result-card"
-                          className="p-2.5 rounded-xl bg-[#E7ECD9] border border-[#1E3227]/25 text-sm text-[#1E3227] flex flex-col gap-1.5"
+                          className="p-2.5 rounded-xl bg-primary-soft border border-ink/25 text-sm text-ink flex flex-col gap-1.5"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#1E3227] text-[#FAFBF7] font-bold text-sm tabular-nums">
-                                <Award className="w-3.5 h-3.5 text-[#C5B358]" />
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-inverse text-white font-bold text-sm tabular-nums">
+                                <Award className="w-3.5 h-3.5 text-highlight" />
                                 <span>{speechResult.score}%</span>
                               </span>
-                              <strong className="text-xs sm:text-sm text-[#1E3227]">
+                              <strong className="text-xs sm:text-sm text-ink">
                                 {speechResult.feedback}
                               </strong>
                             </div>
                             <button
                               type="button"
                               onClick={() => setSpeechResult(null)}
-                              className="text-sm text-[#3F5447] hover:text-[#1E3227] px-1 cursor-pointer"
+                              className="text-sm text-ink-muted hover:text-ink px-1 cursor-pointer"
                             >
                               <X className="w-4 h-4" />
                             </button>
                           </div>
 
                           {speechResult.charMatches && speechResult.charMatches.length > 0 && (
-                            <div className="bg-white/90 p-2 rounded-lg border border-[rgba(30,50,39,0.12)] space-y-1">
-                              <div className="text-xs font-bold text-[#5F7266] flex items-center justify-between">
+                            <div className="bg-surface/90 p-2 rounded-lg border border-border space-y-1">
+                              <div className="text-xs font-bold text-ink-muted flex items-center justify-between">
                                 <span>Đối chiếu âm đọc từng chữ Hán:</span>
-                                <span className="text-xs text-[#3F5447]">
+                                <span className="text-xs text-ink-muted">
                                   Xanh: Chuẩn · Đỏ: Cần chỉnh
                                 </span>
                               </div>
@@ -3254,7 +3254,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                     key={`match-${idx}`}
                                     className={`px-1.5 py-0.5 rounded font-['Noto_Sans_SC'] font-bold text-sm ${
                                       item.isPunctuation
-                                        ? 'text-[#5F7266]'
+                                        ? 'text-ink-muted'
                                         : item.isMatched
                                         ? 'text-emerald-800 bg-emerald-100 border border-emerald-300'
                                         : 'text-rose-800 bg-rose-100 border border-rose-300'
@@ -3264,8 +3264,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                   </span>
                                 ))}
                               </div>
-                              <div className="text-xs text-[#5F7266] truncate pt-0.5">
-                                Ghi nhận: <span className="font-mono text-[#1E3227] font-medium">{speechResult.transcript}</span>
+                              <div className="text-xs text-ink-muted truncate pt-0.5">
+                                Ghi nhận: <span className="font-mono text-ink font-medium">{speechResult.transcript}</span>
                               </div>
                             </div>
                           )}
@@ -3279,18 +3279,18 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     className="flex flex-col justify-between gap-2 flex-1"
                   >
                     {/* Top Action Row: [Nghe hội thoại] + Quick Pinyin / Meaning Toggles */}
-                    <div className="flex flex-wrap items-center justify-between gap-1.5 pb-1.5 border-b border-[rgba(30,50,39,0.12)]">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 pb-1.5 border-b border-border">
                       <button
                         type="button"
                         data-testid="play-dialogue-karaoke-btn"
                         onClick={handlePlayContextualDialogue}
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           isPlayingDialogue
-                            ? 'bg-[#C84B31] text-white shadow-xs'
-                            : 'bg-[#1E3227] hover:bg-[#2B4637] text-[#FAFBF7]'
+                            ? 'bg-accent text-on-primary shadow-xs'
+                            : 'bg-inverse hover:bg-inverse-hover text-on-primary'
                         }`}
                       >
-                        <Volume2 className="w-3.5 h-3.5 text-[#C5B358]" />
+                        <Volume2 className="w-3.5 h-3.5 text-highlight" />
                         <span>
                           {isPlayingDialogue ? 'Đang đọc Karaoke...' : 'Nghe hội thoại'}
                         </span>
@@ -3303,8 +3303,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           onClick={() => setShowPinyin((v) => !v)}
                           className={`px-2 py-0.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
                             showPinyin
-                              ? 'bg-[#E7ECD9] border-[#1E3227]/25 text-[#1E3227]'
-                              : 'bg-white border-[rgba(30,50,39,0.15)] text-[#5F7266]'
+                              ? 'bg-primary-soft border-ink/25 text-ink'
+                              : 'bg-surface border-border text-ink-muted'
                           }`}
                         >
                           {showPinyin ? '✓ Pinyin' : 'Pinyin'}
@@ -3319,8 +3319,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           }}
                           className={`px-2 py-0.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
                             showMeaning
-                              ? 'bg-[#E7ECD9] border-[#1E3227]/25 text-[#1E3227]'
-                              : 'bg-white border-[rgba(30,50,39,0.15)] text-[#5F7266]'
+                              ? 'bg-primary-soft border-ink/25 text-ink'
+                              : 'bg-surface border-border text-ink-muted'
                           }`}
                         >
                           {showMeaning ? '✓ Dịch nghĩa' : 'Dịch nghĩa'}
@@ -3343,18 +3343,18 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                             }}
                             className={`p-2 rounded-xl border transition-all cursor-pointer ${
                               isKaraokeActive
-                                ? 'bg-[#FFFDF5] border-2 border-[#C84B31] shadow-xs ring-2 ring-[#C5B358]/40'
-                                : 'bg-white border-[rgba(30,50,39,0.12)] hover:border-[#9B8A3E]'
+                                ? 'bg-surface-2 border-2 border-accent shadow-xs ring-2 ring-highlight/40'
+                                : 'bg-surface border-border hover:border-border-strong'
                             }`}
                           >
                             <div className="flex items-start justify-between gap-1.5">
                               <div className="min-w-0 flex-1 space-y-0.5">
                                 <div className="flex items-center gap-1.5">
                                   <span
-                                    className={`px-1.5 py-0.5 rounded text-xs font-extrabold ${
+                                    className={`px-1.5 py-0.5 rounded text-xs font-semibold ${
                                       turn.speaker === 'A'
-                                        ? 'bg-[#1E3227] text-[#C5B358]'
-                                        : 'bg-[#9B8A3E] text-white'
+                                        ? 'bg-inverse text-highlight'
+                                        : 'bg-gold text-white'
                                     }`}
                                   >
                                     {turn.speaker} · {turn.speakerName}
@@ -3362,21 +3362,21 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                   {isKaraokeActive && (
                                     <span
                                       data-testid="karaoke-active-badge"
-                                      className="px-1.5 py-0.5 rounded bg-[#C84B31] text-white text-xs font-bold uppercase tracking-wider"
+                                      className="px-1.5 py-0.5 rounded bg-accent text-on-primary text-xs font-bold"
                                     >
                                       Đang đọc
                                     </span>
                                   )}
                                 </div>
 
-                                <div className="font-['Noto_Sans_SC'] text-sm font-bold text-[#1E3227] leading-snug pt-0.5">
+                                <div className="font-['Noto_Sans_SC'] text-sm font-bold text-ink leading-snug pt-0.5">
                                   {renderHighlightedExample(turn.hanziLine, currentSlide.hanzi)}
                                 </div>
 
                                 {showPinyin && (
                                   <div
                                     data-testid={`dialogue-pinyin-${idx}`}
-                                    className="text-xs font-medium text-[#9B8A3E] leading-snug"
+                                    className="text-xs font-medium text-gold leading-snug"
                                   >
                                     {turn.pinyinLine}
                                   </div>
@@ -3385,7 +3385,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                 {(showMeaning || showVietnamese) && (
                                   <div
                                     data-testid={`dialogue-meaning-${idx}`}
-                                    className="text-xs text-[#3F5447] italic leading-snug"
+                                    className="text-xs text-ink-muted italic leading-snug"
                                   >
                                     {turn.meaningLine}
                                   </div>
@@ -3400,7 +3400,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                                   setActiveDialogueTurnIdx(idx);
                                   speakChinese(turn.hanziLine, speechRate);
                                 }}
-                                className="w-6 h-6 rounded-lg bg-[#E7ECD9] hover:bg-[#1E3227] text-[#1E3227] hover:text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                                className="w-6 h-6 rounded-lg bg-primary-soft hover:bg-inverse text-ink hover:text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
                               >
                                 <Volume2 className="w-3 h-3" />
                               </button>
@@ -3422,36 +3422,36 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
             <div
               data-testid="keyboard-shortcuts-bar"
-              className="inline-flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[rgba(255,255,255,0.75)] border border-[rgba(30,50,39,0.14)] text-sm text-[#3F5447]"
+              className="inline-flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface/75 border border-border text-sm text-ink-muted"
             >
-              <Keyboard className="w-4 h-4 text-[#9B8A3E] shrink-0" />
-              <span className="font-bold text-[#1E3227]">Phím tắt đứng lớp:</span>
+              <Keyboard className="w-4 h-4 text-gold shrink-0" />
+              <span className="font-bold text-ink">Phím tắt đứng lớp:</span>
               <span className="inline-flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-sm font-bold text-[#1E3227]">
+                <kbd className="px-1.5 py-0.5 rounded bg-primary-soft border border-border font-mono text-sm font-bold text-ink">
                   ←
                 </kbd>
-                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-sm font-bold text-[#1E3227]">
+                <kbd className="px-1.5 py-0.5 rounded bg-primary-soft border border-border font-mono text-sm font-bold text-ink">
                   →
                 </kbd>
                 <span>Lùi/Tiến từ</span>
               </span>
-              <span className="text-[#9B8A3E]/60">·</span>
+              <span className="text-gold/60">·</span>
               <span className="inline-flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-sm font-bold text-[#1E3227]">
+                <kbd className="px-1.5 py-0.5 rounded bg-primary-soft border border-border font-mono text-sm font-bold text-ink">
                   Space
                 </kbd>
                 <span>Phát âm</span>
               </span>
-              <span className="text-[#9B8A3E]/60">·</span>
+              <span className="text-gold/60">·</span>
               <span className="inline-flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-sm font-bold text-[#1E3227]">
+                <kbd className="px-1.5 py-0.5 rounded bg-primary-soft border border-border font-mono text-sm font-bold text-ink">
                   W
                 </kbd>
                 <span>Chạy nét mẫu</span>
               </span>
-              <span className="text-[#9B8A3E]/60">·</span>
+              <span className="text-gold/60">·</span>
               <span className="inline-flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 rounded bg-[#E7ECD9] border border-[rgba(30,50,39,0.2)] font-mono text-sm font-bold text-[#1E3227]">
+                <kbd className="px-1.5 py-0.5 rounded bg-primary-soft border border-border font-mono text-sm font-bold text-ink">
                   F
                 </kbd>
                 <span>Fullscreen</span>
@@ -3510,21 +3510,21 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               <form
                 onSubmit={handleSaveQuickEditSlide}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-lg rounded-3xl bg-[#FAF7F0] border border-[#C5B358]/70 shadow-2xl p-5 sm:p-6 space-y-3.5 text-[#0F382E]"
+                className="w-full max-w-lg rounded-3xl bg-surface-2 border border-highlight/70 shadow-2xl p-5 sm:p-6 space-y-3.5 text-ink"
               >
-                <div className="flex items-start justify-between gap-3 pb-2.5 border-b border-[#0F5243]/15">
+                <div className="flex items-start justify-between gap-3 pb-2.5 border-b border-primary/15">
                   <div>
-                    <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E]">
+                    <div className="text-xs font-bold text-gold">
                       FULL LESSON AUTHORING STUDIO · CHỈNH SỬA TRỰC TIẾP
                     </div>
-                    <h3 className="text-base sm:text-lg font-bold text-[#0F382E] mt-0.5">
+                    <h3 className="text-base sm:text-lg font-bold text-ink mt-0.5">
                       ✏️ Sửa nhanh thẻ từ vựng “{currentSlide.hanzi}”
                     </h3>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsQuickEditModalOpen(false)}
-                    className="w-8 h-8 rounded-full bg-white border border-[#0F5243]/15 flex items-center justify-center text-[#0F382E] hover:bg-[#F4EFE6] cursor-pointer"
+                    className="w-8 h-8 rounded-full bg-surface border border-primary/15 flex items-center justify-center text-ink hover:bg-surface-2 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -3532,27 +3532,27 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <div>
-                    <label className="block text-xs font-bold text-[#0F382E] mb-1">Pinyin</label>
+                    <label className="block text-xs font-bold text-ink mb-1">Pinyin</label>
                     <input
                       type="text"
                       data-testid="quick-edit-pinyin-input"
                       value={editPinyin}
                       onChange={(e) => setEditPinyin(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#0F5243]/20 text-xs sm:text-sm font-semibold text-[#0F382E] focus:outline-none focus:border-[#0F5243]"
+                      className="w-full px-3 py-1.5 rounded-xl bg-surface border border-primary/20 text-xs sm:text-sm font-semibold text-ink focus:outline-none focus:border-primary"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#0F382E] mb-1">Hán Việt</label>
+                    <label className="block text-xs font-bold text-ink mb-1">Hán Việt</label>
                     <input
                       type="text"
                       data-testid="quick-edit-hanviet-input"
                       value={editHanViet}
                       onChange={(e) => setEditHanViet(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#0F5243]/20 text-xs sm:text-sm font-semibold text-[#0F382E] focus:outline-none focus:border-[#0F5243]"
+                      className="w-full px-3 py-1.5 rounded-xl bg-surface border border-primary/20 text-xs sm:text-sm font-semibold text-ink focus:outline-none focus:border-primary"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-[#0F382E] mb-1">
+                    <label className="block text-xs font-bold text-ink mb-1">
                       Nghĩa tiếng Việt
                     </label>
                     <input
@@ -3560,14 +3560,14 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       data-testid="quick-edit-meaning-input"
                       value={editMeaning}
                       onChange={(e) => setEditMeaning(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#0F5243]/20 text-xs sm:text-sm font-semibold text-[#0F382E] focus:outline-none focus:border-[#0F5243]"
+                      className="w-full px-3 py-1.5 rounded-xl bg-surface border border-primary/20 text-xs sm:text-sm font-semibold text-ink focus:outline-none focus:border-primary"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-xs font-bold text-[#0F382E] mb-1">
+                    <label className="block text-xs font-bold text-ink mb-1">
                       Câu ví dụ tiếng Trung (Chuẩn HSK 3.0)
                     </label>
                     <input
@@ -3575,23 +3575,23 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       data-testid="quick-edit-example-hanzi-input"
                       value={editExampleHanzi}
                       onChange={(e) => setEditExampleHanzi(e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#0F5243]/20 text-xs sm:text-sm font-['Noto_Sans_SC'] font-bold text-[#0F382E] focus:outline-none focus:border-[#0F5243]"
+                      className="w-full px-3 py-1.5 rounded-xl bg-surface border border-primary/20 text-xs sm:text-sm font-['Noto_Sans_SC'] font-bold text-ink focus:outline-none focus:border-primary"
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                      <label className="block text-xs font-bold text-[#0F382E] mb-1">
+                      <label className="block text-xs font-bold text-ink mb-1">
                         Pinyin câu ví dụ
                       </label>
                       <input
                         type="text"
                         value={editExamplePinyin}
                         onChange={(e) => setEditExamplePinyin(e.target.value)}
-                        className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#0F5243]/20 text-xs text-[#0F382E] focus:outline-none focus:border-[#0F5243]"
+                        className="w-full px-3 py-1.5 rounded-xl bg-surface border border-primary/20 text-xs text-ink focus:outline-none focus:border-primary"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-[#0F382E] mb-1">
+                      <label className="block text-xs font-bold text-ink mb-1">
                         Nghĩa tiếng Việt câu ví dụ
                       </label>
                       <input
@@ -3599,14 +3599,14 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                         data-testid="quick-edit-example-meaning-input"
                         value={editExampleMeaning}
                         onChange={(e) => setEditExampleMeaning(e.target.value)}
-                        className="w-full px-3 py-1.5 rounded-xl bg-white border border-[#0F5243]/20 text-xs text-[#0F382E] focus:outline-none focus:border-[#0F5243]"
+                        className="w-full px-3 py-1.5 rounded-xl bg-surface border border-primary/20 text-xs text-ink focus:outline-none focus:border-primary"
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="p-3 rounded-2xl bg-white/90 border border-[#C5B358]/50 space-y-2">
-                  <label className="block text-xs font-bold text-[#0F382E]">
+                <div className="p-3 rounded-2xl bg-surface/90 border border-highlight/50 space-y-2">
+                  <label className="block text-xs font-bold text-ink">
                     🎨 Mô tả cảnh minh họa tùy chỉnh (Để trống sẽ tự động phân tích theo Câu ví dụ)
                   </label>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -3616,31 +3616,31 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       value={editCustomImagePrompt}
                       onChange={(e) => setEditCustomImagePrompt(e.target.value)}
                       placeholder="VD: sunrise over the Great Wall of China, calendar flipping..."
-                      className="flex-1 px-3 py-1.5 rounded-xl bg-[#FAF7F0] border border-[#0F5243]/20 text-xs text-[#0F382E] focus:outline-none"
+                      className="flex-1 px-3 py-1.5 rounded-xl bg-surface-2 border border-primary/20 text-xs text-ink focus:outline-none"
                     />
                     <button
                       type="button"
                       data-testid="generate-contextual-image-btn"
                       onClick={handleGenerateContextualImageForEdit}
-                      className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#B8292F] to-[#961C21] hover:from-[#C83238] hover:to-[#A82026] text-white text-xs font-bold shadow-xs cursor-pointer shrink-0"
+                      className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-xl bg-accent hover:bg-accent text-on-primary text-xs font-bold shadow-xs cursor-pointer shrink-0"
                     >
                       <span>🎨 Tạo ảnh khớp câu ví dụ</span>
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#0F5243]/15">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-primary/15">
                   <button
                     type="button"
                     onClick={() => setIsQuickEditModalOpen(false)}
-                    className="px-4 py-1.5 rounded-xl bg-white border border-[#0F5243]/20 text-xs font-semibold text-[#0F382E] cursor-pointer"
+                    className="px-4 py-1.5 rounded-xl bg-surface border border-primary/20 text-xs font-semibold text-ink cursor-pointer"
                   >
                     Đóng
                   </button>
                   <button
                     type="submit"
                     data-testid="save-quick-edit-slide-btn"
-                    className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-xs font-bold shadow-xs cursor-pointer"
+                    className="px-4 py-1.5 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-xs cursor-pointer"
                   >
                     💾 Lưu thay đổi
                   </button>
@@ -3663,28 +3663,28 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               <form
                 onSubmit={handleConfirmBatchImport}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-2xl rounded-3xl bg-[#FAF7F0] border border-[#C5B358]/70 shadow-2xl p-5 sm:p-6 space-y-4 text-[#0F382E]"
+                className="w-full max-w-2xl rounded-3xl bg-surface-2 border border-highlight/70 shadow-2xl p-5 sm:p-6 space-y-4 text-ink"
               >
-                <div className="flex items-start justify-between gap-3 pb-2.5 border-b border-[#0F5243]/15">
+                <div className="flex items-start justify-between gap-3 pb-2.5 border-b border-primary/15">
                   <div>
-                    <div className="text-xs font-bold uppercase tracking-wider text-[#9B8A3E]">
+                    <div className="text-xs font-bold text-gold">
                       BATCH VOCABULARY IMPORT · CHUẨN HÓA HSK 3.0 TỰ ĐỘNG
                     </div>
-                    <h3 className="text-base sm:text-lg font-bold text-[#0F382E] mt-0.5">
+                    <h3 className="text-base sm:text-lg font-bold text-ink mt-0.5">
                       📋 Nhập danh sách từ vựng hàng loạt (1-Click Batch Import)
                     </h3>
                   </div>
                   <button
                     type="button"
                     onClick={() => setIsBatchImportModalOpen(false)}
-                    className="w-8 h-8 rounded-full bg-white border border-[#0F5243]/15 flex items-center justify-center text-[#0F382E] hover:bg-[#F4EFE6] cursor-pointer"
+                    className="w-8 h-8 rounded-full bg-surface border border-primary/15 flex items-center justify-center text-ink hover:bg-surface-2 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#0F382E] mb-1">
+                  <label className="block text-xs font-bold text-ink mb-1">
                     Dán danh sách chữ Hán (cách nhau bởi dấu phẩy hoặc xuống dòng):
                   </label>
                   <textarea
@@ -3693,29 +3693,29 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     value={batchRawInput}
                     onChange={(e) => setBatchRawInput(e.target.value)}
                     placeholder="Ví dụ: 明天, 考试, 照顾, 旅行, 周末, 复习"
-                    className="w-full px-3 py-2 rounded-2xl bg-white border border-[#0F5243]/20 text-sm font-['Noto_Sans_SC'] font-bold text-[#0F382E] focus:outline-none focus:border-[#0F5243]"
+                    className="w-full px-3 py-2 rounded-2xl bg-surface border border-primary/20 text-sm font-['Noto_Sans_SC'] font-bold text-ink focus:outline-none focus:border-primary"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <div className="text-xs font-bold text-[#0F382E]">
+                  <div className="text-xs font-bold text-ink">
                     Xem trước {batchPreviewSlides.length} thẻ từ vựng được chuẩn hóa tự động (Không dịch ghép cơ học):
                   </div>
-                  <div className="max-h-48 overflow-y-auto rounded-2xl bg-white border border-[#0F5243]/15 divide-y divide-[#0F5243]/10">
+                  <div className="max-h-48 overflow-y-auto rounded-2xl bg-surface border border-primary/15 divide-y divide-primary/10">
                     {batchPreviewSlides.map((item, idx) => (
                       <div
                         key={`batch-prev-${item.hanzi}-${idx}`}
                         className="px-3 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="font-hanzi-calligraphy text-lg font-bold text-[#0F382E]">
+                          <span className="font-hanzi-calligraphy text-lg font-bold text-ink">
                             {item.hanzi}
                           </span>
-                          <span className="font-bold text-[#9B8A3E]">{item.pinyin}</span>
-                          <span className="text-[#3A544B] uppercase">[{item.hanViet}]</span>
-                          <span className="font-extrabold text-[#0F5243]">→ {item.meaning}</span>
+                          <span className="font-bold text-gold">{item.pinyin}</span>
+                          <span className="text-ink-muted uppercase">[{item.hanViet}]</span>
+                          <span className="font-semibold text-primary">→ {item.meaning}</span>
                         </div>
-                        <div className="text-xs text-[#3A544B] font-['Noto_Sans_SC'] truncate max-w-xs">
+                        <div className="text-xs text-ink-muted font-['Noto_Sans_SC'] truncate max-w-xs">
                           VD: {item.exampleHanzi}
                         </div>
                       </div>
@@ -3723,18 +3723,18 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#0F5243]/15">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-primary/15">
                   <button
                     type="button"
                     onClick={() => setIsBatchImportModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-white border border-[#0F5243]/20 text-xs font-semibold text-[#0F382E] cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-surface border border-primary/20 text-xs font-semibold text-ink cursor-pointer"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
                     data-testid="confirm-batch-import-btn"
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-xs font-bold shadow-xs cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-bold shadow-xs cursor-pointer"
                   >
                     ✨ Chuẩn hóa &amp; Tạo {batchPreviewSlides.length} Slide
                   </button>

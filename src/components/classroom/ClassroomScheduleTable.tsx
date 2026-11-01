@@ -66,7 +66,7 @@ export const ClassroomScheduleTable: React.FC<ClassroomScheduleTableProps> = ({
                   <button
                     type="button"
                     onClick={() => onSelectReportSession(session)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-surface hover:bg-primary/10 border border-gold/40 text-gold hover:text-ink transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-surface hover:bg-primary/10 border border-border-strong text-gold hover:text-ink transition-all cursor-pointer"
                   >
                     <Sparkles className="w-3 h-3 text-gold" />
                     {session.submissionsCount}/{session.totalStudents} bài đã chấm
@@ -85,7 +85,7 @@ export const ClassroomScheduleTable: React.FC<ClassroomScheduleTableProps> = ({
                     <button
                       type="button"
                       onClick={() => onRegradeSession(session)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all whitespace-nowrap cursor-pointer"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all whitespace-nowrap cursor-pointer"
                     >
                       <Sparkles className="w-3 h-3 text-gold" />
                       <span>Chấm lại</span>
@@ -113,7 +113,7 @@ export const ClassroomScheduleTable: React.FC<ClassroomScheduleTableProps> = ({
           <div className="p-5 sm:p-6 flex flex-col max-h-[85vh] overflow-hidden bg-canvas text-ink">
             <div className="flex items-start justify-between gap-3 pb-4 border-b border-border">
               <div>
-                <div className="flex items-center gap-2 text-xs font-bold text-gold uppercase tracking-wider">
+                <div className="flex items-center gap-2 text-xs font-bold text-gold">
                   <span>📊 Báo Cáo Chi Tiết Bài Làm</span>
                   <span>·</span>
                   <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold text-xs">
@@ -213,7 +213,7 @@ export const ClassroomScheduleTable: React.FC<ClassroomScheduleTableProps> = ({
               <button
                 type="button"
                 onClick={() => onSelectReportSession(null)}
-                className="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all cursor-pointer"
               >
                 Đóng báo cáo
               </button>

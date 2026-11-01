@@ -100,7 +100,7 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
         >
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary">
                 <FolderKanban className="w-4 h-4 text-gold" />
                 <span>1. Danh sách lớp học</span>
               </span>
@@ -137,7 +137,7 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
             <button
               type="button"
               onClick={onOpenAddStudentModal}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-colors cursor-pointer"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-colors cursor-pointer"
             >
               <Users className="w-3.5 h-3.5 text-gold" />
               <span>+ Thêm học viên</span>
@@ -152,7 +152,7 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
         >
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary">
                 <BookOpen className="w-4 h-4 text-gold" />
                 <span>2. Bài tập đã giao</span>
               </span>
@@ -213,7 +213,7 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
         >
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-accent uppercase tracking-wider">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-accent">
                 <AlertCircle className="w-4 h-4 text-accent" />
                 <span>3. Ai chưa nộp / Cần kèm</span>
               </span>
@@ -269,10 +269,10 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
       </div>
 
       {/* Quick Assignment Upload & AI Extraction Bar */}
-      <div className="rounded-2xl bg-canvas border border-gold/45 p-4 shadow-2xs space-y-3">
+      <div className="rounded-2xl bg-canvas border border-border-strong p-4 shadow-2xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-border">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary text-white flex items-center justify-center shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-primary text-on-primary flex items-center justify-center shrink-0">
               <UploadCloud className="w-4 h-4 text-gold" />
             </div>
             <h4 className="text-sm font-bold text-ink">
@@ -287,7 +287,7 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
               className="px-2.5 py-1.5 rounded-lg bg-surface border border-border hover:border-primary text-xs font-bold text-ink transition-all flex items-center gap-1 cursor-pointer"
             >
               <FileType className="w-3.5 h-3.5 text-gold" />
-              <span>⚡ Đề mẫu Buổi 14</span>
+              <span>Đề mẫu Buổi 14</span>
             </button>
             <button
               type="button"
@@ -295,19 +295,19 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
               className="px-2.5 py-1.5 rounded-lg bg-surface border border-border hover:border-primary text-xs font-bold text-ink transition-all flex items-center gap-1 cursor-pointer"
             >
               <FileCode className="w-3.5 h-3.5 text-gold" />
-              <span>⚡ Đề mẫu Buổi 15</span>
+              <span>Đề mẫu Buổi 15</span>
             </button>
             <button
               type="button"
               onClick={() => setShowPasteArea((v) => !v)}
               className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                 showPasteArea
-                  ? 'bg-primary text-white border-primary'
+                  ? 'bg-primary text-on-primary border-primary'
                   : 'bg-surface border-border text-ink-muted hover:text-ink'
               }`}
             >
               <FileText className="w-3.5 h-3.5 text-gold" />
-              <span>📝 Dán văn bản</span>
+              <span>Dán văn bản</span>
             </button>
           </div>
         </div>
@@ -354,10 +354,10 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
               onClick={() => fileInputRef.current?.click()}
               className={`w-full cursor-pointer rounded-xl border border-dashed py-2 px-3 flex items-center justify-between gap-2 transition-all text-left ${
                 isDragging
-                  ? 'border-gold bg-primary/10'
+                  ? 'border-border-strong bg-primary/10'
                   : selectedFile
                   ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-gold bg-surface'
+                  : 'border-border hover:border-border-strong bg-surface'
               }`}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -381,7 +381,7 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
               type="button"
               disabled={isExtracting}
               onClick={onAssignUploadedFile}
-              className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all shadow-2xs whitespace-nowrap disabled:opacity-75 cursor-pointer"
+              className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all shadow-2xs whitespace-nowrap disabled:opacity-75 cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-gold shrink-0" />
               <span>{isExtracting ? 'Đang phân tích đề...' : '✨ Giao bài ngay'}</span>
@@ -424,7 +424,7 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
               <button
                 type="button"
                 onClick={onSwitchToStudentView}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all shrink-0 cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all shrink-0 cursor-pointer"
               >
                 <Eye className="w-3.5 h-3.5 text-gold" />
                 <span>Xem góc nhìn Học sinh</span>

@@ -35,11 +35,11 @@ export const ArenaSentenceBuilderSection: React.FC<ArenaSentenceBuilderSectionPr
   return (
     <div
       data-testid="sentence-builder-arena"
-      className="rounded-3xl bg-surface/90 border-2 border-gold/55 p-5 sm:p-6 shadow-2xs space-y-5"
+      className="rounded-3xl bg-surface/90 border-2 border-border-strong p-5 sm:p-6 shadow-2xs space-y-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-border">
         <div>
-          <div className="text-xs font-bold uppercase tracking-wider text-primary">
+          <div className="text-xs font-bold text-primary">
             PHÒNG LUYỆN CẤU TRÚC CÂU &amp; TRẬT TỰ TỪ HSK 3.0 · <span lang="zh-CN">连词成句</span>
           </div>
           <h3 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
@@ -72,7 +72,7 @@ export const ArenaSentenceBuilderSection: React.FC<ArenaSentenceBuilderSectionPr
               onChangeSentenceBuilderEvals(nextEval);
               playGentleChime(783.99, 0.22);
             }}
-            className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-ink border border-gold/50 text-xs font-bold cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-ink border border-border-strong text-xs font-bold cursor-pointer"
           >
             ⚡ Điền mẫu nhanh 5 câu
           </button>
@@ -81,7 +81,7 @@ export const ArenaSentenceBuilderSection: React.FC<ArenaSentenceBuilderSectionPr
             type="button"
             data-testid="sentence-builder-check-btn"
             onClick={onCheckAllSentenceBuilder}
-            className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-bold cursor-pointer"
+            className="px-4 py-1.5 rounded-xl bg-primary text-on-primary text-xs font-bold cursor-pointer"
           >
             ✨ Kiểm tra &amp; Chấm cấu trúc câu
           </button>
@@ -115,7 +115,7 @@ export const ArenaSentenceBuilderSection: React.FC<ArenaSentenceBuilderSectionPr
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-2.5 py-0.5 rounded-lg bg-primary text-white text-xs font-bold">
+                  <span className="px-2.5 py-0.5 rounded-lg bg-primary text-on-primary text-xs font-bold">
                     Câu {idx + 1} · {challenge.hskLevel}
                   </span>
                   <span className="text-xs sm:text-sm font-bold text-ink">
@@ -127,7 +127,7 @@ export const ArenaSentenceBuilderSection: React.FC<ArenaSentenceBuilderSectionPr
                   <button
                     type="button"
                     onClick={() => speakChinese(challenge.targetSentence, 0.88)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface border border-gold/45 text-xs font-bold text-ink hover:bg-primary/10 cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface border border-border-strong text-xs font-bold text-ink hover:bg-primary/10 cursor-pointer"
                   >
                     <Volume2 className="w-3.5 h-3.5 text-gold" />
                     <span>Nghe câu chuẩn</span>
@@ -152,7 +152,7 @@ export const ArenaSentenceBuilderSection: React.FC<ArenaSentenceBuilderSectionPr
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-surface border border-gold/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="p-3 rounded-xl bg-surface border border-border-strong flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                 <div>
                   <span className="font-bold text-gold uppercase mr-1.5">Nghĩa tiếng Việt:</span>
                   <strong className="text-ink">&ldquo;{challenge.vietnamesePrompt}&rdquo;</strong>
@@ -184,7 +184,7 @@ export const ArenaSentenceBuilderSection: React.FC<ArenaSentenceBuilderSectionPr
                             ),
                           }));
                         }}
-                        className="px-3 py-1.5 rounded-xl bg-primary text-white text-left cursor-pointer hover:opacity-90 transition-all"
+                        className="px-3 py-1.5 rounded-xl bg-primary text-on-primary text-left cursor-pointer hover:opacity-90 transition-all"
                       >
                         <div lang="zh-CN" className="font-['Noto_Sans_SC'] text-base font-bold leading-tight">
                           {tile.hanzi}
@@ -266,7 +266,7 @@ export const ArenaSentenceBuilderSection: React.FC<ArenaSentenceBuilderSectionPr
                             evalItem.grammarDiagnostic
                           )
                         }
-                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-primary text-white text-xs font-bold cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-primary text-on-primary text-xs font-bold cursor-pointer"
                       >
                         <span>🐼 Hỏi 彬彬 câu này</span>
                       </button>

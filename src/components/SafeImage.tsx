@@ -61,7 +61,7 @@ export const SafeImage: React.FC<SafeImageProps> = ({
         role="img"
         aria-label={descriptiveAlt}
         data-testid="safe-image-oriental-fallback"
-        className="w-full h-full min-h-[160px] bg-gradient-to-br from-[#14261E] via-[#1B352A] to-[#0E1B15] flex flex-col items-center justify-center p-4 text-center relative overflow-hidden select-none"
+        className="w-full h-full min-h-[160px] from-[#14261E] via-[#1B352A] to-[#0E1B15] flex flex-col items-center justify-center p-4 text-center relative overflow-hidden select-none"
       >
         <svg
           viewBox="0 0 400 220"
@@ -93,11 +93,11 @@ export const SafeImage: React.FC<SafeImageProps> = ({
           />
         </svg>
         <div className="relative z-10 flex flex-col items-center gap-1">
-          <span className="font-hanzi-calligraphy text-4xl sm:text-5xl font-bold text-[#FAF7F0] drop-shadow">
+          <span className="font-hanzi-calligraphy text-4xl sm:text-5xl font-bold text-white drop-shadow">
             {hanzi}
           </span>
           {pinyin && (
-            <span className="text-sm font-bold text-[#C5B358] tracking-wide">{pinyin}</span>
+            <span className="text-sm font-bold text-highlight tracking-wide">{pinyin}</span>
           )}
           {meaning && (
             <span className="text-sm font-medium text-[#E5E9D7] max-w-[260px] line-clamp-2">

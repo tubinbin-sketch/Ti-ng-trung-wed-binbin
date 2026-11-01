@@ -1311,14 +1311,14 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
           />
 
           {/* Elegant Dark-to-Transparent Vignette Gradient */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/45 pointer-events-none" />
+          <div className="absolute inset-0 bg-black/85 pointer-events-none" />
 
           {/* Halora Gold Filigree Inner Frame */}
-          <div className="absolute inset-2 border border-[#DFC470]/40 rounded-xl pointer-events-none" />
+          <div className="absolute inset-2 border border-highlight/40 rounded-xl pointer-events-none" />
 
           {/* Top-Left Word & Meaning Badge */}
-          <div className="absolute top-3 left-3 bg-[#182A21]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#DFC470]/60 shadow-lg flex items-center gap-2 max-w-[60%]">
-            <span className="w-2 h-2 rounded-full bg-[#DFC470] animate-pulse shrink-0" />
+          <div className="absolute top-3 left-3 bg-[#182A21]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-highlight/60 shadow-lg flex items-center gap-2 max-w-[60%]">
+            <span className="w-2 h-2 rounded-full bg-highlight animate-pulse shrink-0" />
             <div className="flex flex-col min-w-0">
               <span className="font-['Noto_Sans_SC'] text-base font-bold text-[#F7E29C] leading-tight truncate">
                 {hanzi}
@@ -1333,7 +1333,7 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
           <div className="absolute bottom-2.5 right-3 flex items-center justify-end pointer-events-none">
             <span
               data-testid="vocab-photo-angle-badge"
-              className="px-2.5 py-0.5 rounded-md bg-[#182A21]/90 border border-[#DFC470]/50 text-sm font-bold text-[#E5E9D7] shrink-0 tabular-nums shadow"
+              className="px-2.5 py-0.5 rounded-md bg-[#182A21]/90 border border-highlight/50 text-sm font-bold text-[#E5E9D7] shrink-0 tabular-nums shadow"
             >
               Ảnh {safeAngleIdx + 1}/{availablePhotos.length}
             </span>
@@ -1350,10 +1350,10 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
           data-testid="cycle-vocab-image-btn"
           onClick={handleCyclePhotoAngle}
           title="Đổi sang góc ảnh minh họa khác của từ vựng này"
-          className="flex items-center justify-center p-1.5 rounded-xl text-[10.5px] font-bold bg-[#182A21]/85 hover:bg-[#182A21] text-[#F7E29C] border border-[#DFC470]/60 backdrop-blur-md shadow-md transition-all active:scale-95 cursor-pointer"
+          className="flex items-center justify-center p-1.5 rounded-xl text-[10.5px] font-bold bg-[#182A21]/85 hover:bg-[#182A21] text-[#F7E29C] border border-highlight/60 backdrop-blur-md shadow-md transition-all active:scale-95 cursor-pointer"
           aria-label="Đổi góc ảnh minh họa khác"
         >
-          <RefreshCw className="w-3.5 h-3.5 text-[#DFC470]" />
+          <RefreshCw className="w-3.5 h-3.5 text-highlight" />
         </button>
 
         <button
@@ -1361,10 +1361,10 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
           data-testid="open-custom-image-url-btn"
           onClick={() => setIsCustomUrlEditorOpen((v) => !v)}
           title="Dán link ảnh tùy chọn để minh họa theo ý riêng trên lớp"
-          className="flex items-center justify-center p-1.5 rounded-xl text-[10.5px] font-bold bg-[#182A21]/85 hover:bg-[#182A21] text-[#F7E29C] border border-[#DFC470]/60 backdrop-blur-md shadow-md transition-all active:scale-95 cursor-pointer"
+          className="flex items-center justify-center p-1.5 rounded-xl text-[10.5px] font-bold bg-[#182A21]/85 hover:bg-[#182A21] text-[#F7E29C] border border-highlight/60 backdrop-blur-md shadow-md transition-all active:scale-95 cursor-pointer"
           aria-label="Tự cập nhật link ảnh minh họa"
         >
-          <Link2 className="w-3.5 h-3.5 text-[#DFC470]" />
+          <Link2 className="w-3.5 h-3.5 text-highlight" />
         </button>
 
         <button
@@ -1381,13 +1381,13 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
               ? 'Chuyển sang Tranh vẽ SVG tự động theo bộ thủ & ngữ nghĩa'
               : 'Chuyển sang Ảnh thật'
           }
-          className="flex items-center justify-center p-1.5 rounded-xl text-[10.5px] font-bold bg-[#182A21]/85 hover:bg-[#182A21] text-[#F7E29C] border border-[#DFC470]/60 backdrop-blur-md shadow-md transition-all active:scale-95 cursor-pointer"
+          className="flex items-center justify-center p-1.5 rounded-xl text-[10.5px] font-bold bg-[#182A21]/85 hover:bg-[#182A21] text-[#F7E29C] border border-highlight/60 backdrop-blur-md shadow-md transition-all active:scale-95 cursor-pointer"
           aria-label={viewMode === 'photo' ? 'Chuyển sang Tranh vẽ' : 'Chuyển sang Ảnh thật'}
         >
           {viewMode === 'photo' ? (
-            <Palette className="w-3.5 h-3.5 text-[#DFC470]" />
+            <Palette className="w-3.5 h-3.5 text-highlight" />
           ) : (
-            <ImageIcon className="w-3.5 h-3.5 text-[#DFC470]" />
+            <ImageIcon className="w-3.5 h-3.5 text-highlight" />
           )}
         </button>
       </div>
@@ -1397,11 +1397,11 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
         <form
           onSubmit={handleApplyCustomUrl}
           data-testid="custom-vocab-image-form"
-          className="absolute inset-x-2.5 bottom-2.5 z-20 p-3 rounded-xl bg-[#111F18]/95 backdrop-blur-md border border-[#DFC470]/70 shadow-xl flex flex-col gap-2"
+          className="absolute inset-x-2.5 bottom-2.5 z-20 p-3 rounded-xl bg-[#111F18]/95 backdrop-blur-md border border-highlight/70 shadow-xl flex flex-col gap-2"
         >
           <div className="flex items-center justify-between gap-2 text-sm font-bold text-[#F7E29C]">
             <span className="inline-flex items-center gap-1.5">
-              <Link2 className="w-4 h-4 text-[#DFC470]" />
+              <Link2 className="w-4 h-4 text-highlight" />
               <span>Tự cập nhật ảnh minh họa cho "{hanzi}"</span>
             </span>
             <button
@@ -1420,12 +1420,12 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
               onChange={(e) => setCustomUrlInput(e.target.value)}
               placeholder="Dán link ảnh (https://...) hoặc để trống để tự động..."
               data-testid="custom-vocab-image-input"
-              className="flex-1 px-2.5 py-1.5 rounded-lg bg-white/95 text-[#1E3227] text-sm border border-[#DFC470]/50 focus:outline-none"
+              className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface/95 text-ink text-sm border border-highlight/50 focus:outline-none"
             />
             <button
               type="submit"
               data-testid="apply-custom-vocab-image-btn"
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#DFC470] hover:bg-[#e8cf7f] text-[#182A21] text-sm font-extrabold cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-highlight hover:bg-highlight text-[#182A21] text-sm font-semibold cursor-pointer shrink-0"
             >
               <Check className="w-4 h-4" />
               <span>Lưu ảnh</span>

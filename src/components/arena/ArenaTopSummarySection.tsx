@@ -116,7 +116,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
         className="px-3.5 py-2.5 rounded-2xl bg-surface/90 border border-border shadow-2xs text-ink flex flex-wrap items-center justify-between gap-2.5 transition-all"
       >
         <div className="flex flex-wrap items-center gap-2 min-w-0">
-          <span className="px-2.5 py-1 rounded-xl bg-primary text-white text-xs font-bold whitespace-nowrap shrink-0">
+          <span className="px-2.5 py-1 rounded-xl bg-primary text-on-primary text-xs font-bold whitespace-nowrap shrink-0">
             Buổi {assignmentPackage.sessionNumber} · HSK 1–3
           </span>
           <span className="font-bold text-xs text-ink break-words">
@@ -169,7 +169,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
             onClick={onToggleListeningExamMode}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
               isListeningExamMode
-                ? 'bg-accent text-white border-gold'
+                ? 'bg-accent text-on-primary border-transparent'
                 : 'bg-surface hover:bg-canvas text-ink border-border'
             }`}
           >
@@ -186,7 +186,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
               type="button"
               data-testid="quick-fill-sample-answers-btn"
               onClick={onQuickFillSampleAnswers}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary hover:bg-primary/90 text-white border border-gold/50 text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary hover:bg-primary/90 text-on-primary border border-transparent text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
             >
               <span>⚡ Demo điền mẫu</span>
             </button>
@@ -226,7 +226,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
             ))}
             <span
               data-testid="srs-mistake-count-pill"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-canvas border border-gold/40 text-xs font-bold text-ink"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-canvas border border-border-strong text-xs font-bold text-ink"
             >
               📓 Sổ từ khó: <span className="text-accent tabular-nums">{srsMistakeWords.length} từ</span>
             </span>
@@ -236,7 +236,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
             type="button"
             data-testid="toggle-hsk3-pillars-btn"
             onClick={onTogglePillarsExpanded}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-canvas hover:bg-surface border border-gold/45 text-xs font-bold text-ink transition-all cursor-pointer whitespace-nowrap"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-canvas hover:bg-surface border border-border-strong text-xs font-bold text-ink transition-all cursor-pointer whitespace-nowrap"
           >
             <span>{isPillarsExpanded ? '📊 Thu gọn 4 trụ cột ▲' : '📊 Chi tiết 4 trụ cột ▾'}</span>
           </button>
@@ -258,13 +258,13 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
                     </span>
                   </div>
                   <div className="flex items-baseline justify-between">
-                    <span className="text-base font-black text-ink tabular-nums">
+                    <span className="text-base font-bold text-ink tabular-nums">
                       {pillar.currentCount}{' '}
                       <span className="text-xs font-semibold text-ink-muted">
                         / {pillar.targetCount} {pillar.unitLabel}
                       </span>
                     </span>
-                    <span className="text-xs font-extrabold text-gold tabular-nums">
+                    <span className="text-xs font-semibold text-gold tabular-nums">
                       {pillar.percent}%
                     </span>
                   </div>
@@ -275,7 +275,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
 
             <div
               data-testid="arena-mistake-notebook-banner"
-              className="p-2.5 rounded-xl bg-canvas border border-gold/40 flex flex-wrap items-center justify-between gap-2"
+              className="p-2.5 rounded-xl bg-canvas border border-border-strong flex flex-wrap items-center justify-between gap-2"
             >
               <div className="flex items-center gap-2 text-xs text-ink">
                 <span className="font-bold">📓 Sổ tay từ hay quên (<span lang="zh-CN">错题本</span>):</span>
@@ -291,7 +291,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
                     key={item.slideId}
                     type="button"
                     onClick={() => speakChinese(item.hanzi)}
-                    className="px-2.5 py-1 rounded-xl bg-surface border border-gold/50 text-xs font-bold text-ink hover:bg-primary/10 cursor-pointer"
+                    className="px-2.5 py-1 rounded-xl bg-surface border border-border-strong text-xs font-bold text-ink hover:bg-primary/10 cursor-pointer"
                   >
                     <span lang="zh-CN" className="font-['Noto_Sans_SC'] mr-1">{item.hanzi}</span>
                     <span className="text-xs text-gold">({item.pinyin})</span>
@@ -311,7 +311,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
           onClick={() => onChangeSection('homework')}
           className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeSection === 'homework'
-              ? 'bg-primary text-white shadow-2xs'
+              ? 'bg-primary text-on-primary shadow-2xs'
               : 'text-ink-muted hover:text-ink'
           }`}
         >
@@ -331,7 +331,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
           onClick={() => onChangeSection('sentence-builder')}
           className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeSection === 'sentence-builder'
-              ? 'bg-primary text-white shadow-2xs'
+              ? 'bg-primary text-on-primary shadow-2xs'
               : 'text-ink-muted hover:text-ink'
           }`}
         >
@@ -344,7 +344,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
           onClick={() => onChangeSection('speedtest')}
           className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeSection === 'speedtest'
-              ? 'bg-accent text-white shadow-2xs'
+              ? 'bg-accent text-on-primary shadow-2xs'
               : 'text-ink-muted hover:text-accent'
           }`}
         >
@@ -357,7 +357,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
           onClick={() => onChangeSection('leaderboard')}
           className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeSection === 'leaderboard'
-              ? 'bg-primary text-white shadow-2xs'
+              ? 'bg-primary text-on-primary shadow-2xs'
               : 'text-ink-muted hover:text-ink'
           }`}
         >
@@ -374,15 +374,15 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
         <div
           ref={scorecardRef}
           data-testid="ai-grading-scorecard"
-          className="rounded-3xl bg-canvas border-2 border-gold p-6 shadow-md space-y-4 scroll-mt-6"
+          className="rounded-3xl bg-canvas border-2 border-border-strong p-6 shadow-md space-y-4 scroll-mt-6"
         >
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-border pb-4">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-ink shrink-0 border border-gold/50">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-ink shrink-0 border border-border-strong">
                 <BinBinPandaMascotSVG mood={pandaMood} size={44} />
               </div>
               <div>
-                <div className="flex items-center gap-2 text-xs font-bold text-gold uppercase tracking-wider">
+                <div className="flex items-center gap-2 text-xs font-bold text-gold">
                   <span>KẾT QUẢ CHẤM ĐIỂM HÁN NGỮ TỰ ĐỘNG</span>
                   <span>·</span>
                   <span className="text-ink">HSK 1–3 CHUẨN</span>
@@ -400,18 +400,18 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-3 bg-surface p-3.5 rounded-2xl border border-gold/40">
+            <div className="flex items-center gap-3 bg-surface p-3.5 rounded-2xl border border-border-strong">
               <div className="text-right">
                 <div className="text-xs font-semibold text-ink-muted">TỔNG ĐIỂM BÀI LÀM</div>
                 <div
                   data-testid="submitted-total-score"
-                  className="text-3xl font-black text-ink tabular-nums"
+                  className="text-3xl font-bold text-ink tabular-nums"
                 >
                   {totalScore} <span className="text-sm font-bold text-gold">/ 100</span>
                 </div>
               </div>
               <div
-                className={`px-3 py-2 rounded-xl flex items-center justify-center font-bold text-xs text-white ${
+                className={`px-3 py-2 rounded-xl flex items-center justify-center font-bold text-xs text-on-primary ${
                   totalScore >= 85 ? 'bg-primary' : totalScore >= 70 ? 'bg-gold' : 'bg-warning'
                 }`}
               >
@@ -431,7 +431,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
                   {syncedSubmissionSummary.rank && (
                     <span
                       data-testid="submitted-rank-pill"
-                      className="px-2 py-0.5 rounded-lg bg-primary text-gold font-extrabold text-xs"
+                      className="px-2 py-0.5 rounded-lg bg-primary text-gold font-semibold text-xs"
                     >
                       🏆 Xếp hạng #{syncedSubmissionSummary.rank}/{syncedSubmissionSummary.totalStudents || 12}
                     </span>
@@ -463,7 +463,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
                 type="button"
                 data-testid="scorecard-jump-leaderboard-btn"
                 onClick={() => onChangeSection('leaderboard')}
-                className="px-3 py-1.5 rounded-xl bg-primary text-white font-bold text-xs whitespace-nowrap cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-primary text-on-primary font-bold text-xs whitespace-nowrap cursor-pointer"
               >
                 🏆 Xem Bảng Xếp Hạng Lớp
               </button>
@@ -523,7 +523,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
             <button
               type="button"
               onClick={() => onChangeSection('leaderboard')}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gold/40 bg-canvas hover:bg-surface text-ink text-xs font-bold transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-border-strong bg-canvas hover:bg-surface text-ink text-xs font-bold transition-all cursor-pointer"
             >
               <Trophy className="w-3.5 h-3.5 text-gold" />
               Xem Bảng vàng thi đua
@@ -531,7 +531,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
             <button
               type="button"
               onClick={() => onSetShowBinBinFeedbackModal(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-gold" />
               Lời khuyên của Trợ Giảng 彬彬
@@ -581,7 +581,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
           <button
             type="button"
             onClick={() => onSetShowBinBinFeedbackModal(false)}
-            className="w-full py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer"
+            className="w-full py-2.5 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer"
           >
             Đã hiểu, cảm ơn 彬彬!
           </button>

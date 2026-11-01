@@ -59,7 +59,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
       <div className="rounded-2xl bg-surface/90 border border-border shadow-2xs p-5 sm:p-6 space-y-5">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-xl bg-primary text-white text-xs font-bold flex items-center justify-center">
+            <span className="w-7 h-7 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center justify-center">
               A
             </span>
             <h3 className="text-sm sm:text-base font-bold text-ink">
@@ -91,10 +91,10 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         type="button"
                         data-testid={`part-a-listen-btn-${q.id}`}
                         onClick={() => speakChinese(fullSpokenSentence)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-primary text-white text-xs font-bold cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-primary text-on-primary text-xs font-bold cursor-pointer"
                       >
                         <Volume2 className="w-3.5 h-3.5 text-gold" />
-                        <span>🔊 Nghe câu (<span lang="zh-CN">听力</span>)</span>
+                        <span>Nghe câu (<span lang="zh-CN">听力</span>)</span>
                       </button>
                     </div>
 
@@ -106,7 +106,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         <div className="text-xs font-bold text-ink flex items-center gap-2">
                           <Headphones className="w-4 h-4 text-accent shrink-0" />
                           <span>
-                            🎧 Chế độ Nghe hiểu HSK (<span lang="zh-CN">听力</span>): Đang ẩn chữ Hán gốc — Hãy bấm{' '}
+                            Chế độ Nghe hiểu HSK (<span lang="zh-CN">听力</span>): Đang ẩn chữ Hán gốc — Hãy bấm{' '}
                             <strong>&ldquo;🔊 Nghe câu&rdquo;</strong> để chọn đáp án đúng!
                           </span>
                         </div>
@@ -133,20 +133,20 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                   {q.options.map((opt) => {
                     const isChosen = userChoice === opt.key;
                     let optionStyle =
-                      'bg-surface border-border text-ink hover:border-gold';
+                      'bg-surface border-border text-ink hover:border-border-strong';
 
                     if (isSubmitted) {
                       if (opt.isCorrect) {
                         optionStyle =
-                          'bg-primary border-gold text-white font-bold tactile-pill-correct';
+                          'bg-primary border-transparent text-on-primary font-bold tactile-pill-correct';
                       } else if (isChosen && !opt.isCorrect) {
                         optionStyle =
-                          'bg-accent border-accent text-white font-bold tactile-pill-wrong';
+                          'bg-accent border-accent text-on-primary font-bold tactile-pill-wrong';
                       } else {
                         optionStyle = 'bg-surface/60 opacity-60 border-border text-ink-muted';
                       }
                     } else if (isChosen) {
-                      optionStyle = 'bg-primary border-gold text-white font-semibold';
+                      optionStyle = 'bg-primary border-transparent text-on-primary font-semibold';
                     }
 
                     return (
@@ -214,7 +214,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         onClick={() =>
                           onAskBinBinAboutQuestion(q.targetWord, q.question, q.explanation)
                         }
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary text-white text-xs font-bold border border-gold/60 cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary text-on-primary text-xs font-bold border border-transparent cursor-pointer"
                       >
                         <span>🐼 Hỏi 彬彬 câu này</span>
                       </button>
@@ -242,7 +242,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
       <div className="rounded-2xl bg-surface/90 border border-border shadow-2xs p-5 sm:p-6 space-y-5">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-xl bg-accent text-white text-xs font-bold flex items-center justify-center">
+            <span className="w-7 h-7 rounded-xl bg-accent text-on-primary text-xs font-bold flex items-center justify-center">
               B
             </span>
             <h3 className="text-sm sm:text-base font-bold text-ink">
@@ -294,7 +294,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                     <button
                       type="button"
                       onClick={() => speakChinese(q.correctTokens.join(''))}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface border border-border text-xs font-semibold text-ink hover:border-gold transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface border border-border text-xs font-semibold text-ink hover:border-border-strong transition-all cursor-pointer"
                     >
                       <Volume2 className="w-3.5 h-3.5 inline text-gold" />
                       <span>Nghe câu</span>
@@ -322,7 +322,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         type="button"
                         disabled={isSubmitted}
                         onClick={() => onReturnToken(q.id, tok, tIdx)}
-                        className="px-3.5 py-1.5 rounded-xl bg-primary text-white font-['Noto_Sans_SC'] font-bold text-sm border border-gold/50 flex items-center gap-1.5 cursor-pointer"
+                        className="px-3.5 py-1.5 rounded-xl bg-primary text-on-primary font-['Noto_Sans_SC'] font-bold text-sm border border-transparent flex items-center gap-1.5 cursor-pointer"
                       >
                         <span lang="zh-CN">{tok}</span>
                         {!isSubmitted && <span className="text-white/70 text-xs">×</span>}
@@ -333,7 +333,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
 
                 {!isSubmitted && (
                   <div>
-                    <div className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-1.5">
+                    <div className="text-xs font-semibold text-ink-muted mb-1.5">
                       Ngân hàng từ vựng (Bấm để chọn):
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -383,7 +383,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                             q.explanation
                           )
                         }
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary text-white text-xs font-bold border border-gold/60 cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary text-on-primary text-xs font-bold border border-transparent cursor-pointer"
                       >
                         <span>🐼 Hỏi 彬彬 câu này</span>
                       </button>
