@@ -367,10 +367,10 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
             type="button"
             data-testid="classroom-tools-dropdown-btn"
             onClick={() => setIsToolsDropdownOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary text-on-primary border border-highlight/60 text-sm font-bold shadow-xs transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-on-primary border border-highlight/60 text-sm font-bold shadow-xs transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap"
             title="Mở menu Công cụ đứng lớp (Gọi tên, Bấm giờ, Giao bài, Chính tả, In A4, Phím tắt)"
           >
-            <Wrench className="w-4 h-4 text-highlight shrink-0" />
+            <Wrench className="w-4 h-4 shrink-0" />
             <span>Công cụ đứng lớp</span>
             {isTimerRunning && (
               <span className="px-1.5 py-0.5 rounded bg-highlight text-on-highlight font-mono text-sm font-semibold tabular-nums">
@@ -460,7 +460,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                   setIsToolsDropdownOpen(false);
                   handleOpenMiniGame();
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-accent hover:bg-accent text-on-primary border border-highlight/40 text-sm font-bold transition-all cursor-pointer"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-accent hover:bg-accent/90 text-on-primary border border-highlight/40 text-sm font-bold transition-all cursor-pointer"
               >
                 <span className="inline-flex items-center gap-2">
                   <Gamepad2 className="w-4 h-4 text-[#FDE68A] shrink-0" />
@@ -1470,7 +1470,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
             {/* Header */}
             <div className="px-5 py-3.5 bg-primary text-on-primary flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
-                <Headphones className="w-5 h-5 text-highlight" />
+                <Headphones className="w-5 h-5" />
                 <div>
                   <div className="text-xs font-bold text-highlight">
                     🎧 PHÒNG ĐỌC CHÍNH TẢ TRÊN LỚP · 课堂听写 (TĪNGXIĚ)
@@ -1681,7 +1681,7 @@ export const LiveTeachingToolkit: React.FC<LiveTeachingToolkitProps> = ({
                       }}
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-xs font-bold cursor-pointer"
                     >
-                      <Star className="w-3.5 h-3.5 text-highlight fill-highlight" />
+                      <Star className="w-3.5 h-3.5 fill-highlight" />
                       <span>+1 ⭐ Điểm thuộc bài</span>
                     </button>
                   </div>

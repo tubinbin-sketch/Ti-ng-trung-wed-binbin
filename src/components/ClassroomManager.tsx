@@ -469,7 +469,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               data-testid="batch-autograde-btn"
               className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all cursor-pointer"
             >
-              <Sparkles className="w-4 h-4 text-gold" />
+              <Sparkles className="w-4 h-4" />
               <span>Giao &amp; Tự chấm toàn khóa</span>
             </button>
           </div>
@@ -598,7 +598,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
                 onClick={() => setIsAddStudentModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5 text-gold" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>+ Thêm học viên mới</span>
               </button>
               <button

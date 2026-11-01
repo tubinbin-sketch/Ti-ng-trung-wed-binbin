@@ -170,7 +170,7 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
                     onClick={() => speakChinese(q.targetWord)}
                     className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-primary text-on-primary border border-transparent text-xs font-bold cursor-pointer"
                   >
-                    <Volume2 className="w-3 h-3 text-gold" />
+                    <Volume2 className="w-3 h-3" />
                     <span lang="zh-CN" className="font-['Noto_Sans_SC']">
                       {isListeningExamMode && !isSpeedTestSubmitted
                         ? `🔊 Nghe câu #${qIdx + 1}`
@@ -275,7 +275,7 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
             onClick={onSubmitSpeedTest}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-on-primary text-xs sm:text-sm font-bold shadow-md cursor-pointer"
           >
-            <Send className="w-4 h-4 text-gold" />
+            <Send className="w-4 h-4" />
             <span>Nộp Đề 10 Câu &amp; Nhận Chứng Nhận HSK 3.0</span>
           </button>
         </div>

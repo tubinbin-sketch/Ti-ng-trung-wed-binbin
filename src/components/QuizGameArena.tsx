@@ -345,7 +345,7 @@ export const QuizGameArena: React.FC<QuizGameArenaProps> = ({
                 <button
                   type="button"
                   onClick={handleSubmitSentence}
-                  className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-accent hover:bg-accent text-on-primary transition-colors whitespace-nowrap"
+                  className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-accent hover:bg-accent/90 text-on-primary transition-colors whitespace-nowrap"
                 >
                   Trả lời
                 </button>

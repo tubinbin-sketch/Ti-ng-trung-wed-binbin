@@ -93,7 +93,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         onClick={() => speakChinese(fullSpokenSentence)}
                         className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-primary text-on-primary text-xs font-bold cursor-pointer"
                       >
-                        <Volume2 className="w-3.5 h-3.5 text-gold" />
+                        <Volume2 className="w-3.5 h-3.5" />
                         <span>Nghe câu (<span lang="zh-CN">听力</span>)</span>
                       </button>
                     </div>

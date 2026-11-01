@@ -34,7 +34,7 @@ export const ClassroomAnalyticsPanel: React.FC<ClassroomAnalyticsPanelProps> = (
             onClick={onOpenWorksheetModal}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer"
           >
-            <Printer className="w-3.5 h-3.5 text-gold" />
+            <Printer className="w-3.5 h-3.5" />
             <span>In Phiếu Luyện Viết A4 (PDF)</span>
           </button>
         </div>

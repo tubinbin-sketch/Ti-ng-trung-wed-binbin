@@ -87,7 +87,7 @@ export const ClassroomScheduleTable: React.FC<ClassroomScheduleTableProps> = ({
                       onClick={() => onRegradeSession(session)}
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all whitespace-nowrap cursor-pointer"
                     >
-                      <Sparkles className="w-3 h-3 text-gold" />
+                      <Sparkles className="w-3 h-3" />
                       <span>Chấm lại</span>
                     </button>
                   </div>

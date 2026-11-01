@@ -70,16 +70,16 @@ export const FilterDisplayPopover: React.FC<FilterDisplayPopoverProps> = ({
         type="button"
         data-testid="filter-display-popover-btn"
         onClick={() => setIsOpen((v) => !v)}
-        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap border ${
+        className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-medium transition-colors cursor-pointer whitespace-nowrap border ${
           isOpen || hsk3LevelFilter !== 'all' || hsk3StageFilter !== 'all' || isDueTodayFilterActive
-            ? 'bg-primary text-on-primary border-highlight/60 shadow-xs'
-            : 'bg-surface/90 hover:bg-surface text-ink border-primary/20'
+            ? 'bg-primary-soft text-primary border-primary/30'
+            : 'bg-surface hover:bg-surface-2 text-ink border-border'
         }`}
         title="Bộ lọc cấp độ HSK 3.0 & Tùy chọn hiển thị Pinyin, Nghĩa tiếng Việt, Tốc độ"
       >
-        <SlidersHorizontal className="w-3.5 h-3.5 text-highlight shrink-0" />
-        <span>Bộ lọc &amp; Hiển thị</span>
-        <span className="px-1.5 py-0.5 rounded-md bg-black/15 text-xs font-semibold">
+        <SlidersHorizontal className="w-4 h-4 shrink-0" />
+        <span>Bộ lọc</span>
+        <span className="px-1.5 py-0.5 rounded-md bg-surface-2 text-ink-muted text-xs font-medium">
           {activeFilterSummary}
         </span>
         <ChevronDown className="w-3.5 h-3.5 opacity-80 shrink-0" />
@@ -88,7 +88,7 @@ export const FilterDisplayPopover: React.FC<FilterDisplayPopoverProps> = ({
       {isOpen && (
         <div
           data-testid="filter-display-popover-content"
-          className="absolute left-0 xl:left-auto xl:right-0 mt-2 w-[min(350px,calc(100vw-2rem))] sm:w-[370px] z-40 rounded-2xl backdrop-blur-xl bg-surface-2/98 border border-highlight/60 shadow-2xl p-4 space-y-3.5 text-sm text-ink"
+          className="absolute left-0 xl:left-auto xl:right-0 mt-2 w-[min(350px,calc(100vw-2rem))] sm:w-[370px] z-40 rounded-2xl bg-surface border border-border shadow-xl p-4 space-y-3.5 text-sm text-ink"
         >
           {/* 1. HSK 3.0 Level Selector */}
           <div className="space-y-1.5">

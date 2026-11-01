@@ -228,6 +228,10 @@ h1, h2, h3, h4 {
   scrollbar-color: var(--token-border-strong) transparent;
 }
 
+/* Horizontal strips that scroll without a visible bar */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* Hanzi display face for Mi Zi Ge and featured characters */
 .font-hanzi-calligraphy {
   font-family: 'KaiTi', 'STKaiti', 'Kaiti SC', var(--font-hanzi);

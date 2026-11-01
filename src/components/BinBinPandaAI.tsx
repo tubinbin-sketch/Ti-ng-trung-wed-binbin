@@ -675,7 +675,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
             type="button"
             data-testid="binbin-inline-open-btn"
             onClick={() => setIsOpen(true)}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary text-on-primary text-xs font-bold border border-highlight/60 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-xs font-bold border border-highlight/60 shadow-sm transition-all duration-200 active:scale-95 cursor-pointer"
           >
             <span className="text-sm">🐼</span>
             <span>Trợ Giảng Gấu Trúc · 彬彬</span>
@@ -699,7 +699,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
           title="Hỏi Trợ Giảng Gấu Trúc · 彬彬"
           aria-label="Mở Trợ Giảng Gấu Trúc · 彬彬"
           data-testid="binbin-floating-toggle"
-          className="group relative w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-primary text-on-primary border-2 border-highlight shadow-[0_4px_14px_rgba(15,82,67,0.3)] hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer"
+          className="group relative w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-primary text-on-primary border-2 border-highlight hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer"
         >
           <span className="text-base sm:text-lg leading-none select-none">🐼</span>
           <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#10B981] border border-primary animate-pulse" />
@@ -1115,7 +1115,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       isSlideApplied
                         ? 'bg-success text-on-primary'
-                        : 'bg-primary hover:bg-primary text-on-primary shadow-2xs'
+                        : 'bg-primary hover:bg-primary-hover text-on-primary shadow-2xs'
                     }`}
                   >
                     {isSlideApplied ? (
@@ -1386,7 +1386,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
             type="submit"
             data-testid="binbin-send-btn"
             disabled={isLoading || !userInput.trim()}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary disabled:opacity-50 text-on-primary text-xs font-bold transition-all shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary-hover disabled:opacity-50 text-on-primary text-xs font-bold transition-all shrink-0 cursor-pointer"
           >
             <Send className="w-3.5 h-3.5 text-[#FDE68A]" />
             <span>{activeInteractivePanel === 'sentence-builder' ? 'Chấm câu' : 'Gửi'}</span>

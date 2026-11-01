@@ -62,7 +62,7 @@ export class LazyErrorBoundary extends Component<
             data-testid="lazy-error-retry-btn"
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-xs sm:text-sm font-bold cursor-pointer transition-all"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-highlight" />
+            <RefreshCw className="w-3.5 h-3.5" />
             <span>Thử tải lại</span>
           </button>
         </div>

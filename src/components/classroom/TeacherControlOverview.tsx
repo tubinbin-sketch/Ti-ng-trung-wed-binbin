@@ -139,7 +139,7 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
               onClick={onOpenAddStudentModal}
               className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-colors cursor-pointer"
             >
-              <Users className="w-3.5 h-3.5 text-gold" />
+              <Users className="w-3.5 h-3.5" />
               <span>+ Thêm học viên</span>
             </button>
           </div>
@@ -273,7 +273,7 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-border">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-primary text-on-primary flex items-center justify-center shrink-0">
-              <UploadCloud className="w-4 h-4 text-gold" />
+              <UploadCloud className="w-4 h-4" />
             </div>
             <h4 className="text-sm font-bold text-ink">
               📤 Giao Bài Tập Nhanh (Tự Động Bóc Đề)
@@ -383,7 +383,7 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
               onClick={onAssignUploadedFile}
               className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3.5 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all shadow-2xs whitespace-nowrap disabled:opacity-75 cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 text-gold shrink-0" />
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
               <span>{isExtracting ? 'Đang phân tích đề...' : '✨ Giao bài ngay'}</span>
             </button>
           </div>
@@ -426,7 +426,7 @@ export const TeacherControlOverview: React.FC<TeacherControlOverviewProps> = ({
                 onClick={onSwitchToStudentView}
                 className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all shrink-0 cursor-pointer"
               >
-                <Eye className="w-3.5 h-3.5 text-gold" />
+                <Eye className="w-3.5 h-3.5" />
                 <span>Xem góc nhìn Học sinh</span>
                 <ArrowRight className="w-3 h-3 text-white/70" />
               </button>

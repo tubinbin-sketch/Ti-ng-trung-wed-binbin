@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, Clock, Flame, Headphones, RotateCcw, Sparkles, Trophy } from 'lucide-react';
+import { BookOpen, Clock, Flame, Headphones, Puzzle, RotateCcw, Sparkles, Timer, Trophy } from 'lucide-react';
 import { type UploadedAssignmentPackage } from '../../utils/assignmentParser';
 import { type Hsk3PillarMetric } from '../../utils/hsk3Engine';
 import { type SrsWordRecord } from '../../utils/hskStudyHelpers';
@@ -176,8 +176,8 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
             <Headphones className="w-3.5 h-3.5" />
             <span>
               {isListeningExamMode
-                ? '🎧 Nghe hiểu HSK (听力): BẬT'
-                : '🎧 Chế độ Nghe hiểu (听力)'}
+                ? 'Đang luyện nghe'
+                : 'Luyện nghe (听力)'}
             </span>
           </button>
 
@@ -188,7 +188,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
               onClick={onQuickFillSampleAnswers}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary hover:bg-primary/90 text-on-primary border border-transparent text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
             >
-              <span>⚡ Demo điền mẫu</span>
+              <span>Điền đáp án mẫu</span>
             </button>
           )}
         </div>
@@ -197,12 +197,12 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
       {/* Collapsible HSK 3.0 4-Pillar Summary Bar */}
       <div
         data-testid="hsk3-student-roadmap"
-        className="px-3.5 py-2.5 rounded-2xl bg-surface/90 border border-border shadow-2xs transition-all"
+        className="px-4 py-3 rounded-2xl bg-surface border border-border"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="font-bold text-ink whitespace-nowrap">
-              🧭 Lộ trình HSK 3.0 (<span lang="zh-CN">四维基准</span>):
+              Lộ trình HSK 3.0
             </span>
             {hsk3Pillars.map((pillar) => (
               <div
@@ -228,7 +228,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
               data-testid="srs-mistake-count-pill"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-canvas border border-border-strong text-xs font-bold text-ink"
             >
-              📓 Sổ từ khó: <span className="text-accent tabular-nums">{srsMistakeWords.length} từ</span>
+              Từ khó: <span className="text-accent tabular-nums">{srsMistakeWords.length} từ</span>
             </span>
           </div>
 
@@ -238,7 +238,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
             onClick={onTogglePillarsExpanded}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-canvas hover:bg-surface border border-border-strong text-xs font-bold text-ink transition-all cursor-pointer whitespace-nowrap"
           >
-            <span>{isPillarsExpanded ? '📊 Thu gọn 4 trụ cột ▲' : '📊 Chi tiết 4 trụ cột ▾'}</span>
+            <span>{isPillarsExpanded ? 'Thu gọn' : 'Xem chi tiết'}</span>
           </button>
         </div>
 
@@ -303,70 +303,49 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
         )}
       </div>
 
-      {/* Sub-tab Switcher */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 p-1.5 rounded-2xl bg-canvas border border-border">
-        <button
-          type="button"
-          data-testid="arena-subtab-homework"
-          onClick={() => onChangeSection('homework')}
-          className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-            activeSection === 'homework'
-              ? 'bg-primary text-on-primary shadow-2xs'
-              : 'text-ink-muted hover:text-ink'
-          }`}
-        >
-          <BookOpen className="w-4 h-4 shrink-0" />
-          <span className="truncate">
-            Phiếu Bài Tập (
-            {assignmentPackage.multipleChoiceList.length +
-              assignmentPackage.sentenceOrderingList.length +
-              assignmentPackage.essayList.length}{' '}
-            câu)
-          </span>
-        </button>
-
-        <button
-          type="button"
-          data-testid="arena-subtab-sentence-builder"
-          onClick={() => onChangeSection('sentence-builder')}
-          className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-            activeSection === 'sentence-builder'
-              ? 'bg-primary text-on-primary shadow-2xs'
-              : 'text-ink-muted hover:text-ink'
-          }`}
-        >
-          <span className="truncate">🧩 Ghép câu HSK 3.0 (<span lang="zh-CN">连词成句</span>)</span>
-        </button>
-
-        <button
-          type="button"
-          data-testid="arena-subtab-speedtest"
-          onClick={() => onChangeSection('speedtest')}
-          className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-            activeSection === 'speedtest'
-              ? 'bg-accent text-on-primary shadow-2xs'
-              : 'text-ink-muted hover:text-accent'
-          }`}
-        >
-          <span className="truncate">🏆 Kiểm tra 10 câu (15p)</span>
-        </button>
-
-        <button
-          type="button"
-          data-testid="arena-subtab-leaderboard"
-          onClick={() => onChangeSection('leaderboard')}
-          className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-            activeSection === 'leaderboard'
-              ? 'bg-primary text-on-primary shadow-2xs'
-              : 'text-ink-muted hover:text-ink'
-          }`}
-        >
-          <Trophy className="w-4 h-4 text-gold shrink-0" />
-          <span className="truncate">Bảng Xếp Hạng Lớp</span>
-          {(isSubmitted || isSpeedTestSubmitted) && (
-            <span className="w-2 h-2 rounded-full bg-gold animate-pulse shrink-0" />
-          )}
-        </button>
+      {/* Sub-tabs */}
+      <div
+        role="tablist"
+        aria-label="Các phần bài tập"
+        className="flex items-end gap-1 border-b border-border overflow-x-auto no-scrollbar"
+      >
+        {(
+          [
+            { id: 'homework', testId: 'arena-subtab-homework', icon: BookOpen, label: 'Phiếu bài tập', count: assignmentPackage.multipleChoiceList.length + assignmentPackage.sentenceOrderingList.length + assignmentPackage.essayList.length },
+            { id: 'sentence-builder', testId: 'arena-subtab-sentence-builder', icon: Puzzle, label: 'Ghép câu', count: null },
+            { id: 'speedtest', testId: 'arena-subtab-speedtest', icon: Timer, label: 'Kiểm tra 15 phút', count: null },
+            { id: 'leaderboard', testId: 'arena-subtab-leaderboard', icon: Trophy, label: 'Xếp hạng lớp', count: null },
+          ] as const
+        ).map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeSection === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              data-testid={tab.testId}
+              onClick={() => onChangeSection(tab.id)}
+              className={`relative inline-flex items-center gap-2 h-11 px-3 sm:px-4 -mb-px border-b-2 text-sm whitespace-nowrap transition-colors cursor-pointer ${
+                isActive
+                  ? 'border-primary text-primary font-semibold'
+                  : 'border-transparent text-ink-muted hover:text-ink font-medium'
+              }`}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              <span>{tab.label}</span>
+              {tab.count !== null && (
+                <span className="px-1.5 py-0.5 rounded-md bg-surface-2 text-ink-muted text-xs tabular-nums">
+                  {tab.count}
+                </span>
+              )}
+              {tab.id === 'leaderboard' && (isSubmitted || isSpeedTestSubmitted) && (
+                <span className="w-2 h-2 rounded-full bg-highlight shrink-0" aria-label="Có cập nhật" />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* AI Grading Overview Scorecard */}
@@ -533,7 +512,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
               onClick={() => onSetShowBinBinFeedbackModal(true)}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 text-gold" />
+              <Sparkles className="w-3.5 h-3.5" />
               Lời khuyên của Trợ Giảng 彬彬
             </button>
           </div>

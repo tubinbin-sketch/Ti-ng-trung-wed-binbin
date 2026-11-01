@@ -187,7 +187,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
                         }}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 cursor-pointer"
                       >
-                        <Mic className="w-3 h-3 text-gold" />
+                        <Mic className="w-3 h-3" />
                         <span>Luyện nói chấm phát âm</span>
                       </button>
 
@@ -299,7 +299,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
                     onClick={() => speakChinese(lc.audioText)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-on-primary text-xs font-bold cursor-pointer"
                   >
-                    <Headphones className="w-3.5 h-3.5 text-gold" />
+                    <Headphones className="w-3.5 h-3.5" />
                     <span>Nghe phát âm câu #{idx + 1}</span>
                   </button>
                 </div>
