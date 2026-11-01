@@ -45,6 +45,14 @@ interface ArchetypeDefinition {
   photoUrls: string[];
 }
 
+function getLocalArchetypeUrls(archetype: SemanticVisualArchetype): string[] {
+  return [
+    `/illustrations/${archetype}.svg`,
+    `/illustrations/${archetype}_2.svg`,
+    `/illustrations/${archetype}_3.svg`,
+  ];
+}
+
 export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDefinition> = {
   family_home: {
     archetype: 'family_home',
@@ -52,11 +60,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'happy asian family home',
     wikiQueryEn: 'Family',
     defaultCaptionVi: 'Gia đình sum vầy bên mái ấm sáng đèn',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1542037104857-ffbb0b9155fb?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1475503572774-15a45e5d60b9?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('family_home'),
   },
   friends_community: {
     archetype: 'friends_community',
@@ -64,11 +68,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'friends talking together',
     wikiQueryEn: 'Friendship',
     defaultCaptionVi: 'Bạn bè & tập thể gắn kết, sẻ chia',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('friends_community'),
   },
   appliance_ac: {
     archetype: 'appliance_ac',
@@ -76,11 +76,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'air conditioner home cooling',
     wikiQueryEn: 'Air_conditioning',
     defaultCaptionVi: 'Máy điều hòa không khí mát lành 24°C',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1585338107529-13afc5f02586?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1615873968403-89e068629265?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('appliance_ac'),
   },
   appliance_washer: {
     archetype: 'appliance_washer',
@@ -88,11 +84,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'washing machine laundry',
     wikiQueryEn: 'Washing_machine',
     defaultCaptionVi: 'Máy giặt lồng ngang hiện đại & quần áo sạch thơm',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1582735689369-4fe89db7114c?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1517677208171-0bc6725a3e60?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('appliance_washer'),
   },
   appliance_fridge: {
     archetype: 'appliance_fridge',
@@ -100,11 +92,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'refrigerator kitchen food',
     wikiQueryEn: 'Refrigerator',
     defaultCaptionVi: 'Tủ lạnh bảo quản thực phẩm & trái cây tươi mát',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1584992236310-6edddc08acff?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('appliance_fridge'),
   },
   appliance_lamp_bath: {
     archetype: 'appliance_lamp_bath',
@@ -112,11 +100,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'warm interior lamp room',
     wikiQueryEn: 'Light_fixture',
     defaultCaptionVi: 'Không gian nội thất tiện nghi & ánh đèn ấm áp',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('appliance_lamp_bath'),
   },
   tech_device: {
     archetype: 'tech_device',
@@ -124,11 +108,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'laptop computer smartphone',
     wikiQueryEn: 'Personal_computer',
     defaultCaptionVi: 'Máy tính & điện thoại thông minh kết nối số',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('tech_device'),
   },
   food_coffee_tea: {
     archetype: 'food_coffee_tea',
@@ -136,11 +116,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'hot coffee cup tea',
     wikiQueryEn: 'Coffee',
     defaultCaptionVi: 'Tách cà phê & ấm trà nóng bốc khói thơm lừng',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('food_coffee_tea'),
   },
   food_cuisine_fruit: {
     archetype: 'food_cuisine_fruit',
@@ -148,11 +124,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'fresh red apple fruit asian food',
     wikiQueryEn: 'Apple',
     defaultCaptionVi: 'Trái cây tươi ngon & bàn ăn ẩm thực hấp dẫn',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('food_cuisine_fruit'),
   },
   transport_city: {
     archetype: 'transport_city',
@@ -160,11 +132,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'modern city train metro traffic',
     wikiQueryEn: 'Transport',
     defaultCaptionVi: 'Giao thông đô thị hiện đại, tàu điện & đại lộ thông suốt',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('transport_city'),
   },
   medical_hospital: {
     archetype: 'medical_hospital',
@@ -172,11 +140,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'modern hospital medical doctor',
     wikiQueryEn: 'Hospital',
     defaultCaptionVi: 'Bệnh viện hiện đại & chăm sóc y tế tận tâm',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('medical_hospital'),
   },
   animal_dog_cat: {
     archetype: 'animal_dog_cat',
@@ -184,11 +148,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'cute golden retriever puppy dog',
     wikiQueryEn: 'Dog',
     defaultCaptionVi: 'Thú cưng đáng yêu vui đùa trên thảm cỏ xanh',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('animal_dog_cat'),
   },
   animal_panda_bamboo: {
     archetype: 'animal_panda_bamboo',
@@ -196,11 +156,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'giant panda bamboo forest',
     wikiQueryEn: 'Giant_panda',
     defaultCaptionVi: 'Gấu trúc Quốc bảo bên rừng trúc xanh mướt',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1564349683136-77e08dba1ef7?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1527118732049-c88155f2107c?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1534567153574-2b12153a87f0?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('animal_panda_bamboo'),
   },
   mythic_dragon: {
     archetype: 'mythic_dragon',
@@ -208,11 +164,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'chinese dragon festival lantern',
     wikiQueryEn: 'Chinese_dragon',
     defaultCaptionVi: 'Thần Long Trung Hoa & biểu tượng văn hóa cát tường',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1516245834210-c4c142787335?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('mythic_dragon'),
   },
   nature_garden: {
     archetype: 'nature_garden',
@@ -220,11 +172,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'blooming flower garden spring',
     wikiQueryEn: 'Garden',
     defaultCaptionVi: 'Khu vườn hoa xuân nở rộ & thiên nhiên trong lành',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('nature_garden'),
   },
   school_study: {
     archetype: 'school_study',
@@ -232,11 +180,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'classroom students studying books',
     wikiQueryEn: 'School',
     defaultCaptionVi: 'Lớp học Hán ngữ, sách vở & tri thức',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('school_study'),
   },
   work_effort: {
     archetype: 'work_effort',
@@ -244,11 +188,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'studying hard goal achievement',
     wikiQueryEn: 'Study_skills',
     defaultCaptionVi: 'Nỗ lực rèn luyện, kiên trì vươn tới thành công',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('work_effort'),
   },
   state_warm_sun: {
     archetype: 'state_warm_sun',
@@ -256,11 +196,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'warm morning sunlight cozy tea',
     wikiQueryEn: 'Sunlight',
     defaultCaptionVi: 'Ánh nắng ban mai ấm áp & không gian an yên',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('state_warm_sun'),
   },
   action_exchange: {
     archetype: 'action_exchange',
@@ -268,11 +204,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'currency exchange hands trading',
     wikiQueryEn: 'Currency',
     defaultCaptionVi: 'Đôi bàn tay trao đổi tiền tệ & quà tặng',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1580519542036-c47de6196ba5?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('action_exchange'),
   },
   time_quarter_clock: {
     archetype: 'time_quarter_clock',
@@ -280,11 +212,7 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'classic watch clock quarter hour',
     wikiQueryEn: 'Clock',
     defaultCaptionVi: 'Đồng hồ chỉ 15 phút (Một khắc) · Quý trọng thời gian',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1508057198894-247b23fe5ade?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1495364141860-b0d03eccd065?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1509048191080-d2984bad6ae5?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('time_quarter_clock'),
   },
   state_willing_heart: {
     archetype: 'state_willing_heart',
@@ -292,17 +220,13 @@ export const ARCHETYPE_DEFINITIONS: Record<SemanticVisualArchetype, ArchetypeDef
     englishKeyword: 'helping hands volunteer kindness',
     wikiQueryEn: 'Kindness',
     defaultCaptionVi: 'Bàn tay sẻ chia, sẵn lòng giúp đỡ & đồng thuận',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('state_willing_heart'),
   },
 };
 
 /**
  * Exact per-word overrides so specific words like 茶, 苹果, 猫, 手机, 卫生间, 礼物, 火车, 飞机, 饭, 菜
- * get tailored multi-angle photos and Wikipedia queries.
+ * get tailored multi-angle local illustrations.
  */
 const WORD_SPECIFIC_VISUAL_OVERRIDES: Record<
   string,
@@ -313,11 +237,7 @@ const WORD_SPECIFIC_VISUAL_OVERRIDES: Record<
     englishKeyword: 'warm happy family home',
     wikiQueryEn: 'Family',
     sceneCaptionVi: 'Gia đình đầm ấm quây quần bên ngôi nhà sáng đèn',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1542037104857-ffbb0b9155fb?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1475503572774-15a45e5d60b9?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('family_home'),
   },
   家: {
     archetype: 'family_home',
@@ -378,11 +298,7 @@ const WORD_SPECIFIC_VISUAL_OVERRIDES: Record<
     englishKeyword: 'clean modern bathroom interior',
     wikiQueryEn: 'Bathroom',
     sceneCaptionVi: 'Phòng tắm & nhà vệ sinh hiện đại, sáng sạch',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('appliance_lamp_bath'),
   },
   灯: {
     archetype: 'appliance_lamp_bath',
@@ -401,11 +317,7 @@ const WORD_SPECIFIC_VISUAL_OVERRIDES: Record<
     englishKeyword: 'smartphone mobile phone screen',
     wikiQueryEn: 'Smartphone',
     sceneCaptionVi: 'Điện thoại thông minh kết nối liên lạc tức thì',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1523206489230-c012c64b2b48?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('tech_device'),
   },
   咖啡: {
     archetype: 'food_coffee_tea',
@@ -418,22 +330,14 @@ const WORD_SPECIFIC_VISUAL_OVERRIDES: Record<
     englishKeyword: 'chinese green tea teapot cup',
     wikiQueryEn: 'Tea',
     sceneCaptionVi: 'Ấm trà đạo truyền thống & chén trà xanh thanh khiết',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('food_coffee_tea'),
   },
   苹果: {
     archetype: 'food_cuisine_fruit',
     englishKeyword: 'fresh red apple fruit',
     wikiQueryEn: 'Apple',
     sceneCaptionVi: 'Quả táo đỏ tươi mọng nước trên bàn gỗ',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1570913149827-d2ac84ab3f9a?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('food_cuisine_fruit'),
   },
   水果: {
     archetype: 'food_cuisine_fruit',
@@ -446,11 +350,7 @@ const WORD_SPECIFIC_VISUAL_OVERRIDES: Record<
     englishKeyword: 'chinese cuisine dumplings dishes',
     wikiQueryEn: 'Chinese_cuisine',
     sceneCaptionVi: 'Bàn tiệc ẩm thực truyền thống hấp dẫn',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('food_cuisine_fruit'),
   },
   菜: {
     archetype: 'food_cuisine_fruit',
@@ -469,11 +369,7 @@ const WORD_SPECIFIC_VISUAL_OVERRIDES: Record<
     englishKeyword: 'high speed train city traffic',
     wikiQueryEn: 'Transport',
     sceneCaptionVi: 'Giao thông đô thị hiện đại với tàu điện & đại lộ',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('transport_city'),
   },
   地铁: {
     archetype: 'transport_city',
@@ -492,11 +388,7 @@ const WORD_SPECIFIC_VISUAL_OVERRIDES: Record<
     englishKeyword: 'modern hospital building doctor',
     wikiQueryEn: 'Hospital',
     sceneCaptionVi: 'Bệnh viện y tế hiện đại & đội ngũ bác sĩ chăm sóc sức khỏe',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('medical_hospital'),
   },
   狗: {
     archetype: 'animal_dog_cat',
@@ -509,11 +401,7 @@ const WORD_SPECIFIC_VISUAL_OVERRIDES: Record<
     englishKeyword: 'cute kitten cat',
     wikiQueryEn: 'Cat',
     sceneCaptionVi: 'Chú mèo nhỏ đáng yêu & lanh lợi',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1495360010541-f48722b34f7d?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('animal_dog_cat'),
   },
   熊猫: {
     archetype: 'animal_panda_bamboo',
@@ -568,11 +456,7 @@ const WORD_SPECIFIC_VISUAL_OVERRIDES: Record<
     englishKeyword: 'mountain climber perseverance peak',
     wikiQueryEn: 'Perseverance',
     sceneCaptionVi: 'Kiên trì bền bỉ chinh phục mục tiêu cao nhất',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('work_effort'),
   },
   温暖: {
     archetype: 'state_warm_sun',
@@ -603,44 +487,28 @@ const WORD_SPECIFIC_VISUAL_OVERRIDES: Record<
     englishKeyword: 'sunrise calendar tomorrow great wall of china Beijing travel',
     wikiQueryEn: 'Great_Wall_of_China',
     sceneCaptionVi: 'Lịch bàn lật sang trang “明天” bên ánh bình minh & chuyến đi Vạn Lý Trường Thành',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('time_quarter_clock'),
   },
   照顾: {
     archetype: 'family_home',
     englishKeyword: 'mother caring for child family warm cup of water home love',
     wikiQueryEn: 'Caregiving',
     sceneCaptionVi: 'Mẹ ân cần bưng cốc nước ấm chăm sóc con cái trong gia đình',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1542037104857-ffbb0b9155fb?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1475503572774-15a45e5d60b9?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('family_home'),
   },
   考试: {
     archetype: 'school_study',
     englishKeyword: 'student taking exam writing test paper classroom desk',
     wikiQueryEn: 'Exam',
     sceneCaptionVi: 'Học sinh tập trung làm bài thi tiếng Trung đạt điểm 100分 xuất sắc',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('school_study'),
   },
   旅行: {
     archetype: 'transport_city',
     englishKeyword: 'traveler suitcase journey china landmarks adventure',
     wikiQueryEn: 'Travel',
     sceneCaptionVi: 'Chuyến du lịch khám phá danh lam thắng cảnh Trung Quốc kỳ nghỉ hè',
-    photoUrls: [
-      'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=900&q=80',
-      'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=900&q=80',
-    ],
+    photoUrls: getLocalArchetypeUrls('transport_city'),
   },
 };
 
@@ -951,20 +819,8 @@ export function saveCustomVocabImage(hanzi: string, url: string | null): void {
   }
 }
 
-function isUsableWikiPhoto(url: string | undefined): url is string {
-  if (!url) return false;
-  const lower = url.toLowerCase();
-  if (lower.endsWith('.svg') || lower.includes('.svg/')) return false;
-  if (lower.includes('commons-logo') || lower.includes('question_book') || lower.includes('disambig')) {
-    return false;
-  }
-  return lower.startsWith('https://');
-}
-
 /**
- * Real-time Wikipedia / Wikimedia Commons REST API image resolver.
- * Queries zh.wikipedia.org and en.wikipedia.org page summary endpoints to retrieve authentic
- * encyclopedic photos for any searched or newly added vocabulary word.
+ * Local-first illustration resolver (replaces external Wikipedia HTTP calls with local /illustrations/*.svg).
  */
 export async function fetchWikipediaImageForVocab(
   hanzi: string,
@@ -978,36 +834,9 @@ export async function fetchWikipediaImageForVocab(
     return WIKI_IMAGE_CACHE.get(cacheKey)!;
   }
 
-  const endpoints: string[] = [
-    `https://zh.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanHanzi)}`,
-  ];
-  if (wikiQueryEn) {
-    endpoints.push(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiQueryEn)}`
-    );
-  }
-
-  for (const endpoint of endpoints) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2800);
-      const res = await fetch(endpoint, {
-        headers: { Accept: 'application/json' },
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (!res.ok) continue;
-      const data = await res.json();
-      const candidate: string | undefined =
-        data?.thumbnail?.source || data?.originalimage?.source;
-      if (isUsableWikiPhoto(candidate)) {
-        WIKI_IMAGE_CACHE.set(cacheKey, candidate);
-        return candidate;
-      }
-    } catch {
-      // Ignore network/CORS errors and continue to next endpoint or curated pool
-    }
-  }
-
-  return null;
+  const archetype = inferSemanticArchetype(cleanHanzi, wikiQueryEn || '');
+  const localUrl = `/illustrations/${archetype}.svg`;
+  WIKI_IMAGE_CACHE.set(cacheKey, localUrl);
+  return localUrl;
 }
+

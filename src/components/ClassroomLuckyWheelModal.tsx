@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { CheckCircle2, X } from 'lucide-react';
 import { ClassStudent } from './ClassroomManager';
 import { playGentleChime, speakChinese } from '../utils/speech';
+import { Dialog } from './ui/Dialog';
 
 export interface ClassroomLuckyWheelModalProps {
   isOpen: boolean;
@@ -39,8 +40,6 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
     side: 'hanzi' | 'meaning';
   } | null>(null);
   const [matchedPairIds, setMatchedPairIds] = useState<string[]>([]);
-
-  if (!isOpen) return null;
 
   const selectedWheelStudent =
     studentsList.find((s) => s.id === selectedWheelStudentId) || studentsList[0];
@@ -101,48 +100,46 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 animate-fade-in"
-      role="dialog"
-      aria-modal="true"
-      data-testid="lucky-wheel-modal"
-      onClick={onClose}
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      labelledBy="lucky-wheel-modal-title"
+      maxWidthClass="max-w-3xl"
+      testId="lucky-wheel-modal"
     >
-      <div
-        className="w-full max-w-3xl bg-[#FAFBF7] border-2 border-[#9B8A3E] rounded-3xl shadow-2xl p-5 sm:p-6 flex flex-col max-h-[90vh] overflow-y-auto text-[#1E3227] space-y-4"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="w-full bg-canvas border-2 border-gold rounded-3xl shadow-2xl p-5 sm:p-6 flex flex-col max-h-[90vh] overflow-y-auto text-ink space-y-4">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 pb-3 border-b border-[rgba(30,50,39,0.15)]">
+        <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
           <div>
-            <div className="text-xs font-bold text-[#9B8A3E] uppercase tracking-wider">
+            <div className="text-xs font-bold text-gold uppercase tracking-wider">
               Mini-Game Tương Tác Lớp Học · Kết nối trực tiếp Sổ Điểm ({studentsList.length} Học viên)
             </div>
-            <h3 className="text-lg sm:text-xl font-bold text-[#1E3227] mt-0.5">
+            <h3 id="lucky-wheel-modal-title" className="text-lg sm:text-xl font-bold text-ink mt-0.5">
               🎡 Vòng Quay Gọi Tên Ngẫu Nhiên &amp; Ghép Thẻ Từ Vựng
             </h3>
           </div>
           <button
             type="button"
+            aria-label="Đóng cửa sổ vòng quay"
             data-testid="close-lucky-wheel-btn"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white hover:bg-[#F4F6EE] border border-[rgba(30,50,39,0.15)] text-[#1E3227] flex items-center justify-center text-xs font-bold cursor-pointer"
+            className="w-8 h-8 rounded-full bg-surface hover:bg-primary/10 border border-border text-ink flex items-center justify-center text-xs font-bold cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Mode Switcher */}
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-[#E7ECD9]/65 p-2 rounded-2xl border border-[#1E3227]/15">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-primary/10 p-2 rounded-2xl border border-border">
           <div className="flex items-center gap-2">
             <button
               type="button"
               data-testid="lucky-wheel-tab-wheel"
               onClick={() => setWheelModeTab('wheel')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 wheelModeTab === 'wheel'
-                  ? 'bg-[#1E3227] text-white shadow-xs'
-                  : 'bg-white text-[#1E3227] hover:bg-[#FAFBF7]'
+                  ? 'bg-primary text-canvas shadow-xs'
+                  : 'bg-surface text-ink hover:bg-canvas'
               }`}
             >
               🎡 Vòng Quay Gọi Tên ({studentsList.length} HV)
@@ -151,10 +148,10 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
               type="button"
               data-testid="lucky-wheel-tab-match"
               onClick={() => setWheelModeTab('match')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 wheelModeTab === 'match'
-                  ? 'bg-[#1E3227] text-white shadow-xs'
-                  : 'bg-white text-[#1E3227] hover:bg-[#FAFBF7]'
+                  ? 'bg-primary text-canvas shadow-xs'
+                  : 'bg-surface text-ink hover:bg-canvas'
               }`}
             >
               🃏 Ghép Thẻ Từ Vựng Nhanh ({matchedPairIds.length}/{CLASS_MATCH_PAIRS.length})
@@ -163,12 +160,15 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
 
           {selectedWheelStudent && (
             <div className="flex items-center gap-2 text-xs">
-              <span className="text-[#3F5447] font-semibold">Đang gọi tên:</span>
+              <label htmlFor="wheel-student-select" className="text-ink-muted font-semibold">
+                Đang gọi tên:
+              </label>
               <select
+                id="wheel-student-select"
                 data-testid="wheel-student-select"
                 value={selectedWheelStudent.id}
                 onChange={(e) => setSelectedWheelStudentId(e.target.value)}
-                className="px-2.5 py-1 rounded-lg bg-white border border-[#9B8A3E]/60 text-xs font-bold text-[#1E3227]"
+                className="px-2.5 py-1 rounded-lg bg-surface border border-border text-xs font-bold text-ink"
               >
                 {studentsList.map((st) => (
                   <option key={st.id} value={st.id}>
@@ -183,26 +183,24 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
         {bonusToastMessage && (
           <div
             data-testid="lucky-wheel-bonus-toast"
-            className="p-3 rounded-2xl bg-[#E7ECD9] border border-[#1E3227]/30 text-xs font-bold text-[#1E3227] flex items-center gap-2 shadow-2xs"
+            className="p-3 rounded-2xl bg-success/10 border border-success/30 text-xs font-bold text-ink flex items-center gap-2 shadow-2xs"
           >
-            <CheckCircle2 className="w-4 h-4 text-[#065F46] shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
             <span>{bonusToastMessage}</span>
           </div>
         )}
 
         {wheelModeTab === 'wheel' ? (
           <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
-            {/* Left: Interactive Visual Wheel */}
-            <div className="md:col-span-6 flex flex-col items-center justify-center p-4 rounded-2xl bg-white border border-[rgba(30,50,39,0.12)]">
+            <div className="md:col-span-6 flex flex-col items-center justify-center p-4 rounded-2xl bg-surface border border-border">
               <div className="relative w-52 h-52 flex items-center justify-center">
-                {/* Top Pointer */}
-                <div className="absolute -top-2 z-20 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[18px] border-t-[#B91C1C] drop-shadow" />
+                <div className="absolute -top-2 z-20 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[18px] border-t-accent drop-shadow" />
                 <svg
                   viewBox="0 0 200 200"
-                  className="w-full h-full rounded-full border-4 border-[#9B8A3E] shadow-md transition-transform duration-700 ease-out"
+                  className="w-full h-full rounded-full border-4 border-gold shadow-md transition-transform duration-700 ease-out"
                   style={{ transform: `rotate(${wheelRotation}deg)` }}
                 >
-                  <circle cx="100" cy="100" r="96" fill="#1E3227" />
+                  <circle cx="100" cy="100" r="96" fill="#0F5243" />
                   {studentsList.slice(0, 8).map((st, idx, arr) => {
                     const angle = (360 / arr.length) * idx;
                     const rad = ((angle - 90) * Math.PI) / 180;
@@ -223,8 +221,8 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                         <text
                           x={tx}
                           y={ty}
-                          fill={idx % 2 === 0 ? '#FAFBF7' : '#F3D778'}
-                          fontSize="8.5"
+                          fill={idx % 2 === 0 ? '#FAF7F0' : '#F3D778'}
+                          fontSize="12"
                           fontWeight="bold"
                           textAnchor="middle"
                           dominantBaseline="middle"
@@ -234,12 +232,13 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                       </g>
                     );
                   })}
-                  <circle cx="100" cy="100" r="22" fill="#9B8A3E" stroke="#FAFBF7" strokeWidth="3" />
+                  <circle cx="100" cy="100" r="22" fill="#9B8A3E" stroke="#FAF7F0" strokeWidth="3" />
                   <text
                     x="100"
                     y="104"
-                    fill="#1E3227"
-                    fontSize="12"
+                    lang="zh-CN"
+                    fill="#0F382E"
+                    fontSize="14"
                     fontWeight="bold"
                     textAnchor="middle"
                   >
@@ -253,24 +252,23 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                 data-testid="spin-lucky-wheel-btn"
                 disabled={isSpinningWheel || studentsList.length === 0}
                 onClick={handleSpinWheel}
-                className="mt-4 px-5 py-2.5 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] text-white text-xs font-bold border border-[#9B8A3E] shadow-sm transition-all cursor-pointer disabled:opacity-60"
+                className="mt-4 px-5 py-2.5 rounded-xl bg-primary hover:opacity-95 text-canvas text-xs font-bold border border-gold shadow-xs transition-all cursor-pointer disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
                 {isSpinningWheel ? '🎡 Đang quay chọn học viên...' : '🎡 Quay gọi tên ngẫu nhiên'}
               </button>
             </div>
 
-            {/* Right: Selected Student & Instant Bonus Points */}
             <div className="md:col-span-6 space-y-3">
               {selectedWheelStudent ? (
                 <div
                   data-testid="selected-wheel-student-card"
-                  className="p-4 rounded-2xl bg-white border-2 border-[#9B8A3E]/70 shadow-xs space-y-3"
+                  className="p-4 rounded-2xl bg-surface border-2 border-gold shadow-xs space-y-3"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#1E3227] text-[#C5B358] text-xs font-bold uppercase">
+                    <span className="px-2.5 py-0.5 rounded-full bg-primary text-canvas text-xs font-bold uppercase">
                       Học viên được gọi tên
                     </span>
-                    <span className="text-xs font-mono font-bold text-[#5F7266]">
+                    <span className="text-xs font-mono font-bold text-ink-muted">
                       {selectedWheelStudent.studentCode} · {selectedWheelStudent.hskLevel}
                     </span>
                   </div>
@@ -278,16 +276,16 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                   <div>
                     <div
                       data-testid="selected-wheel-student-name"
-                      className="text-xl font-bold text-[#1E3227]"
+                      className="text-xl font-bold text-ink"
                     >
                       {selectedWheelStudent.name}
                     </div>
-                    <div className="text-xs text-[#3F5447] mt-1 flex items-center gap-3">
+                    <div className="text-xs text-ink-muted mt-1 flex items-center gap-3">
                       <span>
                         Điểm hiện tại:{' '}
                         <strong
                           data-testid="selected-wheel-student-points"
-                          className="text-base text-[#1E3227] tabular-nums"
+                          className="text-base text-ink tabular-nums"
                         >
                           {selectedWheelStudent.totalPoints}đ
                         </strong>
@@ -297,8 +295,8 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-[#E5E9DC] space-y-2">
-                    <div className="text-xs font-bold text-[#1E3227]">
+                  <div className="pt-2 border-t border-border space-y-2">
+                    <div className="text-xs font-bold text-ink">
                       Thưởng điểm trực tiếp vào Bảng điểm:
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -312,7 +310,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                             'Trả lời đúng câu hỏi Vòng quay trên lớp'
                           )
                         }
-                        className="py-2 px-3 rounded-xl bg-[#E7ECD9] hover:bg-[#1E3227] text-[#1E3227] hover:text-white border border-[#9B8A3E]/60 text-xs font-bold transition-all cursor-pointer"
+                        className="py-2 px-3 rounded-xl bg-primary/10 hover:bg-primary text-ink hover:text-canvas border border-border text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                       >
                         ⭐ +5 điểm thưởng
                       </button>
@@ -326,7 +324,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                             'Phản xạ xuất sắc Vòng quay & Ghép thẻ'
                           )
                         }
-                        className="py-2 px-3 rounded-xl bg-[#1E3227] hover:bg-[#2B4637] text-[#FAFBF7] border border-[#9B8A3E] text-xs font-bold transition-all cursor-pointer"
+                        className="py-2 px-3 rounded-xl bg-primary hover:opacity-95 text-canvas border border-gold text-xs font-bold transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                       >
                         🏆 +10 điểm thưởng
                       </button>
@@ -334,18 +332,17 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                   </div>
                 </div>
               ) : (
-                <div className="p-4 rounded-2xl bg-white text-xs text-[#5F7266]">
+                <div className="p-4 rounded-2xl bg-surface text-xs text-ink-muted">
                   Chưa có học viên trong danh sách lớp.
                 </div>
               )}
             </div>
           </div>
         ) : (
-          /* Tab 2: Card Matching Mini-Game */
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-[#3F5447]">
-                Chọn 1 thẻ <strong>Chữ Hán</strong> bên trái và ghép với thẻ <strong>Pinyin + Nghĩa</strong> tương ứng bên phải:
+              <p className="text-xs text-ink-muted">
+                Chọn 1 thẻ <strong>Chữ Hán</strong> bên trái và ghép với thẻ <strong>Pinyin + Nghĩa</strong> tương ứng:
               </p>
               <div className="flex items-center gap-2">
                 <button
@@ -354,7 +351,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                     setMatchedPairIds([]);
                     setSelectedMatchCard(null);
                   }}
-                  className="px-3 py-1 rounded-lg bg-white border border-[rgba(30,50,39,0.2)] text-xs font-semibold text-[#1E3227] cursor-pointer"
+                  className="px-3 py-1 rounded-lg bg-surface border border-border text-xs font-semibold text-ink cursor-pointer"
                 >
                   Chơi lại ván mới
                 </button>
@@ -369,7 +366,7 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                         'Chiến thắng Mini-Game Ghép Thẻ Từ Vựng'
                       )
                     }
-                    className="px-3 py-1 rounded-lg bg-[#1E3227] text-white text-xs font-bold cursor-pointer"
+                    className="px-3 py-1 rounded-lg bg-primary text-canvas text-xs font-bold cursor-pointer"
                   >
                     🏆 Thưởng +10đ cho {selectedWheelStudent.name}
                   </button>
@@ -391,13 +388,13 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                     onClick={() => handleSelectMatchCard(item.pairId, 'hanzi', item.hanzi)}
                     className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer ${
                       isMatched
-                        ? 'bg-emerald-50 border-emerald-400 text-emerald-800 opacity-75'
+                        ? 'bg-success/10 border-success text-success opacity-75'
                         : isSelected
-                        ? 'bg-[#1E3227] text-white border-[#9B8A3E] shadow-sm'
-                        : 'bg-white hover:bg-[#FAFBF7] border-[rgba(30,50,39,0.2)] text-[#1E3227]'
+                        ? 'bg-primary text-canvas border-gold shadow-xs'
+                        : 'bg-surface hover:bg-canvas border-border text-ink'
                     }`}
                   >
-                    <div className="text-2xl font-bold font-['Noto_Serif_SC']">{item.hanzi}</div>
+                    <div lang="zh-CN" className="text-2xl font-bold font-['Noto_Sans_SC']">{item.hanzi}</div>
                     <div className="text-xs mt-1 opacity-75">Thẻ Chữ Hán</div>
                   </button>
                 );
@@ -416,13 +413,13 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                     onClick={() => handleSelectMatchCard(item.pairId, 'meaning')}
                     className={`p-3.5 rounded-2xl border text-center transition-all cursor-pointer ${
                       isMatched
-                        ? 'bg-emerald-50 border-emerald-400 text-emerald-800 opacity-75'
+                        ? 'bg-success/10 border-success text-success opacity-75'
                         : isSelected
-                        ? 'bg-[#1E3227] text-white border-[#9B8A3E] shadow-sm'
-                        : 'bg-white hover:bg-[#FAFBF7] border-[rgba(30,50,39,0.2)] text-[#1E3227]'
+                        ? 'bg-primary text-canvas border-gold shadow-xs'
+                        : 'bg-surface hover:bg-canvas border-border text-ink'
                     }`}
                   >
-                    <div className="text-xs font-bold text-[#9B8A3E]">{item.pinyin}</div>
+                    <div className="text-xs font-bold text-gold">{item.pinyin}</div>
                     <div className="text-xs font-semibold mt-0.5">{item.meaning}</div>
                   </button>
                 );
@@ -431,6 +428,6 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
           </div>
         )}
       </div>
-    </div>
+    </Dialog>
   );
 };

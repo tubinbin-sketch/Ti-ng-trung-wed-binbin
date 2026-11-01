@@ -1,3 +1,5 @@
+import { appStore } from '../context/AppStoreContext';
+
 export interface MultipleChoiceQ {
   id: string;
   type: 'meaning' | 'fill-blank';
@@ -376,9 +378,7 @@ export function getStoredAssignment(): UploadedAssignmentPackage {
 export function saveStoredAssignment(pkg: UploadedAssignmentPackage): void {
   try {
     localStorage.setItem(STORAGE_KEY_ASSIGNMENT, JSON.stringify(pkg));
-    window.dispatchEvent(
-      new CustomEvent('hanu_assignment_updated', { detail: pkg })
-    );
+    appStore.notifyAssignmentUpdated(pkg);
   } catch {
     // Ignore storage quota errors
   }

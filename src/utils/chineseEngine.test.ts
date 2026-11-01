@@ -515,20 +515,16 @@ test('applyStudentSubmissionToRoster updates timeSeconds and increments streak, 
   }
 });
 
-test('Phase 1 Patch: verifyTeacherPin rejects backdoor 8888, GEMINI_API_TIMEOUT_MS is 20000ms, and runStorageMigrations upgrades schema cleanly', async () => {
+test('Phase 1 & Firebase Migration Patch: GEMINI_API_TIMEOUT_MS is 20000ms and runStorageMigrations upgrades schema cleanly', async () => {
   const { GEMINI_API_TIMEOUT_MS } = await import('./chineseEngine');
   const {
-    verifyTeacherPin,
     runStorageMigrations,
     CURRENT_SCHEMA_VERSION,
   } = await import('./storageService');
   const { INITIAL_VOCAB_SLIDES } = await import('../data/chineseData');
 
   assert.equal(GEMINI_API_TIMEOUT_MS, 20000);
-  assert.equal(verifyTeacherPin('8888'), false);
-  assert.equal(verifyTeacherPin('0000'), false);
-  assert.equal(verifyTeacherPin('2026'), true);
-  assert.equal(CURRENT_SCHEMA_VERSION, '3.2.0');
+  assert.equal(CURRENT_SCHEMA_VERSION, '4.0.0-firebase');
 
   const migrated = runStorageMigrations(INITIAL_VOCAB_SLIDES);
   assert.ok(Array.isArray(migrated) && migrated.length >= 25);
@@ -536,3 +532,60 @@ test('Phase 1 Patch: verifyTeacherPin rejects backdoor 8888, GEMINI_API_TIMEOUT_
   assert.ok(slide25);
   assert.equal(slide25.hanzi, '既然');
 });
+
+test('localStorage persistence: HSK 1-9 filter, learned slides, and custom added vocabulary persist across reloads', async () => {
+  const store = new Map<string, string>();
+  const prevWindow = (globalThis as any).window;
+  const prevLocalStorage = (globalThis as any).localStorage;
+  const mockLocalStorage = {
+    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+    setItem: (k: string, v: string) => {
+      store.set(k, String(v));
+    },
+    removeItem: (k: string) => {
+      store.delete(k);
+    },
+  };
+  (globalThis as any).window = globalThis;
+  (globalThis as any).localStorage = mockLocalStorage;
+
+  try {
+    const {
+      getStoredHsk3FilterState,
+      saveStoredHsk3FilterState,
+      saveStudentLearnedSlideIds,
+      getStudentLearnedSlideIds,
+      runStorageMigrations,
+      STORAGE_KEYS,
+    } = await import('./storageService');
+    const { INITIAL_VOCAB_SLIDES } = await import('../data/chineseData');
+
+    saveStoredHsk3FilterState('intermediate', 'HSK 4');
+    const filterState = getStoredHsk3FilterState();
+    assert.equal(filterState.stage, 'intermediate');
+    assert.equal(filterState.level, 'HSK 4');
+
+    saveStudentLearnedSlideIds(['slide-1', 'slide-11'], 'HV-001');
+    const learnedSet = getStudentLearnedSlideIds('HV-001');
+    assert.equal(learnedSet.has('slide-1'), true);
+    assert.equal(learnedSet.has('slide-11'), true);
+
+    const customSlide = createCustomVocabSlide(
+      { hanzi: '团圆', meaning: 'đoàn viên', hskLevel: 'HSK 4' },
+      26
+    );
+    assert.ok(customSlide);
+    mockLocalStorage.setItem(STORAGE_KEYS.CUSTOM_SLIDES, JSON.stringify([customSlide]));
+
+    const reloadedDeck = runStorageMigrations(INITIAL_VOCAB_SLIDES);
+    assert.ok(reloadedDeck.some((s) => s.hanzi === '团圆'));
+    const s11 = reloadedDeck.find((s) => s.id === 'slide-11');
+    assert.equal(s11?.learned, true);
+  } finally {
+    if (prevWindow === undefined) delete (globalThis as any).window;
+    else (globalThis as any).window = prevWindow;
+    if (prevLocalStorage === undefined) delete (globalThis as any).localStorage;
+    else (globalThis as any).localStorage = prevLocalStorage;
+  }
+});
+

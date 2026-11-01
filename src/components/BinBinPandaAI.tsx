@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  AlertCircle,
   Check,
   Copy,
   Mic,
@@ -7,12 +8,14 @@ import {
   PanelRight,
   PanelRightClose,
   PlusCircle,
+  RotateCcw,
   Send,
   Sparkles,
   Trash2,
   Volume2,
   X,
 } from 'lucide-react';
+import { appStore, useAppStoreSelector } from '../context/AppStoreContext';
 import { VocabSlide } from '../data/chineseData';
 import {
   askBinBinPandaAI,
@@ -74,6 +77,11 @@ interface ChatMessage {
   slidePayload?: BinBinSlidePayload;
   usedOfflineFallback?: boolean;
   fallbackNotice?: string;
+  aiError?: string;
+  retryPayload?: {
+    actionType: BinBinActionType;
+    queryText: string;
+  };
 }
 
 /**
@@ -244,20 +252,19 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
   const messageStreamRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    const handleOpen = () => setIsOpen(true);
-    window.addEventListener('binbin:open-assistant', handleOpen);
-    return () => window.removeEventListener('binbin:open-assistant', handleOpen);
-  }, []);
+  const binbinOpenTick = useAppStoreSelector((s) => s.binbinOpenTick);
+  const binbinAskPayload = useAppStoreSelector((s) => s.binbinAskPayload);
 
-  // Broadcast dock state so App.tsx can shift main content when BinBin is open & docked right
   useEffect(() => {
-    if (typeof window !== 'undefined' && variant === 'floating') {
-      window.dispatchEvent(
-        new CustomEvent('binbin:dock-state', {
-          detail: { isOpen, displayMode },
-        })
-      );
+    if (binbinOpenTick > 0) {
+      setIsOpen(true);
+    }
+  }, [binbinOpenTick]);
+
+  // Sync dock state via AppStoreContext so App.tsx can shift main content when BinBin is open & docked right
+  useEffect(() => {
+    if (variant === 'floating') {
+      appStore.setBinBinDockState(isOpen, displayMode === 'docked' ? 'docked' : 'floating');
     }
   }, [isOpen, displayMode, variant]);
 
@@ -387,8 +394,19 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
     setMessages((prev) => [...prev, userMsg, binbinMsg]);
     setMood('cheering');
 
-    // Enrich via server-side Gemini 2.5 Flash (/api/binbin/chat) for free-form questions
+    // Enrich via server-side Gemini (/api/binbin/chat)
+    await enrichMessageWithAI(replyId, actionType, queryText);
+  };
+
+  const enrichMessageWithAI = async (
+    replyId: string,
+    actionType: BinBinActionType,
+    queryText: string
+  ) => {
     setIsLoading(true);
+    setMessages((prev) =>
+      prev.map((m) => (m.id === replyId ? { ...m, aiError: undefined } : m))
+    );
     try {
       const enriched = await askBinBinPandaAI(
         actionType,
@@ -397,32 +415,65 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
         quizContext
       );
       if (enriched) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === replyId
-              ? {
-                  ...m,
-                  text: enriched.replyText || m.text,
-                  chinesePhrase: enriched.chinesePhrase || m.chinesePhrase,
-                  pinyinPhrase: enriched.pinyinPhrase || m.pinyinPhrase,
-                  vietnamesePhrase: enriched.vietnamesePhrase || m.vietnamesePhrase,
-                  wordCard: enriched.wordCard || m.wordCard,
-                  essenceAndContext: enriched.essenceAndContext || m.essenceAndContext,
-                  collocations: enriched.collocations || m.collocations,
-                  synonymDistinction:
-                    enriched.synonymDistinction || m.synonymDistinction,
-                  examples: enriched.examples || m.examples,
-                  sentenceCorrection:
-                    enriched.sentenceCorrection || m.sentenceCorrection,
-                  teacherExercise: enriched.teacherExercise || m.teacherExercise,
-                  slidePayload: enriched.slidePayload || m.slidePayload,
-                  usedOfflineFallback: enriched.usedOfflineFallback,
-                  fallbackNotice: enriched.fallbackNotice,
-                }
-              : m
-          )
-        );
+        if (enriched.usedOfflineFallback) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === replyId
+                ? {
+                    ...m,
+                    usedOfflineFallback: true,
+                    fallbackNotice: enriched.fallbackNotice,
+                    aiError:
+                      enriched.fallbackNotice ||
+                      'Kết nối AI Trợ giảng 彬彬 bị gián đoạn hoặc quá thời gian chờ.',
+                    retryPayload: { actionType, queryText },
+                  }
+                : m
+            )
+          );
+        } else {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === replyId
+                ? {
+                    ...m,
+                    text: enriched.replyText || m.text,
+                    chinesePhrase: enriched.chinesePhrase || m.chinesePhrase,
+                    pinyinPhrase: enriched.pinyinPhrase || m.pinyinPhrase,
+                    vietnamesePhrase: enriched.vietnamesePhrase || m.vietnamesePhrase,
+                    wordCard: enriched.wordCard || m.wordCard,
+                    essenceAndContext: enriched.essenceAndContext || m.essenceAndContext,
+                    collocations: enriched.collocations || m.collocations,
+                    synonymDistinction:
+                      enriched.synonymDistinction || m.synonymDistinction,
+                    examples: enriched.examples || m.examples,
+                    sentenceCorrection:
+                      enriched.sentenceCorrection || m.sentenceCorrection,
+                    teacherExercise: enriched.teacherExercise || m.teacherExercise,
+                    slidePayload: enriched.slidePayload || m.slidePayload,
+                    usedOfflineFallback: false,
+                    aiError: undefined,
+                  }
+                : m
+            )
+          );
+        }
       }
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === replyId
+            ? {
+                ...m,
+                aiError:
+                  err instanceof Error
+                    ? err.message
+                    : 'Không thể kết nối AI Trợ giảng 彬彬 lúc này.',
+                retryPayload: { actionType, queryText },
+              }
+            : m
+        )
+      );
     } finally {
       setIsLoading(false);
     }
@@ -521,11 +572,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
     if (onApplyToSlide) {
       onApplyToSlide(payload);
     }
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('binbin:apply-slide', { detail: payload })
-      );
-    }
+    appStore.applyBinBinSlide(payload);
 
     setAppliedSlideMsgId(msg.id);
     setTimeout(() => {
@@ -604,25 +651,17 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
     triggerAction(chip.id, chip.prompt);
   };
 
-  // Listen for contextual "🐼 Hỏi 彬彬 câu này" events from wrong quiz questions
+  // Listen for contextual "🐼 Hỏi 彬彬 câu này" actions from AppStoreContext
   useEffect(() => {
-    const handleAskQuestion = (e: Event) => {
-      const customEvent = e as CustomEvent<{
-        prompt?: string;
-        targetWord?: string;
-        actionType?: BinBinActionType;
-      }>;
-      const promptText = (customEvent.detail?.prompt || '').trim();
-      const actionType = customEvent.detail?.actionType || 'chat';
-      setIsOpen(true);
-      setActiveInteractivePanel('none');
-      if (promptText) {
-        triggerAction(actionType, promptText, promptText);
-      }
-    };
-    window.addEventListener('binbin:ask-question', handleAskQuestion);
-    return () => window.removeEventListener('binbin:ask-question', handleAskQuestion);
-  }, [activeSlide?.hanzi]);
+    if (!binbinAskPayload) return;
+    const promptText = (binbinAskPayload.questionPrompt || '').trim();
+    setIsOpen(true);
+    setActiveInteractivePanel('none');
+    if (promptText) {
+      triggerAction('chat', promptText, promptText);
+    }
+    appStore.clearBinBinQuestion();
+  }, [binbinAskPayload]);
 
   // Closed state trigger button (renders for both inline and floating when !isOpen)
   if (!isOpen) {
@@ -833,12 +872,34 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
           return (
             <div key={msg.id} className="flex justify-start">
               <div className="w-full rounded-2xl rounded-tl-xs bg-white/95 border border-[#0F5243]/15 p-3 shadow-xs space-y-2.5 text-[#0F382E]">
-                {msg.usedOfflineFallback && msg.fallbackNotice && (
+                {msg.aiError && (
                   <div
-                    data-testid="binbin-fallback-notice-badge"
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-[10.5px] font-bold"
+                    role="alert"
+                    data-testid="binbin-ai-error-banner"
+                    className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 text-xs font-bold"
                   >
-                    <span>📚 {msg.fallbackNotice}</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                      <span>{msg.aiError}</span>
+                    </span>
+                    {msg.retryPayload && (
+                      <button
+                        type="button"
+                        data-testid="binbin-retry-ai-btn"
+                        disabled={isLoading}
+                        onClick={() =>
+                          enrichMessageWithAI(
+                            msg.id,
+                            msg.retryPayload!.actionType,
+                            msg.retryPayload!.queryText
+                          )
+                        }
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0F5243] hover:bg-[#166E5B] text-[#FAF7F0] text-xs font-bold cursor-pointer shrink-0 disabled:opacity-50"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Thử lại</span>
+                      </button>
+                    )}
                   </div>
                 )}
                 {/* Top Word Summary Header (when wordCard is available) */}
@@ -876,7 +937,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                         key={`${msg.id}-line-${lIdx}`}
                         className={
                           isBullet
-                            ? 'pl-2 border-l-2 border-[#C5B358]/70 py-0.5 text-[11.5px]'
+                            ? 'pl-2 border-l-2 border-[#C5B358]/70 py-0.5 text-xs'
                             : 'font-bold text-[#0F382E] text-xs'
                         }
                       >
@@ -1000,10 +1061,10 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                           key={`${msg.id}-q-${qIdx}`}
                           className="p-2 rounded-lg bg-white border border-[#0F5243]/10 text-xs space-y-0.5"
                         >
-                          <div className="font-bold text-[#0F382E] font-['Noto_Sans_SC']">
+                          <div lang="zh-CN" className="font-bold text-[#0F382E] font-['Noto_Sans_SC']">
                             {qItem.question}
                           </div>
-                          <div className="text-[10.5px] text-[#0F5243] font-semibold">
+                          <div className="text-xs text-[#0F5243] font-semibold">
                             ✓ Đáp án: {qItem.answer}
                           </div>
                           <div className="text-xs text-[#5F7266]">
@@ -1030,13 +1091,13 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                         className="rounded-xl bg-[#FAF7F0] border border-[#C5B358]/40 p-2 flex items-start justify-between gap-2"
                       >
                         <div className="min-w-0 flex-1 space-y-0.5">
-                          <div className="font-['Noto_Sans_SC'] text-xs font-bold text-[#0F382E]">
+                          <div lang="zh-CN" className="font-['Noto_Sans_SC'] text-xs font-bold text-[#0F382E]">
                             {exIdx + 1}. {ex.hanzi}
                           </div>
-                          <div className="text-[10.5px] font-medium text-[#9B8A3E]">
+                          <div className="text-xs font-medium text-[#9B8A3E]">
                             {ex.pinyin}
                           </div>
-                          <div className="text-[10.5px] text-[#3F5447] italic">
+                          <div className="text-xs text-[#3F5447] italic">
                             “{ex.meaning}”
                           </div>
                         </div>
@@ -1065,7 +1126,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                     type="button"
                     data-testid="binbin-add-to-slide-btn"
                     onClick={() => handleApplyMessageToSlide(msg)}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-bold transition-all cursor-pointer ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       isSlideApplied
                         ? 'bg-[#065F46] text-white'
                         : 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] shadow-2xs'
@@ -1088,7 +1149,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                     type="button"
                     data-testid="binbin-copy-reply-btn"
                     onClick={() => handleCopyMessage(msg)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F4F6EE] hover:bg-[#E6EFEA] text-[#0F382E] border border-[#0F5243]/15 text-[10.5px] font-bold transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F4F6EE] hover:bg-[#E6EFEA] text-[#0F382E] border border-[#0F5243]/15 text-xs font-bold transition-colors cursor-pointer"
                   >
                     {isCopied ? (
                       <>
@@ -1108,7 +1169,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                       type="button"
                       data-testid="binbin-speak-reply-btn"
                       onClick={() => handleSpeakPhrase(msg.chinesePhrase!)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F4F6EE] hover:bg-[#E6EFEA] text-[#0F382E] border border-[#0F5243]/15 text-[10.5px] font-bold transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F4F6EE] hover:bg-[#E6EFEA] text-[#0F382E] border border-[#0F5243]/15 text-xs font-bold transition-colors cursor-pointer"
                     >
                       <Volume2 className="w-3 h-3 text-[#C84B31]" />
                       <span>🔊 Nghe phát âm</span>
@@ -1152,7 +1213,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                       : `我非常${currentFocusWord}今天`;
                   triggerAction('grammar-fix', s, s);
                 }}
-                className="px-2 py-1 rounded-lg bg-[#FDF2F2] hover:bg-[#FCE8E8] border border-[#C84B31]/30 text-[10.5px] font-bold text-[#7F1D1D] cursor-pointer"
+                className="px-2 py-1 rounded-lg bg-[#FDF2F2] hover:bg-[#FCE8E8] border border-[#C84B31]/30 text-xs font-bold text-[#7F1D1D] cursor-pointer"
               >
                 Thử câu dễ nhầm: “
                 {currentFocusWord === '温暖'
@@ -1167,7 +1228,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                   const s = `今天天气是${currentFocusWord}`;
                   triggerAction('grammar-fix', s, s);
                 }}
-                className="px-2 py-1 rounded-lg bg-[#FDF2F2] hover:bg-[#FCE8E8] border border-[#C84B31]/30 text-[10.5px] font-bold text-[#7F1D1D] cursor-pointer"
+                className="px-2 py-1 rounded-lg bg-[#FDF2F2] hover:bg-[#FCE8E8] border border-[#C84B31]/30 text-xs font-bold text-[#7F1D1D] cursor-pointer"
               >
                 Thử lỗi dùng 是: “今天天气是{currentFocusWord}”
               </button>
@@ -1198,10 +1259,10 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
               <div className="p-2 rounded-xl bg-white border border-[#0F5243]/15 flex items-center justify-between gap-2">
                 <div>
                   <span className="font-bold text-[#0F5243]">🐼 彬彬 (Vai A): </span>
-                  <span className="font-['Noto_Sans_SC'] font-bold">
+                  <span lang="zh-CN" className="font-['Noto_Sans_SC'] font-bold">
                     你能用“{currentFocusWord}”说一句话吗？
                   </span>
-                  <div className="text-[10.5px] text-[#5F7266]">
+                  <div className="text-xs text-[#5F7266]">
                     (Bạn có thể dùng từ “{currentFocusWord}” đặt một câu trong giao tiếp không?)
                   </div>
                 </div>
@@ -1217,7 +1278,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
               </div>
 
               <div className="p-2 rounded-xl bg-[#FAF7F0] border border-[#C5B358]/50 space-y-1.5">
-                <div className="text-[10.5px] font-bold text-[#8A7630]">
+                <div className="text-xs font-bold text-[#8A7630]">
                   🎓 Lượt của bạn (Vai B) — Chọn câu trả lời hoặc bấm 🎙️ để nói:
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -1303,6 +1364,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
           <input
             ref={chatInputRef}
             type="text"
+            aria-label="Nhập câu hỏi hoặc từ vựng cho trợ giảng 彬彬"
             data-testid="binbin-chat-input"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
@@ -1312,12 +1374,16 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
                 ? `Gõ câu có chứa từ “${currentFocusWord}” để 彬彬 chấm & sửa lỗi...`
                 : `Hỏi từ (${currentFocusWord}), tự đặt câu, tạo bài tập...`
             }
-            className="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-[#FAF7F0] border border-[#0F5243]/20 text-xs text-[#0F382E] placeholder:text-[#5F7266] focus:outline-none focus:border-[#0F5243]"
+            className="flex-1 min-w-0 px-3 py-1.5 rounded-xl bg-[#FAF7F0] border border-[#0F5243]/20 text-xs text-[#0F382E] placeholder:text-[#5F7266] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
           />
           <button
             type="button"
             onClick={handleToggleVoiceChat}
-            title="Nói tiếng Trung để 彬彬 dịch & chữa câu"
+            aria-label={
+              isListeningMic
+                ? 'Dừng thu âm giọng nói tiếng Trung'
+                : 'Thu âm giọng nói tiếng Trung để 彬彬 dịch và chữa câu'
+            }
             className={`inline-flex items-center justify-center w-8 h-8 rounded-xl text-xs font-bold transition-colors shrink-0 cursor-pointer ${
               isListeningMic
                 ? 'bg-[#C84B31] text-white animate-pulse'

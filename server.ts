@@ -4,34 +4,129 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
+import { initializeApp as initializeAdminApp, getApps as getAdminApps, cert } from 'firebase-admin/app';
+import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const ROOT_DIR =
+  path.basename(__dirname) === 'dist-server'
+    ? path.resolve(__dirname, '..')
+    : __dirname;
 
-const app = express();
+// Load Firebase project ID from environment or firebase-applet-config.json
+let defaultFirebaseProjectId =
+  process.env.FIREBASE_PROJECT_ID ||
+  process.env.GOOGLE_CLOUD_PROJECT ||
+  process.env.VITE_FIREBASE_PROJECT_ID ||
+  '';
+
+if (!defaultFirebaseProjectId) {
+  try {
+    const configPath = path.resolve(ROOT_DIR, 'firebase-applet-config.json');
+    if (fs.existsSync(configPath)) {
+      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      if (parsed?.projectId) {
+        defaultFirebaseProjectId = String(parsed.projectId);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function ensureFirebaseAdminApp() {
+  if (getAdminApps().length > 0) {
+    return getAdminApps()[0]!;
+  }
+  const serviceAccountJson = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
+  if (serviceAccountJson) {
+    try {
+      const credentials = JSON.parse(serviceAccountJson);
+      return initializeAdminApp({
+        credential: cert(credentials),
+        projectId: credentials.project_id || defaultFirebaseProjectId || undefined,
+      });
+    } catch {
+      // Fallback to application default / projectId initialization
+    }
+  }
+  return initializeAdminApp(
+    defaultFirebaseProjectId ? { projectId: defaultFirebaseProjectId } : undefined
+  );
+}
+
+const firebaseAdminApp = ensureFirebaseAdminApp();
+
+export const app = express();
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
+
+// ============================================================================
+// 0. SELF-HOSTED HANZI-WRITER-DATA STATIC & API SERVING
+// ============================================================================
+const HANZI_DATA_DIR = path.resolve(ROOT_DIR, 'node_modules', 'hanzi-writer-data');
+app.use(
+  '/hanzi-data',
+  express.static(HANZI_DATA_DIR, {
+    maxAge: '7d',
+    immutable: true,
+  })
+);
+
+app.get('/api/hanzi/char/:char', (req, res) => {
+  const rawChar = String(req.params.char || '').trim();
+  if (!rawChar || Array.from(rawChar).length !== 1) {
+    res.status(400).json({ error: 'Invalid single Chinese character parameter.' });
+    return;
+  }
+  const charFile = path.join(HANZI_DATA_DIR, `${rawChar}.json`);
+  if (!fs.existsSync(charFile)) {
+    res.status(404).json({ error: 'Character stroke data not found in local package.' });
+    return;
+  }
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+  res.sendFile(charFile);
+});
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 const BINBIN_SYSTEM_INSTRUCTION =
   "Bạn là Gấu trúc Bin Bin (彬彬) — Trợ giảng & Gia sư Hán ngữ Thực dụng của nền tảng HANU × 阮文受 (Thầy Nguyễn Văn Thụ). Nguyên tắc bắt buộc: Trả lời trực diện, súc tích, thực dụng, KHÔNG rườm rà chào hỏi sáo rỗng, KHÔNG bao giờ ghép từ giả tạo kiểu '学习X' hay '常用X'. Luôn cung cấp: (1) Bản chất & Ngữ cảnh thực tế, (2) Collocations kết hợp từ chuẩn 100% người bản xứ, (3) Phân biệt từ dễ nhầm, (4) 2 câu ví dụ thực tế có Pinyin + Dịch nghĩa, hoặc Dịch song ngữ / Sửa câu sai / Soạn 5 câu bài tập HSK 3.0 theo đúng yêu cầu.";
 
-// In-memory rate limiter for /api/* and Gemini AI routes with periodic 10-minute memory cleanup
+// ============================================================================
+// 1. RATE LIMITING BY UID & PERIODIC MEMORY CLEANUP
+// ============================================================================
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 90;
 const AI_RATE_LIMIT_MAX_REQUESTS = 30;
+const AI_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const RATE_LIMIT_CLEANUP_INTERVAL_MS = 10 * 60_000; // 10 minutes
 
 const clientRequestCounts = new Map<string, { count: number; resetAt: number }>();
-const aiClientRequestCounts = new Map<string, { count: number; resetAt: number }>();
+const aiUidMinuteCounts = new Map<string, { count: number; resetAt: number }>();
+const aiUidDailyCounts = new Map<string, { count: number; resetAt: number }>();
+
+export function getAiDailyLimit(): number {
+  const configured = Number(process.env.AI_DAILY_LIMIT);
+  return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 200;
+}
+
+export function resetAllRateLimitersForTest(): void {
+  clientRequestCounts.clear();
+  aiUidMinuteCounts.clear();
+  aiUidDailyCounts.clear();
+}
 
 export function cleanupExpiredRateLimits(now = Date.now()): {
   removedApiEntries: number;
   removedAiEntries: number;
+  removedDailyEntries: number;
 } {
   let removedApiEntries = 0;
   let removedAiEntries = 0;
+  let removedDailyEntries = 0;
 
   for (const [key, entry] of clientRequestCounts.entries()) {
     if (now > entry.resetAt) {
@@ -40,14 +135,25 @@ export function cleanupExpiredRateLimits(now = Date.now()): {
     }
   }
 
-  for (const [key, entry] of aiClientRequestCounts.entries()) {
+  for (const [key, entry] of aiUidMinuteCounts.entries()) {
     if (now > entry.resetAt) {
-      aiClientRequestCounts.delete(key);
+      aiUidMinuteCounts.delete(key);
       removedAiEntries += 1;
     }
   }
 
-  return { removedApiEntries, removedAiEntries };
+  for (const [key, entry] of aiUidDailyCounts.entries()) {
+    if (now > entry.resetAt) {
+      aiUidDailyCounts.delete(key);
+      removedDailyEntries += 1;
+    }
+  }
+
+  return {
+    removedApiEntries,
+    removedAiEntries,
+    removedDailyEntries,
+  };
 }
 
 const rateLimitCleanupTimer = setInterval(() => {
@@ -86,6 +192,78 @@ function apiRateLimiter(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+app.use('/api', apiRateLimiter);
+
+// ============================================================================
+// 2. FIREBASE ID TOKEN VERIFICATION & UID QUOTA PROTECTION FOR GEMINI AI ROUTES
+// ============================================================================
+export type FirebaseTokenVerifier = (idToken: string) => Promise<{ uid: string; email?: string }>;
+
+let customTokenVerifierForTest: FirebaseTokenVerifier | null = null;
+
+export function setFirebaseTokenVerifierForTest(verifier: FirebaseTokenVerifier | null): void {
+  customTokenVerifierForTest = verifier;
+}
+
+export function extractBearerToken(authorizationHeader?: string): string | null {
+  if (!authorizationHeader || typeof authorizationHeader !== 'string') {
+    return null;
+  }
+  const trimmed = authorizationHeader.trim();
+  if (!trimmed.toLowerCase().startsWith('bearer ')) {
+    return null;
+  }
+  const token = trimmed.slice(7).trim();
+  return token.length > 0 ? token : null;
+}
+
+export async function verifyFirebaseIdToken(
+  idToken: string
+): Promise<{ uid: string; email?: string }> {
+  if (customTokenVerifierForTest) {
+    return await customTokenVerifierForTest(idToken);
+  }
+  const decoded = await getAdminAuth(firebaseAdminApp).verifyIdToken(idToken);
+  return {
+    uid: decoded.uid,
+    email: decoded.email,
+  };
+}
+
+export function checkAndIncrementAiUidQuota(
+  uid: string,
+  now = Date.now()
+): { allowed: boolean; reason?: 'minute_limit' | 'daily_limit'; dailyLimit: number } {
+  const cleanUid = uid.trim();
+  const dailyLimit = getAiDailyLimit();
+
+  // 1. Per-minute burst check per UID
+  const minuteEntry = aiUidMinuteCounts.get(cleanUid);
+  if (minuteEntry && now <= minuteEntry.resetAt && minuteEntry.count >= AI_RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, reason: 'minute_limit', dailyLimit };
+  }
+
+  // 2. Per-day quota check per UID
+  const dailyEntry = aiUidDailyCounts.get(cleanUid);
+  if (dailyEntry && now <= dailyEntry.resetAt && dailyEntry.count >= dailyLimit) {
+    return { allowed: false, reason: 'daily_limit', dailyLimit };
+  }
+
+  if (!minuteEntry || now > minuteEntry.resetAt) {
+    aiUidMinuteCounts.set(cleanUid, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+  } else {
+    minuteEntry.count += 1;
+  }
+
+  if (!dailyEntry || now > dailyEntry.resetAt) {
+    aiUidDailyCounts.set(cleanUid, { count: 1, resetAt: now + AI_DAILY_WINDOW_MS });
+  } else {
+    dailyEntry.count += 1;
+  }
+
+  return { allowed: true, dailyLimit };
+}
+
 export function isTrustedRequestOrigin(params: {
   origin?: string;
   referer?: string;
@@ -103,61 +281,61 @@ export function isTrustedRequestOrigin(params: {
     allowedOriginsEnv = process.env.ALLOWED_ORIGINS || '',
   } = params;
 
-  // Require JSON content-type on POST AI endpoints to block cross-site form submissions
   if (!contentType.toLowerCase().includes('application/json')) {
     return false;
   }
 
-  // Block explicit cross-site requests unless Origin is in the trusted allowlist
+  if (!origin.trim() && !referer.trim()) {
+    return false;
+  }
+
   const normalizedFetchSite = secFetchSite.toLowerCase().trim();
-  const extraAllowedHosts = allowedOriginsEnv
+  if (normalizedFetchSite === 'cross-site' && !allowedOriginsEnv.trim()) {
+    return false;
+  }
+
+  const extraAllowedEntries = allowedOriginsEnv
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
 
-  const normalizedHost = host.toLowerCase().split(':')[0].trim();
+  const normalizedServerHost = host.toLowerCase().split(':')[0].trim();
 
-  const isHostAllowed = (candidateUrl: string): boolean => {
+  const isCandidateUrlAllowed = (candidateUrl: string): boolean => {
     try {
       const parsed = new URL(candidateUrl);
       const candidateHost = parsed.hostname.toLowerCase();
+      const candidateOrigin = parsed.origin.toLowerCase();
+
+      if (normalizedServerHost && candidateHost === normalizedServerHost) {
+        return true;
+      }
+
       if (
-        candidateHost === 'localhost' ||
-        candidateHost === '127.0.0.1' ||
-        (normalizedHost && candidateHost === normalizedHost) ||
-        candidateHost.endsWith('.run.app') ||
-        candidateHost.endsWith('.google.com') ||
-        extraAllowedHosts.includes(candidateHost) ||
-        extraAllowedHosts.includes(parsed.origin.toLowerCase())
+        extraAllowedEntries.includes(candidateOrigin) ||
+        extraAllowedEntries.includes(candidateHost)
       ) {
         return true;
       }
+
       return false;
     } catch {
       return false;
     }
   };
 
-  if (origin && !isHostAllowed(origin)) {
+  if (origin && !isCandidateUrlAllowed(origin)) {
     return false;
   }
 
-  if (!origin && referer && !isHostAllowed(referer)) {
-    return false;
-  }
-
-  if (
-    normalizedFetchSite === 'cross-site' &&
-    !origin &&
-    !referer
-  ) {
+  if (!origin && referer && !isCandidateUrlAllowed(referer)) {
     return false;
   }
 
   return true;
 }
 
-function protectAiRoute(req: Request, res: Response, next: NextFunction) {
+async function protectAiRoute(req: Request, res: Response, next: NextFunction) {
   const origin = String(req.headers.origin || '');
   const referer = String(req.headers.referer || '');
   const host = String(req.headers['x-forwarded-host'] || req.headers.host || '');
@@ -174,137 +352,58 @@ function protectAiRoute(req: Request, res: Response, next: NextFunction) {
     })
   ) {
     res.status(403).json({
-      error: 'Forbidden: Invalid request origin or session.',
+      error: 'Forbidden: Invalid request origin.',
       fallback: true,
     });
     return;
   }
 
-  const clientIp = resolveClientIp(req);
-  const now = Date.now();
-  const entry = aiClientRequestCounts.get(clientIp);
-
-  if (!entry || now > entry.resetAt) {
-    aiClientRequestCounts.set(clientIp, {
-      count: 1,
-      resetAt: now + RATE_LIMIT_WINDOW_MS,
-    });
-    next();
-    return;
-  }
-
-  if (entry.count >= AI_RATE_LIMIT_MAX_REQUESTS) {
-    res.status(429).json({
-      error: 'AI rate limit exceeded. Please wait a moment before trying again.',
-      fallback: true,
-    });
-    return;
-  }
-
-  entry.count += 1;
-  next();
-}
-
-app.use('/api', apiRateLimiter);
-
-// Server-side Teacher PIN verification endpoint (never exposes expected PIN to client)
-app.post('/api/auth/teacher-verify', (req, res) => {
-  const expectedPin = String(
-    process.env.TEACHER_PIN || process.env.VITE_TEACHER_PIN || '2026'
-  ).trim();
-  const inputPin = String(req.body?.pin || '').trim();
-
-  if (
-    !inputPin ||
-    inputPin === '8888' ||
-    (inputPin !== expectedPin && inputPin !== '2026')
-  ) {
+  // Require Authorization: Bearer <Firebase ID Token>
+  const bearerToken = extractBearerToken(
+    typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+  );
+  if (!bearerToken) {
     res.status(401).json({
-      ok: false,
-      error: 'Mã PIN giảng viên chưa đúng. Vui lòng kiểm tra lại.',
+      error: 'Unauthorized: Missing Firebase ID Token in Authorization Bearer header.',
+      fallback: true,
     });
     return;
   }
 
-  res.status(200).json({ ok: true });
-});
-
-// Persistent disk-backed classroom state store (data/classroom-state.json)
-interface ServerClassroomStore {
-  roster?: unknown[];
-  slides?: unknown[];
-  srsRecords?: Record<string, unknown>;
-  assignment?: unknown;
-  classroomMode?: 'demo' | 'new';
-  updatedAt: string;
-}
-
-const DATA_DIR = path.resolve(__dirname, 'data');
-const STATE_FILE_PATH = path.join(DATA_DIR, 'classroom-state.json');
-
-function loadClassroomStoreFromDisk(): ServerClassroomStore {
+  let verifiedUser: { uid: string; email?: string };
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (fs.existsSync(STATE_FILE_PATH)) {
-      const raw = fs.readFileSync(STATE_FILE_PATH, 'utf-8');
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') {
-        return {
-          ...parsed,
-          updatedAt: String(parsed.updatedAt || new Date().toISOString()),
-        };
-      }
+    verifiedUser = await verifyFirebaseIdToken(bearerToken);
+    if (!verifiedUser || !verifiedUser.uid) {
+      throw new Error('Missing uid in verified token');
     }
   } catch {
-    // Fallback to initial store if file does not exist or is unreadable
+    res.status(401).json({
+      error: 'Unauthorized: Invalid or expired Firebase ID Token.',
+      fallback: true,
+    });
+    return;
   }
-  return {
-    updatedAt: new Date().toISOString(),
-  };
-}
 
-function saveClassroomStoreToDisk(store: ServerClassroomStore): void {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  fs.writeFileSync(STATE_FILE_PATH, JSON.stringify(store, null, 2), 'utf-8');
-}
-
-let classroomStore: ServerClassroomStore = loadClassroomStoreFromDisk();
-
-app.get('/api/storage/state', (_req, res) => {
-  classroomStore = loadClassroomStoreFromDisk();
-  res.status(200).json(classroomStore);
-});
-
-app.post('/api/storage/state', (req, res) => {
-  try {
-    if (!req.body || typeof req.body !== 'object') {
-      res.status(400).json({ error: 'Invalid storage payload' });
+  // Rate-limit by verified Firebase UID (minute burst + AI_DAILY_LIMIT)
+  const quotaResult = checkAndIncrementAiUidQuota(verifiedUser.uid);
+  if (!quotaResult.allowed) {
+    if (quotaResult.reason === 'minute_limit') {
+      res.status(429).json({
+        error: 'AI rate limit exceeded for this user (uid). Please wait a moment.',
+        fallback: true,
+      });
       return;
     }
-    classroomStore = loadClassroomStoreFromDisk();
-    const { roster, slides, srsRecords, assignment, classroomMode } = req.body;
-    if (Array.isArray(roster)) classroomStore.roster = roster;
-    if (Array.isArray(slides)) classroomStore.slides = slides;
-    if (srsRecords && typeof srsRecords === 'object') {
-      classroomStore.srsRecords = srsRecords as Record<string, unknown>;
-    }
-    if (assignment && typeof assignment === 'object') {
-      classroomStore.assignment = assignment;
-    }
-    if (classroomMode === 'demo' || classroomMode === 'new') {
-      classroomStore.classroomMode = classroomMode;
-    }
-    classroomStore.updatedAt = new Date().toISOString();
-    saveClassroomStoreToDisk(classroomStore);
-    res.status(200).json({ ok: true, updatedAt: classroomStore.updatedAt });
-  } catch {
-    res.status(500).json({ error: 'Failed to persist classroom state' });
+    res.status(429).json({
+      error: `Daily AI quota (${quotaResult.dailyLimit} requests/day) exceeded for uid ${verifiedUser.uid}.`,
+      fallback: true,
+    });
+    return;
   }
-});
+
+  (req as Request & { firebaseUser?: { uid: string; email?: string } }).firebaseUser = verifiedUser;
+  next();
+}
 
 async function callGeminiModel(
   ai: GoogleGenAI,
@@ -656,7 +755,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(__dirname, 'dist');
+    const distPath = path.resolve(ROOT_DIR, 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       if (req.path.startsWith('/api/')) {
@@ -673,7 +772,11 @@ async function startServer() {
   });
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+if (
+  process.argv[1] &&
+  (path.resolve(process.argv[1]) === __filename ||
+    path.basename(process.argv[1]) === 'server.ts' ||
+    path.basename(process.argv[1]) === 'server.js')
+) {
   startServer();
 }
-

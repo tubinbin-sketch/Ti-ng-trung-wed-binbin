@@ -1,7 +1,37 @@
 @import "tailwindcss";
 
+@theme {
+  --color-canvas: var(--token-canvas);
+  --color-surface: var(--token-surface);
+  --color-ink: var(--token-ink);
+  --color-ink-muted: var(--token-ink-muted);
+  --color-primary: var(--token-primary);
+  --color-accent: var(--token-accent);
+  --color-gold: var(--token-gold);
+  --color-border: var(--token-border);
+  --color-success: var(--token-success);
+  --color-warning: var(--token-warning);
+  --color-danger: var(--token-danger);
+  --color-focus: var(--token-focus);
+}
+
 :root {
   --s: max(0.55px, min(calc(100vw / 2048), calc(100vh / 1152)));
+
+  /* 12 Core Semantic Design Tokens (Oriental Rice Paper & Jade Identity) */
+  --token-canvas: #FAF7F0;
+  --token-surface: #FFFFFF;
+  --token-ink: #0F382E;
+  --token-ink-muted: #3A544B;
+  --token-primary: #0F5243;
+  --token-accent: #B8292F;
+  --token-gold: #6E5B1B;
+  --token-border: #D5DEC7;
+  --token-success: #065F46;
+  --token-warning: #B45309;
+  --token-danger: #B91C1C;
+  --token-focus: #0F5243;
+
   --halora-bg: #F4EFE6;
   --halora-ink: #0F382E;
   --halora-ink-muted: #3A544B;
@@ -22,9 +52,9 @@
   --liquid-glass-border: 1px solid rgba(255, 255, 255, 0.7);
   --liquid-glass-shadow: 0 8px 30px rgba(15, 56, 46, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.85);
 
-  /* Dynamic Studio Theme Variables (updated when switching between the 5 teacher themes) */
-  --theme-canvas: #F4EFE6;
-  --theme-surface: #FAF7F0;
+  /* Dynamic Studio Theme Variables */
+  --theme-canvas: #FAF7F0;
+  --theme-surface: #FFFFFF;
   --theme-ink: #0F382E;
   --theme-ink-muted: #3A544B;
   --theme-accent: #9B8A3E;
@@ -34,6 +64,32 @@
   --theme-tab-bar-border: rgba(15, 82, 67, 0.14);
   --theme-glass-bg: rgba(255, 255, 255, 0.75);
   --theme-glass-border: rgba(255, 255, 255, 0.65);
+}
+
+html[data-theme="moon-night"] {
+  --token-canvas: #0E1713;
+  --token-surface: #182821;
+  --token-ink: #F0F5F1;
+  --token-ink-muted: #C2D4C9;
+  --token-primary: #1F8A70;
+  --token-accent: #E04F56;
+  --token-gold: #DFC660;
+  --token-border: #2C463B;
+  --token-success: #34D399;
+  --token-warning: #FBBF24;
+  --token-danger: #F87171;
+  --token-focus: #DFC660;
+
+  --theme-canvas: #0E1713;
+  --theme-surface: #182821;
+  --theme-ink: #F0F5F1;
+  --theme-ink-muted: #C2D4C9;
+}
+
+/* Global Accessible Keyboard Focus Ring (WCAG 2.1 AA) */
+:focus-visible {
+  outline: 2px solid var(--token-focus, #0F5243);
+  outline-offset: 2px;
 }
 
 /* Calligraphy / Hanzi Font for Mi Zi Ge & Featured Characters */
@@ -52,10 +108,10 @@
 }
 
 html[data-theme="moon-night"] .oriental-liquid-glass {
-  background: rgba(24, 38, 32, 0.88);
-  border-color: rgba(197, 179, 88, 0.28);
+  background: rgba(24, 40, 33, 0.92);
+  border-color: rgba(223, 198, 96, 0.32);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  color: #E8EFEA;
+  color: #F0F5F1;
 }
 
 .oriental-liquid-glass:hover {
@@ -148,41 +204,67 @@ html[data-theme="moon-night"] .oriental-liquid-glass {
 
 html {
   scroll-behavior: smooth;
-  background-color: var(--theme-canvas, #F4EFE6);
-  color: var(--theme-ink);
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  background-color: var(--token-canvas, #FAF7F0);
+  color: var(--token-ink, #0F382E);
   font-family: 'Plus Jakarta Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 body {
   margin: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   background: linear-gradient(135deg, #FAF7F0 0%, #F4EFE6 50%, #EAE3D5 100%);
   background-attachment: fixed;
-  color: var(--theme-ink);
+  color: var(--token-ink, #0F382E);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
+#root {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
 html[data-theme="moon-night"] body {
   background: linear-gradient(135deg, #0E1713 0%, #13201B 50%, #182821 100%);
-  color: #E8EFEA;
+  color: #F0F5F1;
 }
 
-/* Dark-mode surface overrides when Moon Night theme is active */
+/* Comprehensive Dark-mode surface overrides when Moon Night theme is active */
 html[data-theme="moon-night"] main section,
-html[data-theme="moon-night"] main [class*="bg-white"],
-html[data-theme="moon-night"] main [class*="bg-[#FAF7F0]"],
-html[data-theme="moon-night"] main [class*="bg-[#FAFBF7]"],
-html[data-theme="moon-night"] main [class*="bg-[#F4EFE6]"] {
-  background-color: rgba(24, 38, 32, 0.88) !important;
-  border-color: rgba(197, 179, 88, 0.25) !important;
-  color: #E8EFEA;
+html[data-theme="moon-night"] [role="dialog"] > div,
+html[data-theme="moon-night"] [class*="bg-white"],
+html[data-theme="moon-night"] [class*="bg-surface"],
+html[data-theme="moon-night"] [class*="bg-canvas"],
+html[data-theme="moon-night"] [class*="bg-stone-50"],
+html[data-theme="moon-night"] [class*="bg-stone-100"],
+html[data-theme="moon-night"] [class*="bg-emerald-50"],
+html[data-theme="moon-night"] [class*="bg-amber-50"] {
+  background-color: #182821 !important;
+  border-color: rgba(223, 198, 96, 0.28) !important;
+  color: #F0F5F1 !important;
 }
 
-html[data-theme="moon-night"] main [class*="text-[#1E3227]"],
-html[data-theme="moon-night"] main [class*="text-[#0F382E]"],
-html[data-theme="moon-night"] main [class*="text-[#3F5447]"],
-html[data-theme="moon-night"] main [class*="text-[#3A544B]"] {
-  color: #E8EFEA !important;
+html[data-theme="moon-night"] input,
+html[data-theme="moon-night"] select,
+html[data-theme="moon-night"] textarea {
+  background-color: #111D18 !important;
+  border-color: rgba(223, 198, 96, 0.35) !important;
+  color: #F0F5F1 !important;
+}
+
+html[data-theme="moon-night"] [class*="text-stone-"],
+html[data-theme="moon-night"] [class*="text-emerald-9"],
+html[data-theme="moon-night"] [class*="text-amber-9"],
+html[data-theme="moon-night"] [class*="text-ink"] {
+  color: #F0F5F1 !important;
 }
 
 /* Global orphan-word prevention on all headings */

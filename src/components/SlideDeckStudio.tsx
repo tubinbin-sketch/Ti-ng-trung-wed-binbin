@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useCallback, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useCallback, useRef, useState } from 'react';
 import {
   Volume2,
   Edit3,
@@ -40,9 +40,25 @@ import {
   buildSafeContextualSvgDataUrl,
   saveCustomVocabImage,
 } from '../utils/vocabVisualEngine';
-import { BinBinPandaAI, BinBinPandaMascotSVG, PandaMood } from './BinBinPandaAI';
-import { AddVocabModal } from './AddVocabModal';
-import { WorksheetPreviewModal } from './WorksheetPreviewModal';
+import type { PandaMood } from './BinBinPandaAI';
+import {
+  getStoredHsk3FilterState,
+  saveStoredHsk3FilterState,
+} from '../utils/storageService';
+import { LazyErrorBoundary } from './LazyErrorBoundary';
+
+const AddVocabModal = React.lazy(() =>
+  import('./AddVocabModal').then((m) => ({ default: m.AddVocabModal }))
+);
+const WorksheetPreviewModal = React.lazy(() =>
+  import('./WorksheetPreviewModal').then((m) => ({ default: m.WorksheetPreviewModal }))
+);
+const MeasureWordDrillModal = React.lazy(() =>
+  import('./MeasureWordDrillModal').then((m) => ({ default: m.MeasureWordDrillModal }))
+);
+const LiveTeachingToolkit = React.lazy(() =>
+  import('./LiveTeachingToolkit').then((m) => ({ default: m.LiveTeachingToolkit }))
+);
 import {
   getIsSpeaking,
   getPreferredSpeechRate,
@@ -76,9 +92,7 @@ import {
   filterSlidesByHsk3,
   getHsk3VocabStandard,
 } from '../utils/hsk3Engine';
-import { LiveTeachingToolkit } from './LiveTeachingToolkit';
 import { FilterDisplayPopover } from './FilterDisplayPopover';
-import { MeasureWordDrillModal } from './MeasureWordDrillModal';
 import {
   analyzeToneSandhi,
   applySrsRatingToRecords,
@@ -181,6 +195,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
   const [speechRate, setSpeechRate] = useState<number>(() => getPreferredSpeechRate());
   const [pandaMood, setPandaMood] = useState<PandaMood>('idle');
   const inlineSvgRef = useRef<SVGSVGElement | null>(null);
+  const pillStripRef = useRef<HTMLDivElement | null>(null);
   const chipRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
   // Add Custom Vocab Modal State (+ Tự thêm từ vựng mới)
@@ -234,10 +249,18 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
   } | null>(null);
   const speechRecognitionRef = useRef<any>(null);
 
-  // HSK 3.0 (3 Stages - 9 Levels) Filter State & SRS Due Today Filter
-  const [hsk3StageFilter, setHsk3StageFilter] = useState<Hsk3StageId>('all');
-  const [hsk3LevelFilter, setHsk3LevelFilter] = useState<Hsk3LevelFilter>('all');
+  // HSK 3.0 (3 Stages - 9 Levels) Filter State & SRS Due Today Filter (Persisted in localStorage)
+  const [hsk3StageFilter, setHsk3StageFilter] = useState<Hsk3StageId>(
+    () => getStoredHsk3FilterState().stage
+  );
+  const [hsk3LevelFilter, setHsk3LevelFilter] = useState<Hsk3LevelFilter>(
+    () => getStoredHsk3FilterState().level
+  );
   const [isDueTodayFilterActive, setIsDueTodayFilterActive] = useState(false);
+
+  useEffect(() => {
+    saveStoredHsk3FilterState(hsk3StageFilter, hsk3LevelFilter);
+  }, [hsk3StageFilter, hsk3LevelFilter]);
 
   const currentSlide = useMemo(
     () => slides[activeSlideIndex] || slides[0],
@@ -255,11 +278,35 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     return result;
   }, [slides, hsk3StageFilter, hsk3LevelFilter, isDueTodayFilterActive, srsRecords]);
 
-  // Auto-scroll active chip into view whenever activeSlideIndex changes
+  // Smoothly scroll ONLY the horizontal chip strip (never window/documentElement) when activeSlideIndex changes
   useEffect(() => {
+    const strip = pillStripRef.current;
     const targetEl = chipRefs.current.get(activeSlideIndex);
-    if (targetEl) {
-      targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    if (!strip || !targetEl) return;
+
+    const stripWidth = strip.clientWidth;
+    const targetRight = targetEl.offsetLeft + targetEl.offsetWidth;
+
+    let nextScrollLeft = 0;
+    if (targetRight > stripWidth - 12) {
+      const rawDesired = targetEl.offsetLeft - stripWidth / 2 + targetEl.offsetWidth / 2;
+      let snappedLeft = Math.max(0, rawDesired);
+      for (const [, btn] of chipRefs.current.entries()) {
+        if (btn.offsetLeft >= rawDesired) {
+          snappedLeft = btn.offsetLeft;
+          break;
+        }
+      }
+      nextScrollLeft = snappedLeft;
+    }
+
+    if (typeof strip.scrollTo === 'function') {
+      strip.scrollTo({
+        left: nextScrollLeft,
+        behavior: 'smooth',
+      });
+    } else {
+      strip.scrollLeft = nextScrollLeft;
     }
   }, [activeSlideIndex]);
   const learnedCount = useMemo(
@@ -418,6 +465,17 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
       }
     });
   }, [slides]);
+
+  // Preload React.lazy modal modules 1.5s after mount for instantaneous opening
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void import('./WorksheetPreviewModal');
+      void import('./MeasureWordDrillModal');
+      void import('./AddVocabModal');
+      void import('./LiveTeachingToolkit');
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   // Cleanup any active SpeechRecognition session on unmount
   useEffect(() => {
@@ -835,12 +893,13 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
       const activeEl = document.activeElement as HTMLElement | null;
       const isInteractiveElement = (el: HTMLElement | null): boolean => {
         if (!el) return false;
-        const tag = el.tagName;
+        const tag = el.tagName?.toUpperCase();
         if (
           tag === 'INPUT' ||
           tag === 'TEXTAREA' ||
           tag === 'SELECT' ||
-          el.isContentEditable
+          el.isContentEditable ||
+          el.getAttribute?.('contenteditable') === 'true'
         ) {
           return true;
         }
@@ -853,17 +912,17 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
         }
         return false;
       };
-      if (isInteractiveElement(target) || isInteractiveElement(activeEl)) {
+      if (isInteractiveElement(activeEl) || isInteractiveElement(target)) {
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-      if (e.key === 'ArrowLeft') {
+      if (e.key === 'ArrowLeft' || e.code === 'ArrowLeft') {
         e.preventDefault();
         const prevIdx = (activeSlideIndex - 1 + slides.length) % slides.length;
         handleSelectSlide(prevIdx);
         speakChinese(slides[prevIdx]?.hanzi || '', speechRate);
-      } else if (e.key === 'ArrowRight') {
+      } else if (e.key === 'ArrowRight' || e.code === 'ArrowRight') {
         e.preventDefault();
         const nextIdx = (activeSlideIndex + 1) % slides.length;
         handleSelectSlide(nextIdx);
@@ -871,12 +930,12 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
       } else if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         speakChinese(currentSlide.hanzi, speechRate);
-      } else if (e.key === 'w' || e.key === 'W') {
+      } else if (e.key === 'w' || e.key === 'W' || e.code === 'KeyW') {
         e.preventDefault();
         setInlineStrokeMode('animate');
         setIsAnimatingStrokes(true);
         speakChinese(currentChar.char, speechRate);
-      } else if (e.key === 'f' || e.key === 'F') {
+      } else if (e.key === 'f' || e.key === 'F' || e.code === 'KeyF') {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent('hanu_toggle_projector_fullscreen'));
       }
@@ -895,6 +954,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     isWorksheetModalOpen,
     isQuickEditModalOpen,
     isBatchImportModalOpen,
+    isMeasureWordModalOpen,
   ]);
 
   const handleExportLessonJson = () => {
@@ -1440,46 +1500,43 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
       : null;
 
       return (
-        <div className="space-y-2.5">
+        <div className="w-full max-w-full box-border space-y-1.5 min-w-0">
           {/* =================================================================
               TIER 2: UNIFIED SEARCH, FILTER POPOVER & CLASSROOM TOOLS BAR
               ================================================================= */}
           <div
             data-testid="teacher-ai-vocab-search-section"
-            className="rounded-2xl backdrop-blur-xl bg-white/85 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 px-3 py-2 transition-all duration-300"
+            className="w-full max-w-full box-border rounded-xl backdrop-blur-xl bg-white/85 border border-white/70 shadow-[0_6px_24px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 px-3 py-1.5 transition-all duration-300"
           >
-            <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-2">
-              {/* Left: Search Input (in Teacher Mode) OR Student Mode Quick Label */}
-              {roleMode === 'teacher' ? (
-                <form
-                  onSubmit={handleUnifiedSearchSubmit}
-                  className="relative flex-1 min-w-[200px]"
-                >
-                  <Search className="w-4 h-4 text-[#3A544B] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={vocabSearchQuery}
-                    onChange={(e) => {
-                      setVocabSearchQuery(e.target.value);
-                      if (e.target.value.trim() && !isAiDrawerOpen) {
-                        setIsAiDrawerOpen(true);
-                      }
-                    }}
-                    placeholder="Tìm hoặc thêm nhanh từ vựng (VD: 温暖, 龙, ấm áp)..."
-                    className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-white border border-[#0F5243]/20 focus:border-[#0F5243] focus:outline-none text-sm font-medium text-[#0F382E]"
-                  />
-                </form>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0F5243]/10 text-[#0F5243] text-sm font-bold">
-                    <BookOpen className="w-4 h-4 text-[#9B8A3E]" />
+            <div className="w-full max-w-full box-border flex flex-wrap items-center justify-between gap-1.5">
+              {/* Single Unified Toolbar Row: Learned Badge / Search + Filter + Action Buttons */}
+              <div className="flex flex-wrap items-center justify-start gap-1.5 w-full min-w-0 max-w-full">
+                {roleMode === 'teacher' ? (
+                  <form
+                    onSubmit={handleUnifiedSearchSubmit}
+                    className="relative flex-1 min-w-[180px] max-w-full"
+                  >
+                    <Search className="w-3.5 h-3.5 text-[#3A544B] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={vocabSearchQuery}
+                      onChange={(e) => {
+                        setVocabSearchQuery(e.target.value);
+                        if (e.target.value.trim() && !isAiDrawerOpen) {
+                          setIsAiDrawerOpen(true);
+                        }
+                      }}
+                      placeholder="Tìm hoặc thêm nhanh từ vựng (VD: 温暖, 龙, ấm áp)..."
+                      className="w-full pl-8 pr-2.5 py-1 rounded-xl bg-white border border-[#0F5243]/20 focus:border-[#0F5243] focus:outline-none text-xs sm:text-sm font-medium text-[#0F382E]"
+                    />
+                  </form>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#0F5243]/10 text-[#0F5243] text-xs sm:text-sm font-bold whitespace-nowrap shrink-0">
+                    <BookOpen className="w-3.5 h-3.5 text-[#9B8A3E] shrink-0" />
                     <span>Đã thuộc {learnedCount}/{slides.length} từ</span>
                   </span>
-                </div>
-              )}
+                )}
 
-              {/* Right: Consolidated Filter & Display Popover + Measure Word Drill + Teacher Tools */}
-              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                 <FilterDisplayPopover
                   totalSlidesCount={slides.length}
                   hsk3LevelFilter={hsk3LevelFilter}
@@ -1529,10 +1586,10 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   type="button"
                   data-testid="open-measure-word-drill-btn"
                   onClick={() => setIsMeasureWordModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/50 text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/50 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
                   title="Luyện chuyên đề Lượng từ & Kết hợp Danh từ HSK 3.0 (量词搭配)"
                 >
-                  <Puzzle className="w-4 h-4 text-[#9B8A3E] shrink-0" />
+                  <Puzzle className="w-3.5 h-3.5 text-[#9B8A3E] shrink-0" />
                   <span>Lượng từ HSK</span>
                 </button>
 
@@ -1540,10 +1597,10 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   type="button"
                   data-testid="toolbar-open-worksheet-modal-btn"
                   onClick={() => setIsWorksheetModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/50 text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/50 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
                   title="In phiếu luyện viết chữ Hán A4 (PDF) chuẩn Ô Mễ Tự Cách"
                 >
-                  <Printer className="w-4 h-4 text-[#9B8A3E] shrink-0" />
+                  <Printer className="w-3.5 h-3.5 text-[#9B8A3E] shrink-0" />
                   <span>In phiếu A4</span>
                 </button>
 
@@ -1551,10 +1608,10 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   type="button"
                   data-testid="open-add-vocab-modal-btn"
                   onClick={handleOpenAddVocabModal}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] border border-[#C5B358]/50 text-sm font-bold shadow-[0_2px_10px_rgba(15,82,67,0.22)] transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#0F5243] to-[#166E5B] hover:from-[#12604F] hover:to-[#1B7D68] text-[#FAF7F0] border border-[#C5B358]/50 text-xs sm:text-sm font-bold shadow-[0_2px_10px_rgba(15,82,67,0.22)] transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
                   title="Thêm từ vựng mới vào bộ thẻ học tập"
                 >
-                  <Plus className="w-4 h-4 text-[#C5B358] shrink-0" />
+                  <Plus className="w-3.5 h-3.5 text-[#C5B358] shrink-0" />
                   <span>Thêm từ</span>
                 </button>
 
@@ -1563,9 +1620,9 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   data-testid="open-batch-import-modal-btn"
                   onClick={() => setIsBatchImportModalOpen(true)}
                   title="Nhập danh sách từ vựng / bài khóa hàng loạt (Batch Import)"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/45 text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/45 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
                 >
-                  <ClipboardList className="w-4 h-4 text-[#9B8A3E] shrink-0" />
+                  <ClipboardList className="w-3.5 h-3.5 text-[#9B8A3E] shrink-0" />
                   <span className="hidden xl:inline">Nhập bài khóa</span>
                 </button>
 
@@ -1582,10 +1639,10 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     type="button"
                     data-testid="lesson-save-load-menu-btn"
                     onClick={() => setIsLessonFileMenuOpen((v) => !v)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/45 text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-white hover:bg-[#FAF7F0] text-[#0F382E] border border-[#9B8A3E]/45 text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 whitespace-nowrap cursor-pointer"
                     title="Xuất hoặc Nhập dữ liệu học tập & bài giảng (.json)"
                   >
-                    <Save className="w-4 h-4 text-[#9B8A3E] shrink-0" />
+                    <Save className="w-3.5 h-3.5 text-[#9B8A3E] shrink-0" />
                     <span className="hidden xl:inline">Lưu / Nạp</span>
                   </button>
                 </div>
@@ -1596,26 +1653,30 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       type="button"
                       data-testid="toggle-ai-suggestions-drawer-btn"
                       onClick={() => setIsAiDrawerOpen((o) => !o)}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-sm font-bold transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap border ${
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 active:scale-95 cursor-pointer whitespace-nowrap border ${
                         isAiDrawerOpen
                           ? 'bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] border-[#C5B358]/50 shadow-xs'
                           : 'bg-white hover:bg-[#FAF7F0] text-[#0F382E] border-[#9B8A3E]/45'
                       }`}
                     >
-                      <Sparkles className="w-4 h-4 text-[#C5B358] shrink-0" />
+                      <Sparkles className="w-3.5 h-3.5 text-[#C5B358] shrink-0" />
                       <span>Kho từ gợi ý</span>
                     </button>
 
-                    <LiveTeachingToolkit
-                      slides={slides}
-                      currentSlide={currentSlide}
-                      activeSlideIndex={activeSlideIndex}
-                      onSelectSlideIndex={handleSelectSlide}
-                      onNotify={(msg) => setToastMessage(msg)}
-                      onSwitchToStudentHomework={onSwitchToStudentHomework}
-                      onOpenWorksheetModal={() => setIsWorksheetModalOpen(true)}
-                      onToggleShortcutsHint={() => setShowShortcutsHint((v) => !v)}
-                    />
+                    <LazyErrorBoundary compact>
+                      <Suspense fallback={null}>
+                        <LiveTeachingToolkit
+                          slides={slides}
+                          currentSlide={currentSlide}
+                          activeSlideIndex={activeSlideIndex}
+                          onSelectSlideIndex={handleSelectSlide}
+                          onNotify={(msg) => setToastMessage(msg)}
+                          onSwitchToStudentHomework={onSwitchToStudentHomework}
+                          onOpenWorksheetModal={() => setIsWorksheetModalOpen(true)}
+                          onToggleShortcutsHint={() => setShowShortcutsHint((v) => !v)}
+                        />
+                      </Suspense>
+                    </LazyErrorBoundary>
                   </>
                 )}
               </div>
@@ -1765,18 +1826,18 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
           {/* =================================================================
               TIER 3: HORIZONTAL SCROLLABLE VOCABULARY STRIP + PAGE SWITCHER
               ================================================================= */}
-          <div className="flex items-center gap-2">
+          <div className="w-full max-w-full box-border flex items-center gap-1.5 min-w-0">
             <div className="inline-flex items-center rounded-xl bg-white/90 border border-[rgba(30,50,39,0.16)] p-0.5 shrink-0 shadow-2xs">
               <button
                 type="button"
                 onClick={handlePrev}
                 aria-label="Slide trước"
                 title="Từ trước (Phím tắt: ←)"
-                className="p-1.5 rounded-lg text-[#1E3227] hover:bg-[#E7ECD9] transition-colors cursor-pointer"
+                className="p-1 rounded-lg text-[#1E3227] hover:bg-[#E7ECD9] transition-colors cursor-pointer"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5" />
               </button>
-              <span className="px-2 text-sm font-bold text-[#1E3227] tabular-nums whitespace-nowrap">
+              <span className="px-1.5 text-xs sm:text-sm font-bold text-[#1E3227] tabular-nums whitespace-nowrap">
                 {activeSlideIndex + 1}/{slides.length}
               </span>
               <button
@@ -1784,15 +1845,16 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                 onClick={handleNext}
                 aria-label="Slide tiếp theo"
                 title="Từ tiếp theo (Phím tắt: →)"
-                className="p-1.5 rounded-lg text-[#1E3227] hover:bg-[#E7ECD9] transition-colors cursor-pointer"
+                className="p-1 rounded-lg text-[#1E3227] hover:bg-[#E7ECD9] transition-colors cursor-pointer"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
             <div
+              ref={pillStripRef}
               data-testid="horizontal-vocab-pill-strip"
-              className="flex-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1"
+              className="min-w-0 flex-1 flex items-center justify-start gap-1.5 overflow-x-auto no-scrollbar py-0.5"
             >
               {(filteredSlides.length > 0 ? filteredSlides : slides).map((s) => {
                 const originalIdx = slides.findIndex((item) => item.id === s.id);
@@ -1810,21 +1872,21 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       handleSelectSlide(idx);
                       speakChinese(s.hanzi);
                     }}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-sm font-semibold transition-all whitespace-nowrap shrink-0 border cursor-pointer ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap shrink-0 border cursor-pointer ${
                       isActive
                         ? 'bg-[#1E3227] border-[#9B8A3E] text-[#FAFBF7] shadow-2xs'
                         : 'bg-white/90 border-[rgba(30,50,39,0.14)] text-[#3F5447] hover:text-[#1E3227] hover:bg-[#FAFBF7] hover:border-[#9B8A3E]'
                     }`}
                   >
                     <span
-                      className={`text-sm font-bold tabular-nums ${
+                      className={`text-xs sm:text-sm font-bold tabular-nums ${
                         isActive ? 'text-[#C5B358]' : 'text-[#5F7266]'
                       }`}
                     >
                       {idx + 1}
                     </span>
                     <span
-                      className={`font-['Noto_Sans_SC'] text-base font-bold ${
+                      className={`font-['Noto_Sans_SC'] text-sm sm:text-base font-bold ${
                         isActive ? 'text-[#FAFBF7]' : 'text-[#1E3227]'
                       }`}
                     >
@@ -2080,24 +2142,24 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               5. BALANCED 3-COLUMN WORKSPACE (64-80PX HANZI & >= 14PX TYPOGRAPHY)
               ================================================================= */}
           {(roleMode !== 'student' || studentStudyMode !== 'flashcard') && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3.5 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-2.5 items-stretch">
             {/* COLUMN 1 (lg:col-span-4): Main Vocabulary Card on the Left */}
-            <div className="md:col-span-1 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-white/80 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 p-4 flex flex-col justify-between transition-all duration-300">
-              <div className="space-y-3">
+            <div className="md:col-span-1 lg:col-span-4 rounded-2xl backdrop-blur-xl bg-white/80 border border-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-[#C5B358]/50 p-3 sm:p-3.5 flex flex-col justify-between transition-all duration-300">
+              <div className="space-y-2">
                 {/* Top Badges: [HSK X] + [Từ loại] + [Chữ viết tay / Nhận diện] */}
                 <div className="flex flex-wrap items-center justify-between gap-1.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-sm font-extrabold tracking-wide shadow-2xs">
+                    <span className="px-2 py-0.5 rounded-lg bg-gradient-to-r from-[#0F5243] to-[#166E5B] text-[#FAF7F0] text-xs sm:text-sm font-extrabold tracking-wide shadow-2xs">
                       {currentHsk3Meta.hskLevelNormalized}
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-lg bg-[#FAF7F0] border border-[#9B8A3E]/40 text-[#0F382E] text-sm font-bold">
+                    <span className="px-2 py-0.5 rounded-lg bg-[#FAF7F0] border border-[#9B8A3E]/40 text-[#0F382E] text-xs sm:text-sm font-bold">
                       {currentSlide.partOfSpeech}
                     </span>
                   </div>
 
                   <span
                     data-testid="hsk3-char-category-badge"
-                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border text-sm font-bold ${
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-xs sm:text-sm font-bold ${
                       currentHsk3Meta.charCategory === 'handwriting'
                         ? 'bg-[#0F5243]/10 border-[#0F5243]/25 text-[#0F5243]'
                         : 'bg-[#FAF7F0] border-[#9B8A3E]/45 text-[#0F382E]'
@@ -2114,17 +2176,17 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
                 {/* Enlarged Central Hanzi (64px-80px) + Pinyin + Hán Việt + Prominent Meaning + Example Sentence */}
                 {!isCardFlipped ? (
-                  <div className="py-2 text-center space-y-2.5">
+                  <div className="py-1 text-center space-y-1.5">
                     <div className="inline-flex items-center justify-center">
                       <span
-                        className="font-hanzi-calligraphy text-6xl sm:text-7xl font-bold tracking-wide text-[#0F382E] select-all leading-none py-1"
+                        className="font-hanzi-calligraphy text-5xl sm:text-6xl font-bold tracking-wide text-[#0F382E] select-all leading-none py-0.5"
                         data-testid="active-slide-hanzi"
                       >
                         {currentSlide.hanzi}
                       </span>
                     </div>
 
-                    <div className="text-base sm:text-lg font-bold text-[#0F382E] flex flex-wrap items-center justify-center gap-2 leading-snug">
+                    <div className="text-sm sm:text-base font-bold text-[#0F382E] flex flex-wrap items-center justify-center gap-1.5 leading-snug">
                       {showPinyin && (
                         <span className="text-[#9B8A3E] tracking-wide" data-testid="active-slide-pinyin">
                           {currentSlide.pinyin}
@@ -2138,15 +2200,15 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
                     {/* Prominent Vietnamese Meaning & Usage Note directly below Pinyin */}
                     {showMeaning && (
-                      <div className="p-2.5 rounded-xl bg-[#FAF7F0] border border-[#0F5243]/15 space-y-1">
+                      <div className="p-2 rounded-xl bg-[#FAF7F0] border border-[#0F5243]/15 space-y-0.5">
                         <div
-                          className="text-base sm:text-lg font-extrabold text-[#0F5243]"
+                          className="text-sm sm:text-base font-extrabold text-[#0F5243]"
                           data-testid="active-slide-meaning"
                         >
                           {currentSlide.meaning}
                         </div>
                         {currentSlide.usageNote && (
-                          <p className="text-sm text-[#3A544B] leading-snug line-clamp-2">
+                          <p className="text-xs sm:text-sm text-[#3A544B] leading-snug line-clamp-2">
                             {currentSlide.usageNote}
                           </p>
                         )}
@@ -3397,30 +3459,42 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
             </div>
           </div>
 
-          <MeasureWordDrillModal
-            isOpen={isMeasureWordModalOpen}
-            slides={slides}
-            onClose={() => setIsMeasureWordModalOpen(false)}
-          />
+          <LazyErrorBoundary fallbackLabel="Không thể tải chuyên đề Lượng từ HSK.">
+            <Suspense fallback={null}>
+              <MeasureWordDrillModal
+                isOpen={isMeasureWordModalOpen}
+                slides={slides}
+                onClose={() => setIsMeasureWordModalOpen(false)}
+              />
+            </Suspense>
+          </LazyErrorBoundary>
 
           {/* Sub-component: Modal Tự thêm từ vựng mới vào danh sách Slide */}
-          <AddVocabModal
-            isOpen={isAddVocabModalOpen}
-            onClose={() => setIsAddVocabModalOpen(false)}
-            onSaveVocab={(newSlide) => {
-              onAddSlides([newSlide]);
-              onSelectSlideIndex(slides.length);
-              setToastMessage(`Đã thêm từ mới "${newSlide.hanzi}" vào Slide thành công!`);
-            }}
-            nextIndex={slides.length + 1}
-          />
+          <LazyErrorBoundary fallbackLabel="Không thể tải hộp thoại Thêm từ vựng.">
+            <Suspense fallback={null}>
+              <AddVocabModal
+                isOpen={isAddVocabModalOpen}
+                onClose={() => setIsAddVocabModalOpen(false)}
+                onSaveVocab={(newSlide) => {
+                  onAddSlides([newSlide]);
+                  onSelectSlideIndex(slides.length);
+                  setToastMessage(`Đã thêm từ mới "${newSlide.hanzi}" vào Slide thành công!`);
+                }}
+                nextIndex={slides.length + 1}
+              />
+            </Suspense>
+          </LazyErrorBoundary>
 
           {/* Sub-component: Modal Bản xem trước trang A4 (Phiếu tập viết chữ Mễ) */}
-          <WorksheetPreviewModal
-            isOpen={isWorksheetModalOpen}
-            onClose={() => setIsWorksheetModalOpen(false)}
-            slides={slides}
-          />
+          <LazyErrorBoundary fallbackLabel="Không thể tải trình In phiếu tập viết A4.">
+            <Suspense fallback={null}>
+              <WorksheetPreviewModal
+                isOpen={isWorksheetModalOpen}
+                onClose={() => setIsWorksheetModalOpen(false)}
+                slides={slides}
+              />
+            </Suspense>
+          </LazyErrorBoundary>
 
           {/* =================================================================
               MODAL 3: ✏️ SỬA NHANH THẺ BÀI GIẢNG & TẠO ẢNH KHỚP CÂU VÍ DỤ

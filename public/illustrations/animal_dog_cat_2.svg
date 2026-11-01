@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" width="900" height="600">
+  <defs>
+    <linearGradient id="bg_animal_dog_cat_2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#14532D"/>
+      <stop offset="100%" stop-color="#166534"/>
+    </linearGradient>
+    <radialGradient id="glow_animal_dog_cat_2" cx="50%" cy="45%" r="50%">
+      <stop offset="0%" stop-color="#FDE047" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#14532D" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="900" height="600" rx="28" fill="url(#bg_animal_dog_cat_2)"/>
+  <circle cx="360" cy="230" r="250" fill="url(#glow_animal_dog_cat_2)"/>
+  <rect x="28" y="28" width="844" height="544" rx="20" fill="none" stroke="#FDE047" stroke-opacity="0.4" stroke-width="2"/>
+  <circle cx="450" cy="240" r="115" fill="#0B1510" fill-opacity="0.45" stroke="#FDE047" stroke-opacity="0.65" stroke-width="2.5"/>
+  <text x="450" y="272" text-anchor="middle" font-size="96">🐕</text>
+  <text x="450" y="425" text-anchor="middle" fill="#FFFBEB" font-size="36" font-weight="700" font-family="Plus Jakarta Sans, Noto Sans SC, sans-serif">狗 · Thú cưng đáng yêu</text>
+  <text x="450" y="472" text-anchor="middle" fill="#FDE047" font-size="22" font-weight="600" font-family="Plus Jakarta Sans, sans-serif">Cún con và mèo nhỏ vui đùa trên thảm cỏ (Góc 2)</text>
+</svg>

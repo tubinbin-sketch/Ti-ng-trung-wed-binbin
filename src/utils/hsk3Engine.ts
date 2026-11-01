@@ -532,6 +532,8 @@ export interface StudentHsk3PillarMetric {
   statusNote: string;
 }
 
+export type Hsk3PillarMetric = StudentHsk3PillarMetric;
+
 export function calculateStudentHsk3Pillars(params: {
   learnedSlideCount: number;
   totalSlideCount: number;

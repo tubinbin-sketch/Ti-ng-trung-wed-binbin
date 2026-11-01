@@ -1,51 +1,102 @@
-# HANU × 阮文受 — Hệ Thống Trợ Giảng & Học Tập Hán Ngữ Chuẩn HSK 3.0
+# HANU × 阮文受 — Hệ Thống Học Tập & Quản Lý Lớp Học Hán Ngữ HSK 3.0
 
-Nền tảng giảng dạy, soạn bài tự động, luyện viết chữ Hán trên ô Mễ Tự Cách (`米字格`), bài tập 5 kỹ năng và quản lý lớp học tiếng Trung chuẩn khung **HSK 3.0 (3 giai đoạn – 9 cấp độ)** theo phong cách thiết kế **Modern Oriental Liquid Glass** (Ngọc Bích `#0F5243` & Chu Sa Hoàng Gia `#B8292F` trên nền giấy tuyên thành `#FAF7F0`).
-
----
-
-## Kiến Trúc & Tính Năng Cốt Lõi
-
-### 1. Phân Quyền Vai Trò & Bảo Mật Cổng Giáo Viên (Student-First & Teacher PIN Gate)
-- **Mặc định chế độ Học sinh (`student`)**: Học viên truy cập trực tiếp vào không gian tự học từ vựng, tập viết nét chữ Mễ, Flashcard lặp lại ngắt quãng (Spaced Repetition + Sổ từ khó `错题本`), Luyện Lượng từ & Thanh điệu HSK 3.0, và Đấu trường Bài tập 5 kỹ năng.
-- **Khóa PIN Cổng Giáo viên (`teacher`)**: Chuyển sang chế độ Giảng viên yêu cầu xác thực mã PIN bảo mật (Mã PIN demo mặc định: `2026`) để bảo vệ công cụ quản lý lớp, bảng điểm và trình biên tập bài giảng.
-
-### 2. Hệ Thống Thanh Công Cụ Tối Giản 3 Tầng (3-Tier Teacher Workspace)
-- **Tầng 1 (Top Navbar hợp nhất)**: Logo `HANU × 阮文受`, chuyển đổi 2 phân hệ chính (`1. Soạn Bài`, `2. Quản Lý Lớp`), nút `Đổi kiểu`, `Sao lưu JSON`, và chuyển đổi vai trò `Học sinh / Giáo viên`.
-- **Tầng 2 (Thanh Tìm Kiếm, Bộ Lọc Popover & Menu Công Cụ Đứng Lớp)**:
-  - Ô tìm kiếm từ vựng thông minh kèm kho từ gợi ý chuẩn HSK 3.0.
-  - Popover **`Bộ lọc & Hiển thị`**: Gom gọn bộ lọc cấp độ HSK 1–9, 3 giai đoạn (Sơ cấp, Trung cấp, Cao cấp), các nút bật/tắt `Pinyin`, `Nghĩa TV`, và tùy chỉnh tốc độ viết nét / giọng đọc.
-  - Menu thả xuống **`Công cụ đứng lớp`**: Gom gọn các công cụ giảng dạy trực tiếp (`Trình chiếu Fullscreen`, `Gọi tên ngẫu nhiên`, `Đồng hồ bấm giờ`, `Mini-Game lớp học`, `Nghe viết Chính tả 听写`, `Luyện Lượng từ 量词`, `Giao bài từ Slide`, `Giáo án HSK 3.0`, `In phiếu A4`, `Phím tắt`).
-- **Tầng 3 (Dải Từ Vựng Cuộn Ngang Mượt Mà)**: Hiển thị danh sách thẻ từ vựng với trạng thái đã thuộc và chuyển đổi tức thì.
-
-### 3. Bố Cục 3 Cột Cân Đối & Chuẩn Sư Phạm HSK 3.0
-- **Cột 1 (Thẻ Từ Vựng Trung Tâm)**: Chữ Hán trung tâm kích thước lớn (`64px–80px`), ngay bên dưới Pinyin là từ loại, Hán Việt, nghĩa tiếng Việt rõ ràng và câu ví dụ giao tiếp thực tế kèm phát âm chuẩn `zh-CN`, chiết tự bộ thủ và điểm ngữ pháp HSK 3.0.
-- **Cột 2 (Ô Mễ Tự Cách · 米字格)**: Hoạt ảnh thứ tự nét viết chuẩn `HanziWriter` kết hợp chế độ tự viết chấm điểm độ chính xác từng nét trên canvas SVG.
-- **Cột 3 (Minh Họa Ngữ Cảnh & Hội Thoại Thực Tế · 课文)**: Kết hợp hình ảnh ngữ cảnh an toàn (`SafeImage` tự động chuyển sang tranh thủy mặc Phương Đông khi lỗi mạng), câu ví dụ thực tế (luyện phát âm thu âm giọng nói) và hội thoại A–B đọc Karaoke.
-
-### 4. Backend Express & Lưu Trữ Bền Vững (`server.ts` & `storageService.ts`)
-- **Rate Limiting & Input Validation**: Giới hạn tần suất gọi API (`/api/*`) chống spam, kiểm tra độ dài chuỗi đầu vào và trả về mã trạng thái HTTP chuẩn (`400`, `429`, `500`, `503`), ẩn thông tin lỗi nội bộ.
-- **Model cấu hình qua biến môi trường**: Sử dụng `process.env.GEMINI_MODEL || 'gemini-2.5-flash'` qua SDK `@google/genai`.
-- **Đồng bộ & Sao lưu toàn diện (`storageService.ts`)**: Đồng bộ trạng thái lớp học qua API `/api/storage/state` kết hợp `localStorage` và xuất/nhập toàn bộ dữ liệu lớp học ra file `.json`.
+Ứng dụng web học tiếng Trung HSK 1–9 dành cho lớp học (**React 19 + Vite + Tailwind CSS v4 + Express + Firebase Auth & Cloud Firestore + Gemini AI**), thiết kế sẵn sàng triển khai trên **Google Cloud Run**.
 
 ---
 
-## Cài Đặt & Vận Hành
+## 1. Kiến trúc & Tính năng chính
+
+1. **Xác thực Tài khoản (Firebase Authentication)**:
+   - **Giáo viên**: Đăng nhập bằng tài khoản Google (`GoogleAuthProvider`), tự động khởi tạo hồ sơ giáo viên và lớp học trên Firestore. (Đã loại bỏ hoàn toàn cơ chế mã PIN cũ).
+   - **Học sinh**: Tham gia lớp bằng **Mã lớp (`joinCode`) + Mã học viên (`studentCode`, VD: `HV-001`)** do giáo viên cấp (sử dụng Firebase Anonymous Auth hoặc Google Auth để cấp `uid` riêng biệt cho từng học sinh). Học sinh không thể chọn tên của học sinh khác để làm bài hộ.
+   - **Chế độ Bản Demo (`🧪 Xem bản demo`)**: Chạy dữ liệu mẫu 12 học viên hoàn toàn trong bộ nhớ tạm để trải nghiệm nhanh mà không ghi lên Firestore.
+
+2. **Cơ sở dữ liệu thời gian thực & Offline Cache (Cloud Firestore)**:
+   - `teachers/{uid}`: Hồ sơ giảng viên.
+   - `classes/{classId}`: `{ teacherUid, name, hskLevel, joinCode }`.
+   - `classes/{classId}/students/{studentUid}`: `{ name, studentCode, hskLevel, joinedAt }`.
+   - `classes/{classId}/decks/{deckId}`: Bộ thẻ bài giảng từ vựng của giáo viên.
+   - `classes/{classId}/assignments/{assignmentId}`: Đề bài tập về nhà đã giao.
+   - `classes/{classId}/submissions/{submissionId}`: `{ studentUid, assignmentId, score, answersJson, submittedAt }` — học sinh chỉ được tạo bài nộp của chính mình, không sửa được điểm sau khi nộp và không đọc được bài làm của bạn khác.
+   - `classes/{classId}/leaderboard/{studentUid}`: Bảng xếp hạng lớp chỉ công khai `{ name, studentCode, hskLevel, score, timeSeconds, streak }`.
+   - `users/{studentUid}/srs/{wordId}`: Tiến độ ôn tập Flashcard SRS & trạng thái "đã thuộc" cá nhân của từng học sinh.
+   - Bật sẵn **Firestore Offline Persistence (`persistentLocalCache`)** giúp học viên tra từ và ôn Flashcard ngay cả khi mất mạng.
+
+3. **Công cụ Di chuyển Dữ liệu Cũ (`📂 Chuyển JSON cũ lên Firestore`)**:
+   - Giáo viên bấm nút **`📂 Chuyển JSON cũ lên Firestore`** trong trang Quản lý lớp (`/giao-vien/lop/:classId`) và chọn file `classroom-state.json` hoặc `HANU_HSK3_Full_Backup_*.json` để tự động tạo lớp, danh sách học sinh, bài tập và bộ từ vựng trên Firestore.
+
+4. **Định tuyến URL (`react-router-dom`)**:
+   - `/hoc`: Học từ vựng, ngữ pháp & Luyện viết chữ Hán ô Mễ Tự Cách.
+   - `/flashcard`: Ôn tập Flashcard SRS & Sổ tay từ khó (错题本).
+   - `/bai-tap` & `/bai-tap/:id`: Đấu trường Bài tập HSK 3.0 (`/bai-tap/homework`, `/bai-tap/sentence-builder`, `/bai-tap/speedtest`, `/bai-tap/leaderboard`).
+   - `/giao-vien/soan-bai`: Studio Soạn bài giảng của Giáo viên.
+   - `/giao-vien/lop/:classId`: Quản lý lớp học, giao bài và sổ điểm.
+   - `/dang-nhap`: Cổng đăng nhập Giáo viên / Học sinh.
+   - Hỗ trợ đầy đủ nút Back / Forward của trình duyệt và trang `404` khi nhập sai URL.
+
+5. **Bảo vệ API Gemini AI & Dữ liệu Nét chữ / Hình minh họa Nội bộ**:
+   - Các endpoint `/api/hanzi/enrich`, `/api/hanzi/suggest`, `/api/binbin/chat` yêu cầu header `Authorization: Bearer <Firebase ID Token>`, được xác thực phía server bằng `firebase-admin` và giới hạn lượt gọi theo `uid` (theo phút & theo ngày qua `AI_DAILY_LIMIT`).
+   - Dữ liệu nét viết chữ Hán được phục vụ trực tiếp từ gói `hanzi-writer-data` tại `/hanzi-data/:char.json` (không phụ thuộc `cdn.jsdelivr.net`).
+   - Toàn bộ 63 ảnh minh họa từ vựng được lưu cục bộ tại `public/illustrations/*.svg` (không phụ thuộc `images.unsplash.com`).
+
+---
+
+## 2. Hướng dẫn tạo Firebase Project từ đầu (Từng bước)
+
+1. Truy cập [Firebase Console](https://console.firebase.google.com/) và bấm **Add project** (hoặc chọn Google Cloud project hiện có).
+2. **Bật Authentication**:
+   - Vào **Build → Authentication → Get started**.
+   - Trong tab **Sign-in method**, bật:
+     - **Google** (dành cho Giáo viên và Học sinh đăng nhập bằng Google).
+     - **Anonymous** (dành cho Học sinh tham gia nhanh bằng Mã lớp + Mã học viên).
+   - Trong tab **Settings → Authorized domains**, thêm tên miền Cloud Run của bạn (ví dụ: `your-service-xyz.a.run.app`).
+3. **Tạo Cloud Firestore Database**:
+   - Vào **Build → Firestore Database → Create database**.
+   - Chọn vị trí (ví dụ `asia-southeast1` hoặc `nam5`) và khởi tạo ở chế độ **Production mode**.
+4. **Triển khai Firestore Security Rules**:
+   - Sao chép nội dung file `firestore.rules` trong repo vào tab **Rules** trên Firebase Console và bấm **Publish** (hoặc chạy `firebase deploy --only firestore:rules`).
+5. **Lấy cấu hình Web App**:
+   - Vào **Project Settings → General → Your apps → Web app (`</>`)**.
+   - Điền các giá trị vào file `.env` (theo mẫu `.env.example`) hoặc cập nhật `firebase-applet-config.json`.
+
+---
+
+## 3. Chạy thử tại máy cục bộ (Local Development & Firebase Emulator)
 
 ```bash
 # 1. Cài đặt dependencies
 npm install
 
-# 2. Cấu hình biến môi trường (sao chép từ .env.example)
+# 2. Tạo file .env từ .env.example
 cp .env.example .env
 
-# 3. Chạy môi trường phát triển (Full-stack Express + Vite trên cổng 3000)
+# 3. Chạy server phát triển (Express + Vite tại http://localhost:3000)
 npm run dev
+```
 
-# 4. Chạy bộ kiểm thử đơn vị (Unit Tests)
+### Chạy kiểm thử tự động (`npm test`) & Kiểm thử Firestore Rules với Emulator:
+
+```bash
+# Chạy toàn bộ unit tests (Tone Sandhi, SRS, AI Auth/UID Quota, Hanzi Data, Firestore Rules Invariants)
 npm test
 
-# 5. Kiểm tra TypeScript & Build Production
-npm run lint
+# Nếu máy có cài Firebase CLI & Java, chạy kèm Firestore Emulator trực tiếp:
+npx firebase-tools emulators:exec --only firestore "npm test"
+```
+
+---
+
+## 4. Triển khai lên Google Cloud Run
+
+```bash
+# 1. Kiểm tra bản build Production
 npm run build
+
+# 2. Deploy lên Cloud Run (sử dụng Application Default Credentials cho firebase-admin)
+gcloud run deploy hanu-hsk3-classroom \
+  --source . \
+  --region asia-southeast1 \
+  --allow-unauthenticated \
+  --set-env-vars="NODE_ENV=production,FIREBASE_PROJECT_ID=YOUR_PROJECT_ID,AI_DAILY_LIMIT=60" \
+  --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest"
 ```

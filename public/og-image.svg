@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="riceCanvas" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FAF7F0" />
+      <stop offset="50%" stop-color="#F4EFE6" />
+      <stop offset="100%" stop-color="#EAE3D5" />
+    </linearGradient>
+    <linearGradient id="jadeCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F5243" />
+      <stop offset="100%" stop-color="#166E5B" />
+    </linearGradient>
+    <linearGradient id="cinnabarBadge" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#B8292F" />
+      <stop offset="100%" stop-color="#961C21" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#riceCanvas)" />
+  <rect x="28" y="28" width="1144" height="574" rx="28" fill="none" stroke="#9B8A3E" stroke-width="3" stroke-opacity="0.55" />
+
+  <!-- Decorative Mi Zi Ge Background Grid on Right -->
+  <g transform="translate(760, 95)">
+    <rect width="360" height="360" rx="28" fill="#FAF7F0" stroke="#C5B358" stroke-width="3" />
+    <line x1="0" y1="180" x2="360" y2="180" stroke="#C5B358" stroke-width="2" stroke-dasharray="10 8" stroke-opacity="0.6" />
+    <line x1="180" y1="0" x2="180" y2="360" stroke="#C5B358" stroke-width="2" stroke-dasharray="10 8" stroke-opacity="0.6" />
+    <line x1="0" y1="0" x2="360" y2="360" stroke="#C5B358" stroke-width="1.5" stroke-dasharray="10 8" stroke-opacity="0.45" />
+    <line x1="360" y1="0" x2="0" y2="360" stroke="#C5B358" stroke-width="1.5" stroke-dasharray="10 8" stroke-opacity="0.45" />
+    <text x="180" y="255" text-anchor="middle" font-family="Noto Sans SC, KaiTi, serif" font-size="220" font-weight="700" fill="#0F5243">汉</text>
+  </g>
+
+  <!-- Cinnabar Seal -->
+  <g transform="translate(1030, 390)">
+    <rect width="110" height="110" rx="22" fill="url(#cinnabarBadge)" stroke="#FAF7F0" stroke-width="4" />
+    <text x="55" y="50" text-anchor="middle" font-family="Noto Sans SC, serif" font-size="28" font-weight="700" fill="#FAF7F0">阮文</text>
+    <text x="55" y="86" text-anchor="middle" font-family="Noto Sans SC, serif" font-size="28" font-weight="700" fill="#FAF7F0">受印</text>
+  </g>
+
+  <!-- Left Editorial Content -->
+  <g transform="translate(80, 110)">
+    <rect width="360" height="44" rx="22" fill="url(#jadeCard)" />
+    <text x="24" y="28" font-family="Plus Jakarta Sans, sans-serif" font-size="16" font-weight="700" fill="#FAF7F0" letter-spacing="1.5">HANU × 阮文受 · CHUẨN HSK 3.0</text>
+
+    <text x="0" y="130" font-family="Plus Jakarta Sans, sans-serif" font-size="60" font-weight="800" fill="#0F382E">Hiểu ngôn ngữ.</text>
+    <text x="0" y="205" font-family="Plus Jakarta Sans, sans-serif" font-size="60" font-weight="800" fill="#0F5243">Làm chủ Hán ngữ.</text>
+
+    <text x="0" y="270" font-family="Plus Jakarta Sans, sans-serif" font-size="24" font-weight="500" fill="#3A544B">Luyện nét ô Mễ Tự Cách (米字格) · Flashcard SRS</text>
+    <text x="0" y="308" font-family="Plus Jakarta Sans, sans-serif" font-size="24" font-weight="500" fill="#3A544B">Bài tập 5 kỹ năng · Trợ giảng 彬彬 · Quản lý lớp học</text>
+
+    <!-- Bottom Metric Pills -->
+    <g transform="translate(0, 360)">
+      <rect width="200" height="68" rx="16" fill="#0F5243" />
+      <text x="24" y="30" font-family="Plus Jakarta Sans, sans-serif" font-size="13" font-weight="700" fill="#C5B358">GIAI ĐOẠN HSK 3.0</text>
+      <text x="24" y="54" font-family="Plus Jakarta Sans, sans-serif" font-size="22" font-weight="800" fill="#FAF7F0">9 Cấp Độ (1–9)</text>
+
+      <rect x="220" y="0" width="220" height="68" rx="16" fill="#B8292F" />
+      <text x="244" y="30" font-family="Plus Jakarta Sans, sans-serif" font-size="13" font-weight="700" fill="#FAF7F0">LỚP HỌC TRỰC TUYẾN</text>
+      <text x="244" y="54" font-family="Plus Jakarta Sans, sans-serif" font-size="22" font-weight="800" fill="#FAF7F0">Cloud Firestore</text>
+    </g>
+  </g>
+</svg>

@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { LeaderboardEntry } from '../data/chineseData';
 import { getStoredStudentRoster, ClassStudent } from './ClassroomManager';
-import { fetchRemoteState } from '../utils/storageService';
 
 export interface ClassLeaderboardItem extends LeaderboardEntry {
   studentCode?: string;
@@ -44,7 +43,6 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
     window.addEventListener('hanu_remote_state_synced', syncRoster);
     window.addEventListener('hanu_classroom_mode_changed', syncRoster);
     window.addEventListener('storage', syncRoster);
-    void fetchRemoteState();
     return () => {
       window.removeEventListener('hanu_students_updated', syncRoster);
       window.removeEventListener('hanu_remote_state_synced', syncRoster);

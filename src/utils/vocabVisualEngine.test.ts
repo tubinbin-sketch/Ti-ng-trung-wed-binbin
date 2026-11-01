@@ -1,17 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   buildContextualImagePrompt,
   buildSafeContextualSvgDataUrl,
   inferSemanticArchetype,
   resolveSemanticVisualProfile,
 } from './vocabVisualEngine';
+import { INITIAL_VOCAB_SLIDES } from '../data/chineseData';
 
 test('Auto Semantic Vocabulary Visual Engine maps family and people words to family_home and friends_community', () => {
   const jiaTing = resolveSemanticVisualProfile('家庭', 'gia đình, mái ấm', 'jiā tíng');
   assert.equal(jiaTing.archetype, 'family_home');
   assert.ok(jiaTing.photoUrls.length >= 3);
   assert.ok(jiaTing.sceneCaptionVi.includes('Gia đình'));
+  assert.ok(
+    jiaTing.photoUrls.every(
+      (u) => u.startsWith('/illustrations/') || u.startsWith('data:image/svg+xml')
+    )
+  );
 
   const fuMu = resolveSemanticVisualProfile('父母', 'cha mẹ', 'fù mǔ');
   assert.equal(fuMu.archetype, 'family_home');
@@ -48,10 +56,23 @@ test('Auto Semantic Vocabulary Visual Engine maps animals, nature, school, and a
 });
 
 test('resolveSemanticVisualProfile prioritizes custom image URL when provided', () => {
-  const customUrl = 'https://images.unsplash.com/photo-custom-test?w=800';
+  const customUrl = '/illustrations/custom_test.svg';
   const profile = resolveSemanticVisualProfile('家庭', 'gia đình', 'jiā tíng', customUrl);
   assert.equal(profile.photoUrls[0], customUrl);
   assert.ok(profile.photoUrls.length >= 4);
+});
+
+test('All INITIAL_VOCAB_SLIDES and semantic visual profiles use local /illustrations/*.svg files and zero external Unsplash URLs', () => {
+  for (const slide of INITIAL_VOCAB_SLIDES) {
+    const profile = resolveSemanticVisualProfile(slide.hanzi, slide.meaning, slide.pinyin);
+    for (const url of profile.photoUrls) {
+      assert.equal(url.includes('images.unsplash.com'), false);
+      if (url.startsWith('/illustrations/')) {
+        const diskPath = path.resolve(process.cwd(), 'public', url.slice(1));
+        assert.equal(fs.existsSync(diskPath), true, `Missing local illustration: ${diskPath}`);
+      }
+    }
+  }
 });
 
 test('buildContextualImagePrompt and buildSafeContextualSvgDataUrl generate school-safe SVG data URIs with zero pollinations dependency', () => {
@@ -69,5 +90,3 @@ test('buildContextualImagePrompt and buildSafeContextualSvgDataUrl generate scho
   assert.ok(url.startsWith('data:image/svg+xml;charset=utf-8,'));
   assert.equal(url.includes('pollinations'), false);
 });
-
-

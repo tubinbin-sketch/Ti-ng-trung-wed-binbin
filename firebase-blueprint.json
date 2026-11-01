@@ -1,0 +1,166 @@
+{
+  "entities": {
+    "TeacherProfile": {
+      "title": "TeacherProfile",
+      "description": "Authenticated teacher profile managed via Google Sign-In.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID of the teacher" },
+        "email": { "type": "string", "format": "email", "description": "Teacher Google email" },
+        "displayName": { "type": "string", "description": "Teacher display name" },
+        "role": { "type": "string", "enum": ["teacher"], "description": "Fixed role marker" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "role", "updatedAt"]
+    },
+    "Classroom": {
+      "title": "Classroom",
+      "description": "A Chinese HSK classroom owned by a specific teacher.",
+      "type": "object",
+      "properties": {
+        "teacherUid": { "type": "string", "description": "Owner teacher Firebase UID" },
+        "name": { "type": "string", "description": "Classroom display name" },
+        "hskLevel": { "type": "string", "description": "Target HSK level (e.g. HSK 1-3)" },
+        "joinCode": { "type": "string", "description": "Class join code issued to students" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["teacherUid", "name", "hskLevel", "joinCode"]
+    },
+    "ClassStudent": {
+      "title": "ClassStudent",
+      "description": "Student enrolled in a specific classroom.",
+      "type": "object",
+      "properties": {
+        "studentUid": { "type": "string", "description": "Bound Firebase Auth UID of the student" },
+        "name": { "type": "string", "description": "Student full name" },
+        "studentCode": { "type": "string", "description": "Teacher-issued student code (e.g. HV-001)" },
+        "hskLevel": { "type": "string", "description": "Student HSK level" },
+        "totalPoints": { "type": "number", "description": "Latest score out of 100" },
+        "vocabScore": { "type": "string" },
+        "writingScore": { "type": "string" },
+        "quizScore": { "type": "string" },
+        "status": { "type": "string" },
+        "feedback": { "type": "string" },
+        "timeSeconds": { "type": "number" },
+        "streak": { "type": "number" },
+        "joinedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "studentCode", "joinedAt"]
+    },
+    "ClassDeck": {
+      "title": "ClassDeck",
+      "description": "Vocabulary slide deck curated by the class teacher.",
+      "type": "object",
+      "properties": {
+        "teacherUid": { "type": "string" },
+        "title": { "type": "string" },
+        "slides": { "type": "array", "description": "Array of VocabSlide items" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["teacherUid", "title", "slides", "updatedAt"]
+    },
+    "ClassAssignment": {
+      "title": "ClassAssignment",
+      "description": "Homework or quiz package assigned to a classroom.",
+      "type": "object",
+      "properties": {
+        "teacherUid": { "type": "string" },
+        "sessionNumber": { "type": "number" },
+        "title": { "type": "string" },
+        "fileName": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "multipleChoiceList": { "type": "array" },
+        "sentenceOrderingList": { "type": "array" },
+        "essayList": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["teacherUid", "title", "updatedAt"]
+    },
+    "AssignmentSubmission": {
+      "title": "AssignmentSubmission",
+      "description": "Immutable student homework submission.",
+      "type": "object",
+      "properties": {
+        "studentUid": { "type": "string", "description": "Must match request.auth.uid" },
+        "studentCode": { "type": "string" },
+        "studentName": { "type": "string" },
+        "assignmentId": { "type": "string" },
+        "score": { "type": "number" },
+        "answers": { "type": "object" },
+        "submittedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentUid", "assignmentId", "score", "answers", "submittedAt"]
+    },
+    "LeaderboardEntrySummary": {
+      "title": "LeaderboardEntrySummary",
+      "description": "Sanitized class leaderboard entry exposing only student name, code, score, time, and streak.",
+      "type": "object",
+      "properties": {
+        "studentUid": { "type": "string" },
+        "studentCode": { "type": "string" },
+        "name": { "type": "string" },
+        "hskLevel": { "type": "string" },
+        "score": { "type": "number" },
+        "timeSeconds": { "type": "number" },
+        "streak": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentUid", "name", "score", "updatedAt"]
+    },
+    "UserSrsRecord": {
+      "title": "UserSrsRecord",
+      "description": "Personal flashcard SRS progress and learned status for a student.",
+      "type": "object",
+      "properties": {
+        "wordId": { "type": "string" },
+        "hanzi": { "type": "string" },
+        "pinyin": { "type": "string" },
+        "rating": { "type": "string", "enum": ["forgot", "hard", "good", "mastered"] },
+        "intervalDays": { "type": "number" },
+        "intervalLabel": { "type": "string" },
+        "nextReviewAt": { "type": "string", "format": "date-time" },
+        "inMistakeBook": { "type": "boolean" },
+        "learned": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["wordId", "hanzi", "learned", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/teachers/{uid}": {
+      "schema": { "$ref": "#/entities/TeacherProfile" },
+      "description": "Teacher profiles keyed by Firebase Auth UID."
+    },
+    "/classes/{classId}": {
+      "schema": { "$ref": "#/entities/Classroom" },
+      "description": "Classrooms owned by teachers."
+    },
+    "/classes/{classId}/students/{studentUid}": {
+      "schema": { "$ref": "#/entities/ClassStudent" },
+      "description": "Enrolled students in a class keyed by studentUid (or pre-registered invite key)."
+    },
+    "/classes/{classId}/decks/{deckId}": {
+      "schema": { "$ref": "#/entities/ClassDeck" },
+      "description": "Vocabulary slide decks for a classroom."
+    },
+    "/classes/{classId}/assignments/{assignmentId}": {
+      "schema": { "$ref": "#/entities/ClassAssignment" },
+      "description": "Assignments published to a classroom."
+    },
+    "/classes/{classId}/submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/AssignmentSubmission" },
+      "description": "Student assignment submissions (append-only for students, private per student & class teacher)."
+    },
+    "/classes/{classId}/leaderboard/{studentUid}": {
+      "schema": { "$ref": "#/entities/LeaderboardEntrySummary" },
+      "description": "Sanitized class leaderboard summary readable by class members."
+    },
+    "/users/{studentUid}/srs/{wordId}": {
+      "schema": { "$ref": "#/entities/UserSrsRecord" },
+      "description": "Private student flashcard SRS and learned word progress."
+    }
+  }
+}

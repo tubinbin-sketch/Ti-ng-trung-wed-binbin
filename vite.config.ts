@@ -8,7 +8,59 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
+      },
+    },
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                debugName: 'hanu-bundle-split',
+                name(moduleId) {
+                  if (moduleId.includes('node_modules')) {
+                    if (
+                      moduleId.includes('@firebase/firestore') ||
+                      moduleId.includes('firebase/firestore')
+                    ) {
+                      return 'vendor-firebase-firestore';
+                    }
+                    if (
+                      moduleId.includes('firebase') ||
+                      moduleId.includes('@firebase')
+                    ) {
+                      return 'vendor-firebase-core';
+                    }
+                    if (moduleId.includes('lucide-react')) {
+                      return 'vendor-icons';
+                    }
+                    if (
+                      moduleId.includes('react-dom') ||
+                      moduleId.includes('react-router') ||
+                      moduleId.includes('/react/') ||
+                      moduleId.includes('scheduler')
+                    ) {
+                      return 'vendor-react';
+                    }
+                    return 'vendor-misc';
+                  }
+                  if (moduleId.includes('/src/data/chineseData')) {
+                    return 'hsk-vocab-data';
+                  }
+                  if (
+                    moduleId.includes('/src/utils/chineseEngine') ||
+                    moduleId.includes('/src/utils/hsk3Engine') ||
+                    moduleId.includes('/src/utils/hskStudyHelpers')
+                  ) {
+                    return 'hsk-engine';
+                  }
+                  return null;
+                },
+              },
+            ],
+          },
+        },
       },
     },
     server: {

@@ -8,6 +8,27 @@ import {
   VocabSlide,
 } from '../data/chineseData';
 
+let firebaseTokenGetter: (() => Promise<string | null>) | null = null;
+
+export function registerFirebaseTokenGetter(getter: () => Promise<string | null>): void {
+  firebaseTokenGetter = getter;
+}
+
+export async function getAuthBearerHeaders(): Promise<Record<string, string>> {
+  try {
+    if (firebaseTokenGetter) {
+      const token = await firebaseTokenGetter();
+      if (token) {
+        return { Authorization: `Bearer ${token}` };
+      }
+    }
+  } catch {
+    // ignore token lookup error
+  }
+  return {};
+}
+
+
 export interface SmartDictEntry {
   pinyin: string;
   hanViet: string;
@@ -1351,8 +1372,8 @@ export function getStrokeDataForChar(char: string, fallbackPinyin?: string): Str
 
 /**
  * Fetches 100% authentic SVG stroke outlines and medians for ANY Chinese character
- * directly from the official HanziWriter CDN:
- * https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0/${encodeURIComponent(char)}.json
+ * directly from the locally installed `hanzi-writer-data` package served at:
+ * /hanzi-data/${encodeURIComponent(char)}.json
  */
 export async function fetchHanziWriterCharacter(
   char: string,
@@ -1371,12 +1392,10 @@ export async function fetchHanziWriterCharacter(
     fallbackRadical || existingLib?.radical || meta?.radical || 'Bộ thủ chuẩn';
 
   try {
-    const url = `https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0/${encodeURIComponent(
-      char
-    )}.json`;
+    const url = `/hanzi-data/${encodeURIComponent(char)}.json`;
     const res = await fetch(url);
     if (!res.ok) {
-      throw new Error(`HanziWriter CDN returned ${res.status}`);
+      throw new Error(`Local hanzi-writer-data returned ${res.status}`);
     }
     const data = (await res.json()) as {
       strokes: string[];
@@ -1451,22 +1470,28 @@ export async function hydrateSlideStrokesFromCDN(slide: VocabSlide): Promise<Voc
 export const GEMINI_API_TIMEOUT_MS = 20000;
 export const OFFLINE_FALLBACK_NOTICE = 'Đang dùng từ điển nội bộ do AI phản hồi chậm';
 
-export async function enrichVocabSlideWithAI(slide: VocabSlide): Promise<VocabSlide> {
+export async function enrichVocabSlideWithAI(
+  slide: VocabSlide,
+  options?: { onAIError?: (message: string) => void }
+): Promise<VocabSlide> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), GEMINI_API_TIMEOUT_MS);
   try {
+    const authHeaders = await getAuthBearerHeaders();
     const response = await fetch('/api/hanzi/enrich', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       signal: controller.signal,
       body: JSON.stringify({ hanzi: slide.hanzi }),
     });
     clearTimeout(timeoutId);
     if (!response.ok) {
+      options?.onAIError?.(`Không thể làm giàu từ “${slide.hanzi}” bằng AI (Mã lỗi ${response.status}). Hệ thống tạm hiển thị từ điển nội bộ.`);
       return hydrateSlideStrokesFromCDN(slide);
     }
     const aiData = await response.json();
-    if (!aiData || !aiData.pinyin) {
+    if (!aiData || aiData.fallback || !aiData.pinyin) {
+      options?.onAIError?.(`AI phản hồi không đầy đủ cho từ “${slide.hanzi}”. Hệ thống tạm hiển thị từ điển nội bộ.`);
       return hydrateSlideStrokesFromCDN(slide);
     }
 
@@ -1494,6 +1519,7 @@ export async function enrichVocabSlideWithAI(slide: VocabSlide): Promise<VocabSl
     return hydrateSlideStrokesFromCDN(updatedSlide);
   } catch {
     clearTimeout(timeoutId);
+    options?.onAIError?.(`Kết nối AI cho từ “${slide.hanzi}” bị gián đoạn hoặc quá thời gian chờ. Bạn có thể bấm Thử lại.`);
     return hydrateSlideStrokesFromCDN(slide);
   }
 }
@@ -3292,9 +3318,10 @@ export async function askBinBinPandaAI(
   const timeoutId = setTimeout(() => controller.abort(), GEMINI_API_TIMEOUT_MS);
 
   try {
+    const authHeaders = await getAuthBearerHeaders();
     const res = await fetch('/api/binbin/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       signal: controller.signal,
       body: JSON.stringify({
         actionType,
@@ -3624,7 +3651,8 @@ export function searchInstantVocabSuggestions(
 export async function fetchAIVocabSuggestions(
   query: string,
   topic: 'all' | 'family' | 'school' | 'daily' | 'nature' = 'all',
-  limit = 8
+  limit = 8,
+  options?: { onAIError?: (message: string) => void }
 ): Promise<VocabSuggestionItem[]> {
   const localMatches = searchInstantVocabSuggestions(query, { topic, limit });
   const trimmed = query.trim();
@@ -3636,18 +3664,21 @@ export async function fetchAIVocabSuggestions(
   const timeoutId = setTimeout(() => controller.abort(), GEMINI_API_TIMEOUT_MS);
 
   try {
+    const authHeaders = await getAuthBearerHeaders();
     const res = await fetch('/api/hanzi/suggest', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       signal: controller.signal,
       body: JSON.stringify({ query: trimmed, topic, limit: 6 }),
     });
     clearTimeout(timeoutId);
     if (!res.ok) {
+      options?.onAIError?.(`Không thể tải gợi ý AI cho “${trimmed}” (Mã lỗi ${res.status}). Đang hiển thị kết quả nội bộ.`);
       return localMatches;
     }
     const data = await res.json();
     if (!data || data.fallback || !Array.isArray(data.suggestions)) {
+      options?.onAIError?.(`Dịch vụ gợi ý AI cho “${trimmed}” tạm gián đoạn. Đang hiển thị từ điển nội bộ.`);
       return localMatches;
     }
 
@@ -3682,6 +3713,7 @@ export async function fetchAIVocabSuggestions(
     return [...localMatches, ...aiItems].slice(0, limit);
   } catch {
     clearTimeout(timeoutId);
+    options?.onAIError?.(`Kết nối gợi ý AI cho “${trimmed}” quá thời gian chờ. Bạn có thể bấm Thử lại.`);
     return localMatches;
   }
 }
@@ -3697,7 +3729,7 @@ export interface ClassStudentRecord {
   writingScore: string;
   quizScore: string;
   totalPoints: number;
-  status: 'Đã chấm tự động' | 'Đã chấm AI' | 'Đang nộp bài' | 'Cần kèm thêm';
+  status: 'Đã chấm tự động' | 'Đã chấm AI' | 'Đang nộp bài' | 'Cần kèm thêm' | 'Chưa nộp';
   feedback: string;
   reviewWords?: string[];
   lastSubmittedAt?: string;

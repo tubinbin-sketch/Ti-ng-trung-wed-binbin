@@ -224,10 +224,32 @@ export function getInitialSrsRecords(slides: VocabSlide[]): Record<string, SrsWo
   return defaults;
 }
 
-export function loadStoredSrsRecords(slides: VocabSlide[]): Record<string, SrsWordRecord> {
+export function getStudentSrsStorageKey(studentId?: string): string {
+  const cleanId = String(studentId || '').trim();
+  if (cleanId) {
+    return `${STORAGE_KEY_SRS_MISTAKE_BOOK}_${cleanId.replace(/\s+/g, '_')}`;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const activeId = localStorage.getItem('hanu_active_student_id_v1');
+      if (activeId) {
+        return `${STORAGE_KEY_SRS_MISTAKE_BOOK}_${activeId}`;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return `${STORAGE_KEY_SRS_MISTAKE_BOOK}_HV-001`;
+}
+
+export function loadStoredSrsRecords(
+  slides: VocabSlide[],
+  studentId?: string
+): Record<string, SrsWordRecord> {
   if (typeof window === 'undefined') return getInitialSrsRecords(slides);
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_SRS_MISTAKE_BOOK);
+    const key = getStudentSrsStorageKey(studentId);
+    const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
@@ -240,10 +262,14 @@ export function loadStoredSrsRecords(slides: VocabSlide[]): Record<string, SrsWo
   return getInitialSrsRecords(slides);
 }
 
-export function saveStoredSrsRecords(records: Record<string, SrsWordRecord>): void {
+export function saveStoredSrsRecords(
+  records: Record<string, SrsWordRecord>,
+  studentId?: string
+): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEY_SRS_MISTAKE_BOOK, JSON.stringify(records));
+    const key = getStudentSrsStorageKey(studentId);
+    localStorage.setItem(key, JSON.stringify(records));
   } catch {
     // ignore storage errors
   }

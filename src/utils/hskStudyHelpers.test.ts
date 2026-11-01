@@ -21,7 +21,6 @@ import {
 import {
   buildFullSystemBackup,
   parseSystemBackupPayload,
-  verifyTeacherPin,
 } from './storageService';
 
 test('analyzeToneSandhi detects 3+3 -> 2+3 tone sandhi accurately', () => {
@@ -51,7 +50,6 @@ test('Spaced Repetition (SRS) 4-level ratings filter difficult words into Mistak
   const initial = getInitialSrsRecords(INITIAL_VOCAB_SLIDES);
   const sampleSlide = INITIAL_VOCAB_SLIDES[0];
 
-  // Rate 'forgot' / 'again' (😰 Quên - Ôn lại 1p) -> should be in mistake book
   const afterForgot = applySrsRatingToRecords(initial, sampleSlide, 'forgot');
   assert.equal(afterForgot[sampleSlide.id].inMistakeBook, true);
   assert.equal(afterForgot[sampleSlide.id].rating, 'forgot');
@@ -59,17 +57,14 @@ test('Spaced Repetition (SRS) 4-level ratings filter difficult words into Mistak
     getMistakeNotebookList(afterForgot).some((item) => item.hanzi === sampleSlide.hanzi)
   );
 
-  // Rate 'hard' (🤔 Khó - Ôn lại 10p) -> in mistake book
   const afterHard = applySrsRatingToRecords(afterForgot, sampleSlide, 'hard');
   assert.equal(afterHard[sampleSlide.id].inMistakeBook, true);
   assert.equal(afterHard[sampleSlide.id].rating, 'hard');
 
-  // Rate 'good' (👍 Nhớ - 1 ngày) -> removed from mistake book
   const afterGood = applySrsRatingToRecords(afterHard, sampleSlide, 'good');
   assert.equal(afterGood[sampleSlide.id].inMistakeBook, false);
   assert.equal(afterGood[sampleSlide.id].rating, 'good');
 
-  // Rate 'mastered' (🌟 Thuộc làu - 4 ngày) -> not in mistake book
   const afterMastered = applySrsRatingToRecords(afterGood, sampleSlide, 'mastered');
   assert.equal(afterMastered[sampleSlide.id].inMistakeBook, false);
   assert.equal(afterMastered[sampleSlide.id].rating, 'mastered');
@@ -183,11 +178,7 @@ test('generateMeasureWordChallenges and evaluateMeasureWordAttempt grade HSK 3.0
   assert.equal(wrongRes.scoreDelta, 0);
 });
 
-test('storageService verifyTeacherPin and backup export/import work accurately', () => {
-  assert.equal(verifyTeacherPin('2026'), true);
-  assert.equal(verifyTeacherPin('8888'), false);
-  assert.equal(verifyTeacherPin('0000'), false);
-
+test('storageService backup export/import work accurately for Firestore migration', () => {
   const backup = buildFullSystemBackup(INITIAL_VOCAB_SLIDES.slice(0, 3), []);
   assert.equal(backup.slides.length, 3);
   const parsed = parseSystemBackupPayload(JSON.stringify(backup));
@@ -195,10 +186,10 @@ test('storageService verifyTeacherPin and backup export/import work accurately',
   assert.equal(parsed?.slides?.length, 3);
 });
 
-test('server AI route origin/session guard and periodic rate-limit memory cleanup work accurately', async () => {
+test('server AI route origin guard and periodic rate-limit memory cleanup work accurately', async () => {
   const { isTrustedRequestOrigin, cleanupExpiredRateLimits } = await import('../../server');
+  const { shouldApplyRemoteState } = await import('./storageService');
 
-  // Valid AI Studio Preview & localhost requests pass
   assert.equal(
     isTrustedRequestOrigin({
       origin: 'http://localhost:3000',
@@ -211,18 +202,28 @@ test('server AI route origin/session guard and periodic rate-limit memory cleanu
 
   assert.equal(
     isTrustedRequestOrigin({
-      origin: 'https://ais-dev-pn3kppfm4fs2ypjsjrbixg-801224340907.asia-northeast1.run.app',
-      host: 'ais-dev-pn3kppfm4fs2ypjsjrbixg-801224340907.asia-northeast1.run.app',
-      secFetchSite: 'same-origin',
-      contentType: 'application/json; charset=utf-8',
+      origin: 'https://hanu.edu.vn',
+      host: 'api.hanu.edu.vn',
+      secFetchSite: 'same-site',
+      contentType: 'application/json',
+      allowedOriginsEnv: 'https://hanu.edu.vn',
     }),
     true
   );
 
-  // Untrusted foreign cross-site origin or non-JSON content-type is rejected
   assert.equal(
     isTrustedRequestOrigin({
-      origin: 'https://evil-scraper.example.com',
+      origin: '',
+      referer: '',
+      host: 'localhost:3000',
+      contentType: 'application/json',
+    }),
+    false
+  );
+
+  assert.equal(
+    isTrustedRequestOrigin({
+      origin: 'https://other-app.run.app',
       host: 'localhost:3000',
       secFetchSite: 'cross-site',
       contentType: 'application/json',
@@ -231,13 +232,12 @@ test('server AI route origin/session guard and periodic rate-limit memory cleanu
   );
 
   assert.equal(
-    isTrustedRequestOrigin({
-      origin: 'http://localhost:3000',
-      host: 'localhost:3000',
-      secFetchSite: 'same-origin',
-      contentType: 'application/x-www-form-urlencoded',
-    }),
+    shouldApplyRemoteState('2026-10-31T08:00:00.000Z', '2026-10-31T09:00:00.000Z'),
     false
+  );
+  assert.equal(
+    shouldApplyRemoteState('2026-10-31T10:00:00.000Z', '2026-10-31T09:00:00.000Z'),
+    true
   );
 
   const cleanupResult = cleanupExpiredRateLimits(Date.now() + 120_000);
@@ -245,3 +245,126 @@ test('server AI route origin/session guard and periodic rate-limit memory cleanu
   assert.equal(typeof cleanupResult.removedAiEntries, 'number');
 });
 
+test('AI endpoints require Firebase ID Token (Authorization: Bearer <token>), rate-limit by UID, and legacy PIN/storage routes are removed', async () => {
+  const {
+    app,
+    resetAllRateLimitersForTest,
+    setFirebaseTokenVerifierForTest,
+  } = await import('../../server');
+  resetAllRateLimitersForTest();
+
+  setFirebaseTokenVerifierForTest(async (token: string) => {
+    if (token === 'valid-token-uid-student-1') {
+      return { uid: 'uid-student-1', email: 'student1@hanu.edu.vn' };
+    }
+    if (token === 'valid-token-uid-teacher-1') {
+      return { uid: 'uid-teacher-1', email: 'teacher@hanu.edu.vn' };
+    }
+    throw new Error('Invalid Firebase ID token');
+  });
+
+  const prevDailyLimit = process.env.AI_DAILY_LIMIT;
+  process.env.AI_DAILY_LIMIT = '3';
+
+  const server = app.listen(0);
+  const address = server.address();
+  const port = typeof address === 'object' && address ? address.port : 0;
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const originHeader = `http://127.0.0.1:${port}`;
+
+  try {
+    // 1. Legacy routes (/api/auth/teacher-verify, /api/storage/state, /api/submissions) are completely removed (404)
+    const legacyPinRes = await fetch(`${baseUrl}/api/auth/teacher-verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: '2026' }),
+    });
+    assert.equal(legacyPinRes.status, 404);
+
+    const legacyStateRes = await fetch(`${baseUrl}/api/storage/state`);
+    assert.equal(legacyStateRes.status, 404);
+
+    const legacySubRes = await fetch(`${baseUrl}/api/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    assert.equal(legacySubRes.status, 404);
+
+    // 2. Calling AI route without Authorization: Bearer <token> returns 401
+    const noTokenRes = await fetch(`${baseUrl}/api/hanzi/enrich`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: originHeader,
+      },
+      body: JSON.stringify({ words: ['温暖'] }),
+    });
+    assert.equal(noTokenRes.status, 401);
+
+    // 3. Calling AI route with invalid token returns 401
+    const badTokenRes = await fetch(`${baseUrl}/api/binbin/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: originHeader,
+        Authorization: 'Bearer forged-invalid-token',
+      },
+      body: JSON.stringify({ prompt: 'Xin chào' }),
+    });
+    assert.equal(badTokenRes.status, 401);
+
+    // 4. UID-based daily quota enforcement (AI_DAILY_LIMIT = 3 per UID)
+    for (let i = 1; i <= 3; i++) {
+      const r = await fetch(`${baseUrl}/api/hanzi/suggest`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: originHeader,
+          Authorization: 'Bearer valid-token-uid-student-1',
+        },
+        body: JSON.stringify({ topic: 'Gia đình', count: 2 }),
+      });
+      // Without GEMINI_API_KEY in test env it returns 503 after passing Auth + UID quota check
+      assert.notEqual(r.status, 401);
+      assert.notEqual(r.status, 429);
+    }
+
+    // 4th call from uid-student-1 exceeds AI_DAILY_LIMIT=3 -> returns 429
+    const fourthCallSameUid = await fetch(`${baseUrl}/api/hanzi/suggest`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: originHeader,
+        Authorization: 'Bearer valid-token-uid-student-1',
+      },
+      body: JSON.stringify({ topic: 'Gia đình', count: 2 }),
+    });
+    assert.equal(fourthCallSameUid.status, 429);
+
+    // Different UID (uid-teacher-1) on the exact same IP still has its own independent quota!
+    const otherUidCall = await fetch(`${baseUrl}/api/hanzi/suggest`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: originHeader,
+        Authorization: 'Bearer valid-token-uid-teacher-1',
+      },
+      body: JSON.stringify({ topic: 'Trường học', count: 2 }),
+    });
+    assert.notEqual(otherUidCall.status, 429);
+
+    // 5. Self-hosted Hanzi stroke JSON route serves character strokes from local hanzi-writer-data
+    const strokeRes = await fetch(`${baseUrl}/hanzi-data/${encodeURIComponent('暖')}.json`);
+    assert.equal(strokeRes.status, 200);
+    const strokeJson = (await strokeRes.json()) as { strokes?: string[]; medians?: unknown[] };
+    assert.ok(Array.isArray(strokeJson.strokes));
+    assert.ok(strokeJson.strokes.length > 0);
+  } finally {
+    if (prevDailyLimit === undefined) delete process.env.AI_DAILY_LIMIT;
+    else process.env.AI_DAILY_LIMIT = prevDailyLimit;
+    setFirebaseTokenVerifierForTest(null);
+    resetAllRateLimitersForTest();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
