@@ -68,6 +68,9 @@ const StudentAssignmentArena = React.lazy(() =>
 const ClassroomManager = React.lazy(() =>
   import('./components/ClassroomManager').then((m) => ({ default: m.ClassroomManager }))
 );
+const PrivacyPolicyPage = React.lazy(() =>
+  import('./components/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage }))
+);
 const BinBinPandaAI = React.lazy(() =>
   import('./components/BinBinPandaAI').then((m) => ({ default: m.BinBinPandaAI }))
 );
@@ -735,10 +738,13 @@ export default function App() {
   // Preload secondary React.lazy modules in the background 1.5s after mount for 0ms tab/modal switching
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void import('./components/StudentAssignmentArena');
-      void import('./components/ClassroomManager');
-      void import('./components/BinBinPandaAI');
-      void import('./components/StrokeWritingModal');
+      // Warm the cache for other sections; a failed prefetch is harmless here
+      // (the real navigation retries and has its own error boundary).
+      const ignore = () => {};
+      import('./components/StudentAssignmentArena').catch(ignore);
+      import('./components/ClassroomManager').catch(ignore);
+      import('./components/BinBinPandaAI').catch(ignore);
+      import('./components/StrokeWritingModal').catch(ignore);
     }, 1500);
     return () => window.clearTimeout(timer);
   }, []);
@@ -788,7 +794,12 @@ export default function App() {
     classroom: 'Quản lý lớp',
   };
   const pageTitle =
-    PAGE_TITLES[activeNavId] || (path === '/dang-nhap' ? 'Đăng nhập' : 'Không tìm thấy trang');
+    PAGE_TITLES[activeNavId] ||
+    (path === '/dang-nhap'
+      ? 'Đăng nhập'
+      : path === '/chinh-sach-rieng-tu'
+      ? 'Chính sách quyền riêng tư'
+      : 'Không tìm thấy trang');
 
   const navHome: NavItem = {
     id: 'home',
@@ -1107,8 +1118,15 @@ export default function App() {
                       Tải bản sao lưu (.json)
                     </button>
                   </div>
-                  <div className="px-4 py-2.5 border-t border-border text-xs text-ink-subtle">
-                    HANU × 阮文受 · HSK 3.0 · © 2026
+                  <div className="px-4 py-2.5 border-t border-border flex items-center justify-between gap-2 text-xs text-ink-subtle">
+                    <span>HANU × 阮文受 · © 2026</span>
+                    <Link
+                      to="/chinh-sach-rieng-tu"
+                      onClick={() => setSettingsMenuOpen(false)}
+                      className="hover:text-ink hover:underline"
+                    >
+                      Quyền riêng tư
+                    </Link>
                   </div>
                 </div>
               )}
@@ -1328,6 +1346,22 @@ export default function App() {
                 }}
                 onClose={() => navigate('/')}
               />
+            }
+          />
+
+          {/* /chinh-sach-rieng-tu: Privacy policy (linked from the login dialog) */}
+          <Route
+            path="/chinh-sach-rieng-tu"
+            element={
+              <LazyErrorBoundary fallbackLabel="Không tải được trang Chính sách quyền riêng tư.">
+                <Suspense
+                  fallback={
+                    <div className="p-8 text-center text-sm text-ink-muted">Đang tải…</div>
+                  }
+                >
+                  <PrivacyPolicyPage />
+                </Suspense>
+              </LazyErrorBoundary>
             }
           />
 

@@ -2167,46 +2167,13 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                           {currentSlide.meaning}
                         </div>
                         {currentSlide.usageNote && (
-                          <p className="text-xs sm:text-sm text-ink-muted leading-snug line-clamp-2">
+                          <p className="text-xs sm:text-sm text-ink-muted leading-snug">
                             {currentSlide.usageNote}
                           </p>
                         )}
                       </div>
                     )}
 
-                    {/* Primary Example Sentence Box right underneath Meaning to balance Column 1 height */}
-                    <div
-                      data-testid="col1-inline-example-row"
-                      className="p-2.5 rounded-xl bg-surface border border-border-strong/35 text-left space-y-1 shadow-2xs"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          data-testid="col1-inline-example-hanzi"
-                          className="font-['Noto_Sans_SC'] text-base font-bold text-ink"
-                        >
-                          {renderHighlightedExample(currentSlide.exampleHanzi, currentSlide.hanzi)}
-                        </span>
-                        <button
-                          type="button"
-                          data-testid="col1-inline-listen-example-btn"
-                          onClick={() => speakChinese(currentSlide.exampleHanzi, speechRate)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary hover:bg-primary-hover text-on-primary text-sm font-bold shrink-0 cursor-pointer transition-all duration-300 active:scale-95"
-                        >
-                          <Volume2 className="w-3.5 h-3.5" />
-                          <span>Nghe câu</span>
-                        </button>
-                      </div>
-                      {showPinyin && (
-                        <div className="text-sm font-medium text-gold">
-                          {currentSlide.examplePinyin}
-                        </div>
-                      )}
-                      {showMeaning && (
-                        <div className="text-sm text-ink-muted italic">
-                          {currentSlide.exampleMeaning}
-                        </div>
-                      )}
-                    </div>
                   </div>
                 ) : (
                   <div className="my-2 text-center p-4 rounded-xl bg-surface-2 border border-dashed border-border-strong space-y-2">
@@ -3376,9 +3343,13 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
           )}
 
           {/* =================================================================
-              BOTTOM BAR: KEYBOARD SHORTCUTS LEGEND
+              BOTTOM BAR: KEYBOARD SHORTCUTS LEGEND (teachers on desktop only)
               ================================================================= */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+          <div
+            className={`${
+              roleMode === 'teacher' ? 'hidden lg:flex' : 'hidden'
+            } flex-wrap items-center justify-between gap-2 pt-0.5`}
+          >
             <div
               data-testid="keyboard-shortcuts-bar"
               className="inline-flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface/75 border border-border text-sm text-ink-muted"
