@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   BookOpen,
+  Check,
   ChevronRight,
   GraduationCap,
   Layers,
@@ -9,10 +10,12 @@ import {
   Presentation,
   Trophy,
   Volume2,
+  X,
 } from 'lucide-react';
 import { VocabSlide } from '../data/chineseData';
 import { UserProfile } from './AuthModal';
 import { speakChinese } from '../utils/speech';
+import { Dialog } from './ui/Dialog';
 
 interface HomeDashboardProps {
   userProfile: UserProfile;
@@ -28,6 +31,7 @@ interface HomeDashboardProps {
   onOpenLessonBuilder: () => void;
   onOpenClassroom: () => void;
   onPickSlide: (index: number) => void;
+  onToggleLearned?: (slideId: string) => void;
 }
 
 function greetingForNow(): string {
@@ -65,6 +69,47 @@ function MiZiGeBackdrop() {
   );
 }
 
+/** Visual circular progress ring for learned vocabulary ratio. */
+function VocabProgressRing({ percent }: { percent: number }) {
+  const radius = 26;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(100, percent));
+  const strokeDashoffset = circumference - (clamped / 100) * circumference;
+
+  return (
+    <div
+      className="relative w-16 h-16 shrink-0 grid place-items-center"
+      data-testid="vocab-progress-ring"
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 64 64" className="w-16 h-16 -rotate-90">
+        <circle
+          cx="32"
+          cy="32"
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="6"
+          className="text-surface-2"
+        />
+        <circle
+          cx="32"
+          cy="32"
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          className="text-primary transition-[stroke-dashoffset] duration-700 ease-out"
+        />
+      </svg>
+      <span className="absolute text-xs font-semibold tabular-nums text-ink">{clamped}%</span>
+    </div>
+  );
+}
+
 export function HomeDashboard({
   userProfile,
   slides,
@@ -79,19 +124,27 @@ export function HomeDashboard({
   onOpenLessonBuilder,
   onOpenClassroom,
   onPickSlide,
+  onToggleLearned,
 }: HomeDashboardProps) {
+  const [previewWord, setPreviewWord] = useState<{ slide: VocabSlide; index: number } | null>(null);
+
   const current = slides[activeSlideIndex] || slides[0];
   const learnedCount = slides.filter((s) => s.learned).length;
   const total = slides.length || 1;
   const percent = Math.round((learnedCount / total) * 100);
+  const remainingCount = Math.max(0, slides.length - learnedCount);
   const toReview = slides
     .map((s, i) => ({ s, i }))
     .filter(({ s }) => !s.learned)
     .slice(0, 8);
   const isTeacher = userProfile.role === 'teacher';
 
+  const activePreviewSlide = previewWord
+    ? slides[previewWord.index] || previewWord.slide
+    : null;
+
   return (
-    <div className="space-y-6" data-testid="home-dashboard">
+    <div className="space-y-6 pb-24 sm:pb-16 lg:pb-10" data-testid="home-dashboard">
       <div className="animate-rise-in">
         <p className="text-sm text-ink-muted">{greetingForNow()},</p>
         <h2 className="text-2xl sm:text-[28px] font-semibold text-ink mt-0.5">
@@ -100,25 +153,44 @@ export function HomeDashboard({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* Continue lesson — the featured word */}
+        {/* Continue lesson — compact side-by-side layout on wider screens */}
         {current && (
           <section
-            className="lg:col-span-2 rounded-3xl bg-surface border border-border shadow-xs overflow-hidden animate-rise-in"
+            className="lg:col-span-2 rounded-3xl bg-surface border border-border shadow-xs p-5 sm:p-6 flex flex-col justify-between gap-4 animate-rise-in"
             style={{ '--stagger': 1 } as React.CSSProperties}
             aria-labelledby="continue-heading"
           >
-            <div className="flex flex-col sm:flex-row">
-              <div className="shrink-0 sm:w-64 min-h-44 p-6 flex items-center justify-center gap-1.5 bg-surface-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 id="continue-heading" className="text-sm font-medium text-ink-muted">
+                Tiếp tục bài học
+              </h3>
+              <span className="text-xs text-ink-subtle tabular-nums">
+                Từ {activeSlideIndex + 1}/{slides.length} · {current.hskLevel}
+                {current.partOfSpeech ? ` · ${current.partOfSpeech}` : ''}
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
+              {/* Compact Hanzi MiZiGe box placed right beside Pinyin/Meaning */}
+              <div
+                onClick={() => speakChinese(current.hanzi)}
+                title={`Chạm để nghe phát âm ${current.hanzi}`}
+                className="shrink-0 self-start sm:self-center rounded-2xl bg-surface-2 p-3 flex items-center justify-center gap-1.5 cursor-pointer hover:bg-primary-soft/40 transition-colors"
+              >
                 {Array.from(current.hanzi)
                   .slice(0, 4)
                   .map((ch, i, arr) => {
-                    const size = arr.length === 1 ? 144 : arr.length === 2 ? 96 : 68;
+                    const size = arr.length === 1 ? 92 : arr.length === 2 ? 78 : 58;
                     return (
-                      <div key={`${ch}-${i}`} className="relative shrink-0" style={{ width: size, height: size }}>
+                      <div
+                        key={`${ch}-${i}`}
+                        className="relative shrink-0 bg-surface/70 rounded-lg"
+                        style={{ width: size, height: size }}
+                      >
                         <MiZiGeBackdrop />
                         <span
                           className="absolute inset-0 grid place-items-center font-hanzi leading-none text-ink"
-                          style={{ fontSize: size * 0.68 }}
+                          style={{ fontSize: Math.round(size * 0.68) }}
                         >
                           {ch}
                         </span>
@@ -127,84 +199,108 @@ export function HomeDashboard({
                   })}
               </div>
 
-              <div className="flex-1 p-5 sm:p-6 flex flex-col gap-4">
-                <div>
-                  <h3 id="continue-heading" className="text-sm font-medium text-ink-muted">
-                    Tiếp tục bài học
-                  </h3>
-                  <div className="mt-2 flex items-baseline gap-3 flex-wrap">
-                    <span className="text-xl font-semibold text-ink">{current.pinyin}</span>
-                    {current.hanViet && (
-                      <span className="text-sm text-ink-subtle">{current.hanViet}</span>
-                    )}
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-primary-soft text-primary">
-                      {current.hskLevel}
-                    </span>
-                  </div>
-                  <p className="mt-1.5 text-ink">{current.meaning}</p>
-                  {current.exampleHanzi && (
-                    <p className="mt-3 text-sm text-ink-muted">
-                      <span className="font-hanzi text-ink">{current.exampleHanzi}</span>
-                      {current.exampleMeaning && <span> — {current.exampleMeaning}</span>}
-                    </p>
+              {/* Pinyin, Han-Viet, Meaning & Example right next to the character */}
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="flex items-baseline gap-2.5 flex-wrap">
+                  <span className="text-xl sm:text-2xl font-semibold text-primary">
+                    {current.pinyin}
+                  </span>
+                  {current.hanViet && (
+                    <span className="text-sm text-ink-subtle">Hán Việt: {current.hanViet}</span>
                   )}
                 </div>
-
-                <div className="mt-auto flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    data-testid="home-continue-btn"
-                    onClick={onContinueLesson}
-                    className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors cursor-pointer"
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    Học tiếp
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onPracticeWriting(current)}
-                    className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-border-strong bg-surface hover:bg-surface-2 text-ink text-sm font-medium transition-colors cursor-pointer"
-                  >
-                    <PenLine className="w-4 h-4" />
-                    Luyện viết
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => speakChinese(current.hanzi)}
-                    aria-label={`Nghe phát âm ${current.hanzi}`}
-                    className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-ink-muted hover:bg-surface-2 hover:text-ink transition-colors cursor-pointer"
-                  >
-                    <Volume2 className="w-4 h-4" />
-                  </button>
-                </div>
+                <p className="text-base sm:text-lg font-medium text-ink">{current.meaning}</p>
+                {current.exampleHanzi && (
+                  <p className="text-sm text-ink-muted line-clamp-2 pt-0.5">
+                    <span className="font-hanzi text-ink">{current.exampleHanzi}</span>
+                    {current.exampleMeaning && <span> — {current.exampleMeaning}</span>}
+                  </p>
+                )}
               </div>
+            </div>
+
+            <div className="pt-3 border-t border-border/70 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                data-testid="home-continue-btn"
+                onClick={onContinueLesson}
+                className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors cursor-pointer"
+              >
+                <BookOpen className="w-4 h-4" />
+                Học tiếp
+              </button>
+              <button
+                type="button"
+                onClick={() => onPracticeWriting(current)}
+                className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-border-strong bg-surface hover:bg-surface-2 text-ink text-sm font-medium transition-colors cursor-pointer"
+              >
+                <PenLine className="w-4 h-4" />
+                Luyện viết
+              </button>
+              <button
+                type="button"
+                onClick={() => speakChinese(current.hanzi)}
+                aria-label={`Nghe phát âm ${current.hanzi}`}
+                className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl text-ink-muted hover:bg-surface-2 hover:text-ink text-sm font-medium transition-colors cursor-pointer"
+              >
+                <Volume2 className="w-4 h-4" />
+                <span>Phát âm</span>
+              </button>
             </div>
           </section>
         )}
 
-        {/* Progress */}
+        {/* Progress with visual circular ring + linear progress bar */}
         <section
-          className="rounded-3xl bg-surface border border-border shadow-xs p-5 sm:p-6 flex flex-col animate-rise-in"
+          className="rounded-3xl bg-surface border border-border shadow-xs p-5 sm:p-6 flex flex-col justify-between animate-rise-in"
           style={{ '--stagger': 2 } as React.CSSProperties}
           aria-labelledby="progress-heading"
+          data-testid="home-progress-card"
         >
-          <h3 id="progress-heading" className="text-sm font-medium text-ink-muted">
-            Tiến độ bộ từ
-          </h3>
-          <div className="mt-3 flex items-baseline gap-1.5">
-            <span className="text-4xl font-semibold tabular-nums text-ink">{learnedCount}</span>
-            <span className="text-ink-muted">/ {slides.length} từ đã thuộc</span>
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <h3 id="progress-heading" className="text-sm font-medium text-ink-muted">
+                Tiến độ bộ từ
+              </h3>
+              <span className="text-xs text-ink-subtle tabular-nums">
+                Còn {remainingCount} từ cần ôn
+              </span>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-3xl sm:text-4xl font-semibold tabular-nums text-ink">
+                    {learnedCount}
+                  </span>
+                  <span className="text-sm sm:text-base text-ink-muted">
+                    / {slides.length} từ đã thuộc
+                  </span>
+                </div>
+                <p className="text-xs text-ink-subtle mt-1">
+                  {learnedCount === slides.length
+                    ? 'Tuyệt vời! Bạn đã hoàn thành toàn bộ bộ từ.'
+                    : `Đã hoàn thành ${percent}% mục tiêu từ vựng bài học`}
+                </p>
+              </div>
+              <VocabProgressRing percent={percent} />
+            </div>
+
+            <div
+              className="mt-4 h-2.5 rounded-full bg-surface-2 overflow-hidden"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
+              aria-label="Tỷ lệ từ đã thuộc"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
+                style={{ width: `${percent}%` }}
+              />
+            </div>
           </div>
-          <div
-            className="mt-4 h-2 rounded-full bg-surface-2 overflow-hidden"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent}
-            aria-label="Tỷ lệ từ đã thuộc"
-          >
-            <div className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out" style={{ width: `${percent}%` }} />
-          </div>
+
           <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl bg-surface-2 px-3 py-2.5">
               <dt className="text-ink-muted text-xs">Kho từ HSK</dt>
@@ -271,37 +367,64 @@ export function HomeDashboard({
         </div>
       </section>
 
-      {/* Words to review */}
+      {/* Words to review — click to open quick detail popup or jump directly to lesson */}
       {toReview.length > 0 && (
         <section
           aria-labelledby="review-heading"
           className="animate-rise-in"
           style={{ '--stagger': 4 } as React.CSSProperties}
         >
-          <div className="flex items-baseline justify-between mb-3">
-            <h3 id="review-heading" className="text-base font-semibold text-ink">
-              Từ chưa thuộc
-            </h3>
+          <div className="flex items-baseline justify-between gap-2 mb-3">
+            <div>
+              <h3 id="review-heading" className="text-base font-semibold text-ink">
+                Từ chưa thuộc
+              </h3>
+              <p className="text-xs text-ink-muted mt-0.5">
+                Bấm vào thẻ từ để xem nhanh Pinyin, nghĩa, ví dụ hoặc mở trong Bài học
+              </p>
+            </div>
             <button
               type="button"
               onClick={onOpenFlashcard}
-              className="text-sm font-medium text-primary hover:underline cursor-pointer"
+              className="text-sm font-medium text-primary hover:underline cursor-pointer shrink-0"
             >
               Ôn tất cả
             </button>
           </div>
-          <ul className="grid gap-2 grid-cols-2 sm:grid-cols-4">
+          <ul className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
             {toReview.map(({ s, i }) => (
-              <li key={s.id}>
+              <li
+                key={s.id}
+                className="group relative rounded-2xl bg-surface border border-border hover:border-primary/40 transition-colors"
+              >
                 <button
                   type="button"
-                  onClick={() => onPickSlide(i)}
-                  className="w-full text-left rounded-2xl bg-surface border border-border hover:border-primary/40 px-4 py-3 transition-colors cursor-pointer"
+                  data-testid={`home-unlearned-word-${s.hanzi}`}
+                  onClick={() => {
+                    setPreviewWord({ slide: s, index: i });
+                    speakChinese(s.hanzi);
+                  }}
+                  aria-label={`Xem chi tiết từ ${s.hanzi} (${s.pinyin} - ${s.meaning})`}
+                  className="w-full text-left px-4 py-3 pr-10 cursor-pointer"
                 >
-                  <span className="block font-hanzi text-2xl text-ink leading-tight">{s.hanzi}</span>
+                  <span className="block font-hanzi text-2xl text-ink leading-tight group-hover:text-primary transition-colors">
+                    {s.hanzi}
+                  </span>
                   <span className="block text-xs text-ink-muted mt-1 truncate">
                     {s.pinyin} · {s.meaning}
                   </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    speakChinese(s.hanzi);
+                  }}
+                  aria-label={`Nghe phát âm ${s.hanzi}`}
+                  title={`Nghe phát âm ${s.hanzi}`}
+                  className="absolute top-2.5 right-2.5 w-7 h-7 rounded-lg grid place-items-center text-ink-subtle hover:text-primary hover:bg-primary-soft/60 transition-colors cursor-pointer"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
                 </button>
               </li>
             ))}
@@ -350,6 +473,170 @@ export function HomeDashboard({
           </div>
         </section>
       )}
+
+      {/* Quick Word Detail Popup for "Từ chưa thuộc" */}
+      <Dialog
+        isOpen={Boolean(activePreviewSlide && previewWord)}
+        onClose={() => setPreviewWord(null)}
+        title={activePreviewSlide ? `Chi tiết từ vựng ${activePreviewSlide.hanzi}` : 'Chi tiết từ vựng'}
+        maxWidthClass="max-w-lg"
+        testId="home-word-detail-dialog"
+      >
+        {activePreviewSlide && previewWord && (
+          <div className="rounded-3xl bg-surface border border-border shadow-xl p-5 sm:p-6 space-y-4 text-ink">
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-xs text-ink-subtle">
+                Từ số {previewWord.index + 1}/{slides.length} · {activePreviewSlide.hskLevel}
+                {activePreviewSlide.partOfSpeech ? ` · ${activePreviewSlide.partOfSpeech}` : ''}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewWord(null)}
+                aria-label="Đóng cửa sổ chi tiết từ"
+                className="w-8 h-8 rounded-full grid place-items-center text-ink-muted hover:bg-surface-2 hover:text-ink transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div
+                onClick={() => speakChinese(activePreviewSlide.hanzi)}
+                className="shrink-0 self-start rounded-2xl bg-surface-2 p-3 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {Array.from(activePreviewSlide.hanzi)
+                  .slice(0, 4)
+                  .map((ch, idx, arr) => {
+                    const size = arr.length === 1 ? 84 : arr.length === 2 ? 72 : 56;
+                    return (
+                      <div
+                        key={`${ch}-${idx}`}
+                        className="relative shrink-0 bg-surface/80 rounded-lg"
+                        style={{ width: size, height: size }}
+                      >
+                        <MiZiGeBackdrop />
+                        <span
+                          className="absolute inset-0 grid place-items-center font-hanzi leading-none text-ink"
+                          style={{ fontSize: Math.round(size * 0.68) }}
+                        >
+                          {ch}
+                        </span>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex items-baseline gap-2.5 flex-wrap">
+                  <span
+                    className="text-2xl font-semibold text-primary"
+                    data-testid="home-word-detail-pinyin"
+                  >
+                    {activePreviewSlide.pinyin}
+                  </span>
+                  {activePreviewSlide.hanViet && (
+                    <span className="text-sm text-ink-subtle">
+                      Hán Việt: {activePreviewSlide.hanViet}
+                    </span>
+                  )}
+                </div>
+                <p
+                  className="text-lg font-semibold text-ink"
+                  data-testid="home-word-detail-meaning"
+                >
+                  {activePreviewSlide.meaning}
+                </p>
+                {activePreviewSlide.usageNote && (
+                  <p className="text-xs text-ink-muted leading-relaxed">
+                    {activePreviewSlide.usageNote}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {activePreviewSlide.exampleHanzi && (
+              <div className="rounded-2xl bg-surface-2 p-3.5 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-ink-subtle">Câu ví dụ</span>
+                  <button
+                    type="button"
+                    onClick={() => speakChinese(activePreviewSlide.exampleHanzi)}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline cursor-pointer"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                    Nghe câu
+                  </button>
+                </div>
+                <p className="font-hanzi text-base sm:text-lg text-ink">
+                  {activePreviewSlide.exampleHanzi}
+                </p>
+                {activePreviewSlide.examplePinyin && (
+                  <p className="text-xs text-primary">{activePreviewSlide.examplePinyin}</p>
+                )}
+                {activePreviewSlide.exampleMeaning && (
+                  <p className="text-sm text-ink-muted">{activePreviewSlide.exampleMeaning}</p>
+                )}
+              </div>
+            )}
+
+            <div className="pt-2 border-t border-border flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="home-word-detail-open-lesson-btn"
+                  onClick={() => {
+                    const targetIdx = previewWord.index;
+                    setPreviewWord(null);
+                    onPickSlide(targetIdx);
+                  }}
+                  className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>Mở trong Bài học</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetSlide = activePreviewSlide;
+                    setPreviewWord(null);
+                    onPracticeWriting(targetSlide);
+                  }}
+                  className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl border border-border-strong bg-surface hover:bg-surface-2 text-ink text-sm font-medium transition-colors cursor-pointer"
+                >
+                  <PenLine className="w-4 h-4" />
+                  <span>Luyện viết</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => speakChinese(activePreviewSlide.hanzi)}
+                  aria-label={`Phát âm ${activePreviewSlide.hanzi}`}
+                  className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-surface hover:bg-surface-2 text-ink text-sm font-medium transition-colors cursor-pointer"
+                >
+                  <Volume2 className="w-4 h-4 text-primary" />
+                  <span>Phát âm</span>
+                </button>
+                {onToggleLearned && (
+                  <button
+                    type="button"
+                    data-testid="home-word-detail-toggle-learned-btn"
+                    onClick={() => {
+                      onToggleLearned(activePreviewSlide.id);
+                      setPreviewWord(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-surface hover:bg-surface-2 text-ink text-sm font-medium transition-colors cursor-pointer"
+                  >
+                    <Check className="w-4 h-4 text-success" />
+                    <span>{activePreviewSlide.learned ? 'Bỏ đánh dấu' : 'Đã thuộc'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }

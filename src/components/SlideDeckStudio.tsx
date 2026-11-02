@@ -407,47 +407,65 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     return () => window.removeEventListener('hanu_srs_updated', syncSrs);
   }, [slides]);
 
-  const handleRateCurrentWordSrs = (rating: SrsRating) => {
-    const nextRecords = applySrsRatingToRecords(srsRecords, currentSlide, rating);
-    setSrsRecords(nextRecords);
-    saveStoredSrsRecords(nextRecords);
-    playGentleChime(rating === 'good' ? 783.99 : rating === 'hard' ? 587.33 : 440, 0.18);
+  const handleRateCurrentWordSrs = useCallback(
+    (rating: SrsRating) => {
+      const nextRecords = applySrsRatingToRecords(srsRecords, currentSlide, rating);
+      setSrsRecords(nextRecords);
+      saveStoredSrsRecords(nextRecords);
+      playGentleChime(
+        rating === 'good' || rating === 'mastered' ? 783.99 : rating === 'hard' ? 587.33 : 440,
+        0.18
+      );
 
-    // 2-Way Sync: Sync student's Sổ từ khó (错题本) words to Teacher's Gradebook in localStorage
-    try {
-      const updatedMistakes = getMistakeNotebookList(nextRecords).map((m) => m.hanzi);
-      const rawRoster = localStorage.getItem('hanu_classroom_students_roster_v2');
-      if (rawRoster) {
-        const parsedRoster = JSON.parse(rawRoster);
-        if (Array.isArray(parsedRoster) && parsedRoster.length > 0) {
-          const nextRoster = parsedRoster.map((st, idx) =>
-            idx === 0 ? { ...st, reviewWords: updatedMistakes } : st
-          );
-          localStorage.setItem('hanu_classroom_students_roster_v2', JSON.stringify(nextRoster));
-          window.dispatchEvent(new CustomEvent('hanu_students_updated', { detail: nextRoster.length }));
+      // 2-Way Sync: Sync student's Sổ từ khó (错题本) words to Teacher's Gradebook in localStorage
+      try {
+        const updatedMistakes = getMistakeNotebookList(nextRecords).map((m) => m.hanzi);
+        const rawRoster = localStorage.getItem('hanu_classroom_students_roster_v2');
+        if (rawRoster) {
+          const parsedRoster = JSON.parse(rawRoster);
+          if (Array.isArray(parsedRoster) && parsedRoster.length > 0) {
+            const nextRoster = parsedRoster.map((st, idx) =>
+              idx === 0 ? { ...st, reviewWords: updatedMistakes } : st
+            );
+            localStorage.setItem('hanu_classroom_students_roster_v2', JSON.stringify(nextRoster));
+            window.dispatchEvent(new CustomEvent('hanu_students_updated', { detail: nextRoster.length }));
+          }
         }
+      } catch {
+        // ignore storage errors
       }
-    } catch {
-      // ignore storage errors
-    }
 
-    if (rating === 'good' && !currentSlide.learned) {
-      onToggleLearned(currentSlide.id);
-    }
-    const labelMap: Record<SrsRating, string> = {
-      again: `😰 Đã đưa "${currentSlide.hanzi}" vào Sổ tay từ hay quên (错题本) & đồng bộ tới Giáo viên!`,
-      forgot: `😰 Đã đưa "${currentSlide.hanzi}" vào Sổ tay từ hay quên (错题本) & đồng bộ tới Giáo viên!`,
-      hard: `🤔 Đã đánh dấu "${currentSlide.hanzi}" (Cần củng cố) vào Sổ tay từ hay quên (错题本).`,
-      good: `✅ Đã thuộc nhớ "${currentSlide.hanzi}"! Tiếp tục phát huy nhé.`,
-      mastered: `🌟 Đã thuộc làu "${currentSlide.hanzi}"! Tự tin làm chủ từ vựng.`,
-    };
-    setToastMessage(labelMap[rating]);
-    setIsCardFlipped(false);
+      if ((rating === 'good' || rating === 'mastered') && !currentSlide.learned) {
+        onToggleLearned(currentSlide.id);
+      } else if (
+        (rating === 'forgot' || rating === 'again' || rating === 'hard') &&
+        currentSlide.learned
+      ) {
+        onToggleLearned(currentSlide.id);
+      }
+      const labelMap: Record<SrsRating, string> = {
+        again: `😰 Đã đưa "${currentSlide.hanzi}" vào Sổ tay từ hay quên (错题本) & đồng bộ tới Giáo viên!`,
+        forgot: `😰 Đã đưa "${currentSlide.hanzi}" vào Sổ tay từ hay quên (错题本) & đồng bộ tới Giáo viên!`,
+        hard: `🤔 Đã đánh dấu "${currentSlide.hanzi}" (Cần củng cố) vào Sổ tay từ hay quên (错题本).`,
+        good: `✅ Đã thuộc nhớ "${currentSlide.hanzi}"! Tiếp tục phát huy nhé.`,
+        mastered: `🌟 Đã thuộc làu "${currentSlide.hanzi}"! Tự tin làm chủ từ vựng.`,
+      };
+      setToastMessage(labelMap[rating]);
+      setIsCardFlipped(false);
 
-    // Automatically advance to next slide for smooth flashcard flow
-    const nextIdx = (activeSlideIndex + 1) % slides.length;
-    handleSelectSlide(nextIdx);
-  };
+      // Automatically advance to next slide for smooth flashcard flow
+      const nextIdx = (activeSlideIndex + 1) % slides.length;
+      setActiveCharIdx(0);
+      setUserStrokes([]);
+      setCurrentStroke([]);
+      setPracticeAccuracy(null);
+      setPracticeEvalDetail(null);
+      setIsAnimatingStrokes(true);
+      setSpeechResult(null);
+      onSelectSlideIndex(nextIdx);
+    },
+    [srsRecords, currentSlide, onToggleLearned, activeSlideIndex, slides.length, onSelectSlideIndex]
+  );
 
   // Synchronously clamp character index to avoid undefined during rapid slide transitions
   const safeActiveCharIdx = Math.min(
@@ -897,7 +915,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     handleSelectSlide(next);
   }, [activeSlideIndex, slides.length, handleSelectSlide]);
 
-  // Classroom Keyboard Shortcuts: [←]/[→] Prev/Next word, [Space] Pronounce, [W] Animate Stroke, [F] Toggle Fullscreen
+  // Keyboard Shortcuts: [←]/[→] Prev/Next word, [Space] Flip card (Flashcard) & Pronounce, [1-2-3-(4)] Rate memory level, [W] Animate Stroke, [F] Toggle Fullscreen
   useEffect(() => {
     const handleClassroomShortcuts = (e: KeyboardEvent) => {
       if (
@@ -949,7 +967,22 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
         speakChinese(slides[nextIdx]?.hanzi || '', speechRate);
       } else if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
+        if (roleMode === 'student' && studentStudyMode === 'flashcard') {
+          setIsCardFlipped((f) => !f);
+        }
         speakChinese(currentSlide.hanzi, speechRate);
+      } else if (e.key === '1' || e.code === 'Digit1' || e.code === 'Numpad1') {
+        e.preventDefault();
+        handleRateCurrentWordSrs('forgot');
+      } else if (e.key === '2' || e.code === 'Digit2' || e.code === 'Numpad2') {
+        e.preventDefault();
+        handleRateCurrentWordSrs('hard');
+      } else if (e.key === '3' || e.code === 'Digit3' || e.code === 'Numpad3') {
+        e.preventDefault();
+        handleRateCurrentWordSrs('good');
+      } else if (e.key === '4' || e.code === 'Digit4' || e.code === 'Numpad4') {
+        e.preventDefault();
+        handleRateCurrentWordSrs('mastered');
       } else if (e.key === 'w' || e.key === 'W' || e.code === 'KeyW') {
         e.preventDefault();
         setInlineStrokeMode('animate');
@@ -970,6 +1003,9 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     currentChar.char,
     speechRate,
     handleSelectSlide,
+    handleRateCurrentWordSrs,
+    roleMode,
+    studentStudyMode,
     isAddVocabModalOpen,
     isWorksheetModalOpen,
     isQuickEditModalOpen,
@@ -1781,15 +1817,17 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-bold text-primary inline-flex items-center gap-1">
                     <Keyboard className="w-4 h-4 text-gold" />
-                    <span>Phím tắt đứng lớp:</span>
+                    <span>Phím tắt bàn phím:</span>
                   </span>
-                  <span><strong>[←] / [→]</strong>: Chuyển thẻ từ</span>
+                  <span><strong>[←] / [→]</strong>: Chuyển từ</span>
                   <span>·</span>
-                  <span><strong>[Space]</strong>: Phát âm chuẩn zh-CN</span>
+                  <span><strong>[Space]</strong>: Lật thẻ / Phát âm</span>
                   <span>·</span>
-                  <span><strong>[W]</strong>: Chạy nét mẫu ô Mễ</span>
+                  <span><strong>[1 - 2 - 3]</strong>: Đánh dấu mức độ nhớ</span>
                   <span>·</span>
-                  <span><strong>[F]</strong>: Trình chiếu Fullscreen</span>
+                  <span><strong>[W]</strong>: Chạy nét mẫu</span>
+                  <span>·</span>
+                  <span><strong>[F]</strong>: Fullscreen</span>
                 </div>
                 <button
                   type="button"
@@ -2035,31 +2073,60 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
                 <div>
                   <div className="text-xs text-ink-muted text-center mb-2">
-                    {isCardFlipped ? 'Bạn nhớ từ này đến mức nào?' : 'Lật thẻ để tự chấm'}
+                    {isCardFlipped
+                      ? 'Bạn nhớ từ này đến mức nào? (Bấm nút hoặc phím 1 · 2 · 3)'
+                      : 'Bấm vào thẻ hoặc nhấn Space để lật thẻ · Phím 1 · 2 · 3 để tự chấm nhanh'}
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {(
                       [
-                        { key: 'forgot', testId: 'srs-rate-again-btn', label: 'Quên', when: '1 phút', tone: 'text-accent' },
-                        { key: 'hard', testId: 'srs-rate-hard-btn', label: 'Khó', when: '10 phút', tone: 'text-gold' },
-                        { key: 'good', testId: 'srs-rate-good-btn', label: 'Nhớ', when: '1 ngày', tone: 'text-primary' },
-                        { key: 'mastered', testId: 'srs-rate-mastered-btn', label: 'Thuộc làu', when: '4 ngày', tone: 'text-success' },
+                        { key: 'forgot', shortcut: '1', testId: 'srs-rate-again-btn', label: 'Quên', when: '1 phút', tone: 'text-accent' },
+                        { key: 'hard', shortcut: '2', testId: 'srs-rate-hard-btn', label: 'Khó', when: '10 phút', tone: 'text-gold' },
+                        { key: 'good', shortcut: '3', testId: 'srs-rate-good-btn', label: 'Nhớ', when: '1 ngày', tone: 'text-primary' },
+                        { key: 'mastered', shortcut: '4', testId: 'srs-rate-mastered-btn', label: 'Thuộc làu', when: '4 ngày', tone: 'text-success' },
                       ] as const
                     ).map((r) => (
                       <button
                         key={r.key}
                         type="button"
                         data-testid={r.testId}
+                        title={`Phím tắt [${r.shortcut}]: ${r.label} (ôn lại sau ${r.when})`}
                         onClick={() => {
                           handleRateCurrentWordSrs(r.key);
                           setIsCardFlipped(false);
                         }}
-                        className="h-14 rounded-2xl border border-border bg-surface hover:border-border-strong hover:bg-surface-2 transition-colors cursor-pointer flex flex-col items-center justify-center"
+                        className="relative h-14 rounded-2xl border border-border bg-surface hover:border-border-strong hover:bg-surface-2 transition-colors cursor-pointer flex flex-col items-center justify-center"
                       >
+                        <kbd className="absolute top-1.5 right-2 text-[11px] font-mono text-ink-subtle">
+                          {r.shortcut}
+                        </kbd>
                         <span className={`text-sm font-semibold ${r.tone}`}>{r.label}</span>
                         <span className="text-xs text-ink-subtle">ôn lại sau {r.when}</span>
                       </button>
                     ))}
+                  </div>
+                  <div
+                    data-testid="flashcard-keyboard-shortcuts-hint"
+                    className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-ink-muted"
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <Keyboard className="w-3.5 h-3.5 text-ink-subtle" />
+                      <span>Phím tắt:</span>
+                    </span>
+                    <span>
+                      <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-ink font-mono text-[11px]">Space</kbd> Lật thẻ &amp; phát âm
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-ink font-mono text-[11px]">←</kbd>{' '}
+                      <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-ink font-mono text-[11px]">→</kbd> Chuyển từ
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-ink font-mono text-[11px]">1</kbd>{' '}
+                      <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-ink font-mono text-[11px]">2</kbd>{' '}
+                      <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-ink font-mono text-[11px]">3</kbd> Chấm mức độ nhớ
+                    </span>
                   </div>
                 </div>
               </section>
@@ -2493,6 +2560,33 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       )}
                     </div>
                   )}
+
+                  {/* Keyboard shortcut hint on Lesson card */}
+                  <div
+                    data-testid="lesson-keyboard-shortcuts-hint"
+                    className="mt-3 pt-2.5 border-t border-border/70 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted"
+                  >
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                      <span className="inline-flex items-center gap-1 text-ink-subtle">
+                        <Keyboard className="w-3.5 h-3.5" />
+                        <span>Phím tắt:</span>
+                      </span>
+                      <span>
+                        <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-ink font-mono text-[11px]">Space</kbd> Phát âm
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-ink font-mono text-[11px]">←</kbd>{' '}
+                        <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-ink font-mono text-[11px]">→</kbd> Chuyển từ
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-ink font-mono text-[11px]">1</kbd> Quên ·{' '}
+                        <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-ink font-mono text-[11px]">2</kbd> Khó ·{' '}
+                        <kbd className="px-1.5 py-0.5 rounded bg-surface-2 text-ink font-mono text-[11px]">3</kbd> Đã thuộc
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

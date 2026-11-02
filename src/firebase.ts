@@ -19,8 +19,7 @@ import {
 import {
   getFirestore,
   initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
+  enableNetwork,
   connectFirestoreEmulator,
   doc,
   getDoc,
@@ -88,15 +87,13 @@ export const firebaseConfig = {
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-function createPersistentFirestoreInstance(): Firestore {
+function createFirestoreInstance(): Firestore {
   if (typeof window !== 'undefined') {
     try {
       return initializeFirestore(
         app,
         {
-          localCache: persistentLocalCache({
-            tabManager: persistentMultipleTabManager(),
-          }),
+          experimentalAutoDetectLongPolling: true,
         },
         firebaseConfig.firestoreDatabaseId
       );
@@ -107,13 +104,18 @@ function createPersistentFirestoreInstance(): Firestore {
   return getFirestore(app, firebaseConfig.firestoreDatabaseId);
 }
 
-export const db = createPersistentFirestoreInstance();
+export const db = createFirestoreInstance();
 export const auth = getAuth(app);
 
 let appCheckInstance: AppCheck | null = null;
 if (typeof window !== 'undefined') {
   const recaptchaSiteKey = (envConfig.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY || '').trim();
-  if (recaptchaSiteKey) {
+  const isValidSiteKey =
+    recaptchaSiteKey.length >= 20 &&
+    recaptchaSiteKey.toLowerCase() !== 'disabled' &&
+    recaptchaSiteKey.toLowerCase() !== 'false' &&
+    recaptchaSiteKey.toLowerCase() !== 'none';
+  if (isValidSiteKey) {
     try {
       appCheckInstance = initializeAppCheck(app, {
         provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
@@ -210,11 +212,15 @@ export function handleFirestoreError(
 
 async function testConnection() {
   if (typeof window === 'undefined') return;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
   try {
+    await enableNetwork(db).catch(() => {});
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
+      if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+        console.error('Please check your Firebase configuration.');
+      }
     }
   }
 }

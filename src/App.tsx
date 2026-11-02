@@ -1172,7 +1172,7 @@ export default function App() {
         <main
           ref={studioSectionRef}
           id="studio"
-          className={`relative flex-1 w-full max-w-[1320px] mx-auto px-4 sm:px-6 pt-5 sm:pt-6 pb-28 lg:pb-12 transition-[padding] duration-300 ${
+          className={`relative flex-1 w-full max-w-[1320px] mx-auto px-4 sm:px-6 pt-5 sm:pt-6 pb-32 lg:pb-14 transition-[padding] duration-300 ${
             isBinBinDockedOpen ? 'lg:pr-[384px]' : ''
           }`}
         >
@@ -1197,6 +1197,7 @@ export default function App() {
                   setActiveSlideIndex(index);
                   goStudent('/hoc');
                 }}
+                onToggleLearned={handleToggleLearnedSlide}
               />
             }
           />
