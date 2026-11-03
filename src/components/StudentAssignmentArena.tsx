@@ -30,6 +30,7 @@ import {
   getMistakeNotebookList,
   HSK3_SENTENCE_BUILDER_CHALLENGES,
   loadStoredSrsRecords,
+  recordDailyWordReview,
   saveStoredSrsRecords,
   SentenceBuilderEvaluation,
   SrsWordRecord,
@@ -361,6 +362,7 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
     }
     setRoster(updatedRoster);
     appStore.notifyStudentsUpdated(updatedRoster.length);
+    recordDailyWordReview(`arena-${params.assignmentId}`, slides);
     return updatedRoster;
   };
 

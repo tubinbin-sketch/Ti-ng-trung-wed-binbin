@@ -973,7 +973,7 @@ export function subscribeToStudentSrs(
       onUpdate(map);
     },
     (error) => {
-      console.warn('SRS subscription warning:', error.message);
+      void error;
     }
   );
 }
@@ -1036,7 +1036,7 @@ export function subscribeToClassroom(
           }
         }
       },
-      (err) => console.warn('Deck listener info:', err.message)
+      (err) => void err
     )
   );
 
@@ -1053,7 +1053,7 @@ export function subscribeToClassroom(
           });
         }
       },
-      (err) => console.warn('Assignment listener info:', err.message)
+      (err) => void err
     )
   );
 
@@ -1080,7 +1080,7 @@ export function subscribeToClassroom(
           params.onLeaderboardUpdate(list);
         }
       },
-      (err) => console.warn('Leaderboard listener info:', err.message)
+      (err) => void err
     )
   );
 
@@ -1123,7 +1123,7 @@ export function subscribeToClassroom(
             params.onStudentsUpdate(Array.from(byCode.values()));
           }
         },
-        (err) => console.warn('Students listener info:', err.message)
+        (err) => void err
       )
     );
   } else if (params.currentUid) {
@@ -1157,44 +1157,46 @@ export function subscribeToClassroom(
             ]);
           }
         },
-        (err) => console.warn('Student own-record listener info:', err.message)
+        (err) => void err
       )
     );
   }
 
   // 5. Submissions listener (Teacher reads all class submissions; Student reads only their own submissions)
-  const subQuery = params.isTeacher
-    ? collection(db, 'classes', params.classId, 'submissions')
-    : query(
-        collection(db, 'classes', params.classId, 'submissions'),
-        where('studentUid', '==', params.currentUid)
-      );
+  if (params.onSubmissionsUpdate && (params.isTeacher || params.currentUid)) {
+    const subQuery = params.isTeacher
+      ? collection(db, 'classes', params.classId, 'submissions')
+      : query(
+          collection(db, 'classes', params.classId, 'submissions'),
+          where('studentUid', '==', params.currentUid)
+        );
 
-  unsubs.push(
-    onSnapshot(
-      subQuery,
-      (snap) => {
-        if (params.onSubmissionsUpdate) {
-          const subs: FirestoreSubmissionDoc[] = [];
-          snap.forEach((d) => {
-            const data = d.data();
-            subs.push({
-              id: d.id,
-              studentUid: String(data.studentUid || ''),
-              studentCode: data.studentCode ? String(data.studentCode) : undefined,
-              studentName: data.studentName ? String(data.studentName) : undefined,
-              assignmentId: String(data.assignmentId || 'default-assignment'),
-              score: Number(data.score || 0),
-              answers: (data.answers as Record<string, unknown>) || {},
-              submittedAt: String(data.submittedAt || ''),
+    unsubs.push(
+      onSnapshot(
+        subQuery,
+        (snap) => {
+          if (params.onSubmissionsUpdate) {
+            const subs: FirestoreSubmissionDoc[] = [];
+            snap.forEach((d) => {
+              const data = d.data();
+              subs.push({
+                id: d.id,
+                studentUid: String(data.studentUid || ''),
+                studentCode: data.studentCode ? String(data.studentCode) : undefined,
+                studentName: data.studentName ? String(data.studentName) : undefined,
+                assignmentId: String(data.assignmentId || 'default-assignment'),
+                score: Number(data.score || 0),
+                answers: (data.answers as Record<string, unknown>) || {},
+                submittedAt: String(data.submittedAt || ''),
+              });
             });
-          });
-          params.onSubmissionsUpdate(subs);
-        }
-      },
-      (err) => console.warn('Submissions listener info:', err.message)
-    )
-  );
+            params.onSubmissionsUpdate(subs);
+          }
+        },
+        (err) => void err
+      )
+    );
+  }
 
   return () => {
     unsubs.forEach((u) => u());

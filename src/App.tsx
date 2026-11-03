@@ -98,6 +98,7 @@ import {
   setTeacherSessionUnlocked,
   SyncStatus,
 } from './utils/storageService';
+import { recordDailyWordReview } from './utils/hskStudyHelpers';
 import { saveStoredAssignment } from './utils/assignmentParser';
 import {
   auth,
@@ -285,6 +286,7 @@ export default function App() {
   // Real-time Firestore listener for active class (slides, assignment, roster/leaderboard)
   useEffect(() => {
     if (isDemoMode) return;
+    if (!auth.currentUser?.uid) return;
     const activeSession = loadActiveClassroomSession();
     const classId = userProfile.classId || activeSession?.classId;
     if (!classId || classId.startsWith('demo-')) return;
@@ -661,6 +663,7 @@ export default function App() {
       const targetSlide = updated.find((s) => s.id === slideId);
       if (targetSlide?.learned) {
         learnedIds.add(slideId);
+        recordDailyWordReview(slideId, updated);
       } else {
         learnedIds.delete(slideId);
       }

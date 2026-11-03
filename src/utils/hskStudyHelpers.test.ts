@@ -10,10 +10,16 @@ import {
   generateClassroomDictationDeck,
   generateClassroomMiniGameQuestions,
   generateContextualDialogue,
+  getDailyStudyProgress,
   getInitialSrsRecords,
   getMistakeNotebookList,
   HSK3_SENTENCE_BUILDER_CHALLENGES,
+  extractUnlearnedPosCategories,
+  filterUnlearnedSlides,
+  recordDailyWordReview,
+  setDailyStudyGoal,
 } from './hskStudyHelpers';
+import { evaluateChinesePronunciation } from './speech';
 import {
   evaluateMeasureWordAttempt,
   generateMeasureWordChallenges,
@@ -378,3 +384,82 @@ test('AI endpoints require Firebase ID Token (Authorization: Bearer <token>), ra
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
+
+test('evaluateChinesePronunciation scores exact, partial, Pinyin, and wrong transcripts accurately', () => {
+  const exact = evaluateChinesePronunciation('温暖', '温暖', 'wēn nuǎn');
+  assert.ok(exact.score >= 92);
+  assert.equal(exact.tier, 'excellent');
+  assert.equal(exact.badgeLabel, 'Chuẩn xác');
+
+  const partial = evaluateChinesePronunciation('温水', '温暖', 'wēn nuǎn');
+  assert.ok(partial.score >= 60 && partial.score < 85);
+  assert.equal(partial.tier, 'good');
+  assert.equal(partial.badgeLabel, 'Gần đúng');
+
+  const pinyinFallback = evaluateChinesePronunciation('wen nuan', '温暖', 'wēn nuǎn');
+  assert.ok(pinyinFallback.score >= 85);
+  assert.equal(pinyinFallback.badgeLabel, 'Chuẩn xác');
+
+  const wrong = evaluateChinesePronunciation('苹果', '温暖', 'wēn nuǎn');
+  assert.ok(wrong.score < 60);
+  assert.equal(wrong.tier, 'retry');
+  assert.equal(wrong.badgeLabel, 'Cần thử lại');
+});
+
+test('filterUnlearnedSlides and extractUnlearnedPosCategories filter by search, hard, new, and part of speech', () => {
+  const srsRecords = getInitialSrsRecords(INITIAL_VOCAB_SLIDES);
+  const allUnlearned = filterUnlearnedSlides(INITIAL_VOCAB_SLIDES, srsRecords, {
+    filter: 'all',
+  });
+  assert.ok(allUnlearned.length > 0);
+  assert.ok(allUnlearned.every(({ s }) => !s.learned));
+
+  // Search by tone-insensitive Pinyin ("kong tiao")
+  const byPinyin = filterUnlearnedSlides(INITIAL_VOCAB_SLIDES, srsRecords, {
+    query: 'kong tiao',
+    filter: 'all',
+  });
+  assert.ok(byPinyin.some(({ s }) => s.hanzi === '空调'));
+
+  // Search by Vietnamese meaning without accents ("dieu hoa")
+  const byMeaning = filterUnlearnedSlides(INITIAL_VOCAB_SLIDES, srsRecords, {
+    query: 'dieu hoa',
+    filter: 'all',
+  });
+  assert.ok(byMeaning.some(({ s }) => s.hanzi === '空调'));
+
+  // Filter by "hard" (Hay quên / Từ khó)
+  const hardOnly = filterUnlearnedSlides(INITIAL_VOCAB_SLIDES, srsRecords, {
+    filter: 'hard',
+  });
+  assert.ok(hardOnly.length > 0);
+  assert.ok(hardOnly.every(({ isHard }) => isHard));
+
+  // Filter by "new" (Chưa học lần nào)
+  const newOnly = filterUnlearnedSlides(INITIAL_VOCAB_SLIDES, srsRecords, {
+    filter: 'new',
+  });
+  assert.ok(newOnly.length > 0);
+  assert.ok(newOnly.every(({ isNew }) => isNew));
+
+  // Filter by Part of Speech
+  const posList = extractUnlearnedPosCategories(INITIAL_VOCAB_SLIDES);
+  assert.ok(posList.includes('Danh từ'));
+  const nounOnly = filterUnlearnedSlides(INITIAL_VOCAB_SLIDES, srsRecords, {
+    filter: 'pos:Danh từ',
+  });
+  assert.ok(nounOnly.length > 0);
+});
+
+test('DailyStudyProgress initializes, records reviewed words, and switches daily goals (5 / 10 / 20)', () => {
+  const progress = getDailyStudyProgress(INITIAL_VOCAB_SLIDES);
+  assert.ok(progress.streakDays >= 1);
+  assert.equal(progress.dailyGoal, 10);
+
+  const afterReview = recordDailyWordReview('slide-3', INITIAL_VOCAB_SLIDES);
+  assert.ok(afterReview.reviewedWordIdsToday.includes('slide-3'));
+
+  const afterGoal20 = setDailyStudyGoal(20, INITIAL_VOCAB_SLIDES);
+  assert.equal(afterGoal20.dailyGoal, 20);
+});
+

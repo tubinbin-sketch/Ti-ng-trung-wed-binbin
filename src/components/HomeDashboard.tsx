@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   BookOpen,
   Check,
   ChevronRight,
+  Flame,
   GraduationCap,
   Layers,
   PenLine,
   PenTool,
   Presentation,
+  Search,
+  Target,
   Trophy,
   Volume2,
   X,
@@ -16,6 +19,22 @@ import { VocabSlide } from '../data/chineseData';
 import { UserProfile } from './AuthModal';
 import { speakChinese } from '../utils/speech';
 import { Dialog } from './ui/Dialog';
+import {
+  DailyGoalTarget,
+  DailyStudyProgress,
+  extractUnlearnedPosCategories,
+  filterUnlearnedSlides,
+  getDailyStudyProgress,
+  loadStoredSrsRecords,
+  recordDailyWordReview,
+  setDailyStudyGoal,
+  SrsWordRecord,
+} from '../utils/hskStudyHelpers';
+import {
+  PronunciationPracticeButton,
+  PronunciationResultBanner,
+  usePronunciationPractice,
+} from './PronunciationPracticeWidget';
 
 interface HomeDashboardProps {
   userProfile: UserProfile;
@@ -127,29 +146,177 @@ export function HomeDashboard({
   onToggleLearned,
 }: HomeDashboardProps) {
   const [previewWord, setPreviewWord] = useState<{ slide: VocabSlide; index: number } | null>(null);
+  const [unlearnedSearchQuery, setUnlearnedSearchQuery] = useState('');
+  const [unlearnedFilter, setUnlearnedFilter] = useState<string>('all');
+
+  const [srsRecords, setSrsRecords] = useState<Record<string, SrsWordRecord>>(() =>
+    loadStoredSrsRecords(slides, userProfile.studentCode || userProfile.name)
+  );
+
+  const [dailyProgress, setDailyProgress] = useState<DailyStudyProgress>(() =>
+    getDailyStudyProgress(slides)
+  );
+
+  useEffect(() => {
+    setSrsRecords(loadStoredSrsRecords(slides, userProfile.studentCode || userProfile.name));
+  }, [slides, userProfile.studentCode, userProfile.name]);
+
+  useEffect(() => {
+    const syncSrs = () =>
+      setSrsRecords(loadStoredSrsRecords(slides, userProfile.studentCode || userProfile.name));
+    const syncDaily = () => setDailyProgress(getDailyStudyProgress(slides));
+    window.addEventListener('hanu_srs_updated', syncSrs);
+    window.addEventListener('hanu_daily_progress_updated', syncDaily);
+    return () => {
+      window.removeEventListener('hanu_srs_updated', syncSrs);
+      window.removeEventListener('hanu_daily_progress_updated', syncDaily);
+    };
+  }, [slides, userProfile.studentCode, userProfile.name]);
 
   const current = slides[activeSlideIndex] || slides[0];
   const learnedCount = slides.filter((s) => s.learned).length;
   const total = slides.length || 1;
   const percent = Math.round((learnedCount / total) * 100);
   const remainingCount = Math.max(0, slides.length - learnedCount);
-  const toReview = slides
-    .map((s, i) => ({ s, i }))
-    .filter(({ s }) => !s.learned)
-    .slice(0, 8);
   const isTeacher = userProfile.role === 'teacher';
+
+  const posCategories = useMemo(() => extractUnlearnedPosCategories(slides), [slides]);
+
+  const filteredUnlearned = useMemo(
+    () =>
+      filterUnlearnedSlides(slides, srsRecords, {
+        query: unlearnedSearchQuery,
+        filter: unlearnedFilter,
+      }),
+    [slides, srsRecords, unlearnedSearchQuery, unlearnedFilter]
+  );
+
+  const displayedUnlearned = useMemo(() => {
+    if (unlearnedSearchQuery.trim() || unlearnedFilter !== 'all') {
+      return filteredUnlearned.slice(0, 12);
+    }
+    return filteredUnlearned.slice(0, 8);
+  }, [filteredUnlearned, unlearnedSearchQuery, unlearnedFilter]);
 
   const activePreviewSlide = previewWord
     ? slides[previewWord.index] || previewWord.slide
     : null;
 
+  const popupPronunciation = usePronunciationPractice(
+    activePreviewSlide?.hanzi || '',
+    activePreviewSlide?.pinyin || '',
+    activePreviewSlide?.id
+  );
+
+  const dailyGoalPercent = Math.min(
+    100,
+    Math.round((dailyProgress.reviewedCountToday / Math.max(1, dailyProgress.dailyGoal)) * 100)
+  );
+
+  const handleCycleDailyGoal = () => {
+    const nextGoal: DailyGoalTarget =
+      dailyProgress.dailyGoal === 5 ? 10 : dailyProgress.dailyGoal === 10 ? 20 : 5;
+    setDailyProgress(setDailyStudyGoal(nextGoal, slides));
+  };
+
+  const handleSelectDailyGoal = (goal: DailyGoalTarget, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDailyProgress(setDailyStudyGoal(goal, slides));
+  };
+
   return (
     <div className="space-y-6 pb-24 sm:pb-16 lg:pb-10" data-testid="home-dashboard">
-      <div className="animate-rise-in">
-        <p className="text-sm text-ink-muted">{greetingForNow()},</p>
-        <h2 className="text-2xl sm:text-[28px] font-semibold text-ink mt-0.5">
-          {firstName(userProfile.name)}
-        </h2>
+      {/* Greeting + Daily Streak & Daily Goal Header Bar */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 animate-rise-in">
+        <div>
+          <p className="text-sm text-ink-muted">{greetingForNow()},</p>
+          <h2 className="text-2xl sm:text-[28px] font-semibold text-ink mt-0.5">
+            {firstName(userProfile.name)}
+          </h2>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Daily Streak Badge */}
+          <div
+            data-testid="home-daily-streak-badge"
+            className="inline-flex items-center gap-2 h-11 px-3.5 rounded-2xl bg-surface border border-border shadow-2xs"
+            title="Chuỗi ngày học liên tiếp"
+          >
+            <span className="w-7 h-7 rounded-xl bg-highlight/20 text-gold grid place-items-center shrink-0">
+              <Flame className="w-4 h-4 fill-current" />
+            </span>
+            <div className="leading-tight">
+              <span className="block text-xs text-ink-muted">Chuỗi ngày học</span>
+              <span className="block text-sm font-semibold text-ink tabular-nums">
+                🔥 {dailyProgress.streakDays} ngày liên tiếp
+              </span>
+            </div>
+          </div>
+
+          {/* Daily Goal Progress & Switcher (5 / 10 / 20 words) */}
+          <div
+            data-testid="home-daily-goal-widget"
+            onClick={handleCycleDailyGoal}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleCycleDailyGoal();
+              }
+            }}
+            title="Bấm để đổi mục tiêu ôn tập trong ngày (5 / 10 / 20 từ)"
+            className="flex items-center gap-3 min-h-11 px-3.5 py-2 rounded-2xl bg-surface border border-border hover:border-border-strong shadow-2xs transition-colors cursor-pointer"
+          >
+            <span className="w-7 h-7 rounded-xl bg-primary-soft text-primary grid place-items-center shrink-0">
+              <Target className="w-4 h-4" />
+            </span>
+            <div className="min-w-[140px]">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-medium text-ink tabular-nums" data-testid="home-daily-goal-text">
+                  Đã ôn {dailyProgress.reviewedCountToday}/{dailyProgress.dailyGoal} từ hôm nay
+                </span>
+              </div>
+              <div
+                className="mt-1.5 h-1.5 w-full rounded-full bg-surface-2 overflow-hidden"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={dailyProgress.dailyGoal}
+                aria-valuenow={Math.min(dailyProgress.reviewedCountToday, dailyProgress.dailyGoal)}
+                aria-label="Tiến độ mục tiêu từ vựng hôm nay"
+              >
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
+                  style={{ width: `${dailyGoalPercent}%` }}
+                />
+              </div>
+            </div>
+            <div
+              className="flex items-center gap-1 pl-1 border-l border-border"
+              aria-label="Chọn mục tiêu số từ mỗi ngày"
+            >
+              {([5, 10, 20] as const).map((goalOption) => {
+                const isSelected = dailyProgress.dailyGoal === goalOption;
+                return (
+                  <button
+                    key={goalOption}
+                    type="button"
+                    data-testid={`daily-goal-btn-${goalOption}`}
+                    onClick={(e) => handleSelectDailyGoal(goalOption, e)}
+                    aria-pressed={isSelected}
+                    className={`h-6 px-2 rounded-lg text-xs font-semibold tabular-nums transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-primary text-on-primary'
+                        : 'bg-surface-2 text-ink-muted hover:text-ink'
+                    }`}
+                  >
+                    {goalOption}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -211,10 +378,22 @@ export function HomeDashboard({
                 </div>
                 <p className="text-base sm:text-lg font-medium text-ink">{current.meaning}</p>
                 {current.exampleHanzi && (
-                  <p className="text-sm text-ink-muted line-clamp-2 pt-0.5">
-                    <span className="font-hanzi text-ink">{current.exampleHanzi}</span>
-                    {current.exampleMeaning && <span> — {current.exampleMeaning}</span>}
-                  </p>
+                  <div className="flex items-start gap-2 pt-0.5">
+                    <p className="text-sm text-ink-muted line-clamp-2 flex-1">
+                      <span className="font-hanzi text-ink">{current.exampleHanzi}</span>
+                      {current.exampleMeaning && <span> — {current.exampleMeaning}</span>}
+                    </p>
+                    <button
+                      type="button"
+                      data-testid="home-continue-example-speak-btn"
+                      onClick={() => speakChinese(current.exampleHanzi)}
+                      aria-label={`Nghe câu ví dụ: ${current.exampleHanzi}`}
+                      title={`Nghe phát âm câu ví dụ: ${current.exampleHanzi}`}
+                      className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-lg bg-surface-2 text-ink-muted hover:text-primary hover:bg-primary-soft/60 transition-colors cursor-pointer"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -367,20 +546,23 @@ export function HomeDashboard({
         </div>
       </section>
 
-      {/* Words to review — click to open quick detail popup or jump directly to lesson */}
-      {toReview.length > 0 && (
+      {/* Words to review — with smart filter chips, quick search, direct speaker button & detail popup */}
+      {remainingCount > 0 && (
         <section
           aria-labelledby="review-heading"
-          className="animate-rise-in"
+          className="animate-rise-in space-y-3"
           style={{ '--stagger': 4 } as React.CSSProperties}
         >
-          <div className="flex items-baseline justify-between gap-2 mb-3">
+          <div className="flex items-baseline justify-between gap-2">
             <div>
               <h3 id="review-heading" className="text-base font-semibold text-ink">
-                Từ chưa thuộc
+                Từ chưa thuộc{' '}
+                <span className="text-xs font-normal text-ink-muted tabular-nums">
+                  ({filteredUnlearned.length}/{remainingCount} từ)
+                </span>
               </h3>
               <p className="text-xs text-ink-muted mt-0.5">
-                Bấm vào thẻ từ để xem nhanh Pinyin, nghĩa, ví dụ hoặc mở trong Bài học
+                Bấm vào thẻ từ để xem nhanh Pinyin, nghĩa, ví dụ, luyện đọc thử hoặc mở trong Bài học
               </p>
             </div>
             <button
@@ -391,44 +573,138 @@ export function HomeDashboard({
               Ôn tất cả
             </button>
           </div>
-          <ul className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
-            {toReview.map(({ s, i }) => (
-              <li
-                key={s.id}
-                className="group relative rounded-2xl bg-surface border border-border hover:border-primary/40 transition-colors"
+
+          {/* Smart Filter & Quick Search Toolbar */}
+          <div
+            data-testid="home-unlearned-toolbar"
+            className="flex flex-col sm:flex-row sm:items-center gap-2.5 rounded-2xl bg-surface border border-border p-2.5"
+          >
+            <div className="relative sm:w-64 shrink-0">
+              <Search className="w-4 h-4 text-ink-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                data-testid="home-unlearned-search-input"
+                value={unlearnedSearchQuery}
+                onChange={(e) => setUnlearnedSearchQuery(e.target.value)}
+                placeholder="Tìm chữ Hán, Pinyin, nghĩa..."
+                aria-label="Tìm nhanh trong danh sách từ chưa thuộc"
+                className="w-full h-9 pl-9 pr-8 rounded-xl bg-surface-2 border border-transparent focus:border-primary focus:bg-surface focus:outline-none text-sm text-ink placeholder:text-ink-subtle"
+              />
+              {unlearnedSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setUnlearnedSearchQuery('')}
+                  aria-label="Xóa từ khóa tìm kiếm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full grid place-items-center text-ink-subtle hover:text-ink cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div
+              className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5"
+              role="group"
+              aria-label="Bộ lọc từ chưa thuộc"
+            >
+              {[
+                { id: 'all', label: 'Tất cả', testId: 'unlearned-filter-all' },
+                { id: 'hard', label: 'Hay quên / Từ khó', testId: 'unlearned-filter-hard' },
+                { id: 'new', label: 'Chưa học lần nào', testId: 'unlearned-filter-new' },
+                ...posCategories.map((pos) => ({
+                  id: `pos:${pos}`,
+                  label: pos,
+                  testId: `unlearned-filter-pos-${pos}`,
+                })),
+              ].map((chip) => {
+                const active = unlearnedFilter === chip.id;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    data-testid={chip.testId}
+                    onClick={() => setUnlearnedFilter(chip.id)}
+                    aria-pressed={active}
+                    className={`h-8 px-3 rounded-xl text-xs font-medium whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
+                      active
+                        ? 'bg-primary-soft text-primary border-primary/40 font-semibold'
+                        : 'bg-surface-2/70 text-ink-muted border-transparent hover:text-ink hover:bg-surface-2'
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {displayedUnlearned.length === 0 ? (
+            <div
+              data-testid="home-unlearned-empty-state"
+              className="rounded-2xl bg-surface border border-border p-6 text-center space-y-2"
+            >
+              <p className="text-sm text-ink-muted">
+                Không tìm thấy từ chưa thuộc nào khớp với bộ lọc hiện tại.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setUnlearnedSearchQuery('');
+                  setUnlearnedFilter('all');
+                }}
+                className="inline-flex items-center h-8 px-3 rounded-xl bg-surface-2 hover:bg-primary-soft text-xs font-medium text-primary transition-colors cursor-pointer"
               >
-                <button
-                  type="button"
-                  data-testid={`home-unlearned-word-${s.hanzi}`}
-                  onClick={() => {
-                    setPreviewWord({ slide: s, index: i });
-                    speakChinese(s.hanzi);
-                  }}
-                  aria-label={`Xem chi tiết từ ${s.hanzi} (${s.pinyin} - ${s.meaning})`}
-                  className="w-full text-left px-4 py-3 pr-10 cursor-pointer"
+                Đặt lại bộ lọc
+              </button>
+            </div>
+          ) : (
+            <ul className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
+              {displayedUnlearned.map(({ s, i, isHard }) => (
+                <li
+                  key={s.id}
+                  className="group relative rounded-2xl bg-surface border border-border hover:border-primary/40 transition-colors"
                 >
-                  <span className="block font-hanzi text-2xl text-ink leading-tight group-hover:text-primary transition-colors">
-                    {s.hanzi}
-                  </span>
-                  <span className="block text-xs text-ink-muted mt-1 truncate">
-                    {s.pinyin} · {s.meaning}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    speakChinese(s.hanzi);
-                  }}
-                  aria-label={`Nghe phát âm ${s.hanzi}`}
-                  title={`Nghe phát âm ${s.hanzi}`}
-                  className="absolute top-2.5 right-2.5 w-7 h-7 rounded-lg grid place-items-center text-ink-subtle hover:text-primary hover:bg-primary-soft/60 transition-colors cursor-pointer"
-                >
-                  <Volume2 className="w-3.5 h-3.5" />
-                </button>
-              </li>
-            ))}
-          </ul>
+                  <button
+                    type="button"
+                    data-testid={`home-unlearned-word-${s.hanzi}`}
+                    onClick={() => {
+                      setPreviewWord({ slide: s, index: i });
+                      speakChinese(s.hanzi);
+                    }}
+                    aria-label={`Xem chi tiết từ ${s.hanzi} (${s.pinyin} - ${s.meaning})`}
+                    className="w-full text-left px-4 py-3 pr-10 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-hanzi text-2xl text-ink leading-tight group-hover:text-primary transition-colors">
+                        {s.hanzi}
+                      </span>
+                      {isHard && (
+                        <span className="px-1.5 py-0.5 rounded bg-accent-soft text-accent text-[10px] font-medium">
+                          Khó
+                        </span>
+                      )}
+                    </div>
+                    <span className="block text-xs text-ink-muted mt-1 truncate">
+                      {s.pinyin} · {s.meaning}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    data-testid={`home-unlearned-speak-${s.hanzi}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      speakChinese(s.hanzi);
+                    }}
+                    aria-label={`Nghe phát âm ${s.hanzi}`}
+                    title={`Nghe phát âm ${s.hanzi}`}
+                    className="absolute top-2.5 right-2.5 w-7 h-7 rounded-lg grid place-items-center text-ink-subtle hover:text-primary hover:bg-primary-soft/60 transition-colors cursor-pointer"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 
@@ -579,6 +855,15 @@ export function HomeDashboard({
               </div>
             )}
 
+            {/* Speech Recognition Pronunciation Result inside Popup */}
+            <PronunciationResultBanner
+              result={popupPronunciation.result}
+              targetHanzi={activePreviewSlide.hanzi}
+              onRetry={popupPronunciation.startOrStopPractice}
+              onClose={popupPronunciation.clearResult}
+              testId="popup-pronunciation-result"
+            />
+
             <div className="pt-2 border-t border-border flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -586,6 +871,7 @@ export function HomeDashboard({
                   data-testid="home-word-detail-open-lesson-btn"
                   onClick={() => {
                     const targetIdx = previewWord.index;
+                    recordDailyWordReview(activePreviewSlide.id, slides);
                     setPreviewWord(null);
                     onPickSlide(targetIdx);
                   }}
@@ -598,6 +884,7 @@ export function HomeDashboard({
                   type="button"
                   onClick={() => {
                     const targetSlide = activePreviewSlide;
+                    recordDailyWordReview(activePreviewSlide.id, slides);
                     setPreviewWord(null);
                     onPracticeWriting(targetSlide);
                   }}
@@ -608,7 +895,7 @@ export function HomeDashboard({
                 </button>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => speakChinese(activePreviewSlide.hanzi)}
@@ -618,11 +905,17 @@ export function HomeDashboard({
                   <Volume2 className="w-4 h-4 text-primary" />
                   <span>Phát âm</span>
                 </button>
+                <PronunciationPracticeButton
+                  isRecording={popupPronunciation.isRecording}
+                  onClick={() => popupPronunciation.startOrStopPractice()}
+                  testId="popup-pronounce-practice-btn"
+                />
                 {onToggleLearned && (
                   <button
                     type="button"
                     data-testid="home-word-detail-toggle-learned-btn"
                     onClick={() => {
+                      recordDailyWordReview(activePreviewSlide.id, slides);
                       onToggleLearned(activePreviewSlide.id);
                       setPreviewWord(null);
                     }}

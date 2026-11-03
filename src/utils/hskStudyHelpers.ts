@@ -1222,5 +1222,279 @@ export function evaluateSentenceBuilderOrder(
   };
 }
 
+// ============================================================================
+// DAILY STREAK & DAILY GOAL TRACKER (HOME DASHBOARD + LESSON / FLASHCARD / ARENA)
+// ============================================================================
+
+export type DailyGoalTarget = 5 | 10 | 20;
+
+export interface DailyStudyProgress {
+  streakDays: number;
+  lastActiveDate: string; // YYYY-MM-DD
+  todayDate: string;      // YYYY-MM-DD
+  dailyGoal: DailyGoalTarget;
+  reviewedWordIdsToday: string[];
+  reviewedCountToday: number;
+}
+
+export const STORAGE_KEY_DAILY_STUDY_PROGRESS = 'hanu_daily_study_progress_v1';
+
+export function getLocalDateKey(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function getYesterdayDateKey(date: Date = new Date()): string {
+  const copy = new Date(date.getTime());
+  copy.setDate(copy.getDate() - 1);
+  return getLocalDateKey(copy);
+}
+
+export function getDailyStudyProgress(
+  slides: VocabSlide[] = [],
+  nowDate: Date = new Date()
+): DailyStudyProgress {
+  const todayKey = getLocalDateKey(nowDate);
+  const yesterdayKey = getYesterdayDateKey(nowDate);
+  const initialLearnedIds = slides
+    .filter((s) => s.learned)
+    .map((s) => s.id)
+    .slice(0, 5);
+
+  const fallback: DailyStudyProgress = {
+    streakDays: Math.max(1, initialLearnedIds.length > 0 ? 3 : 1),
+    lastActiveDate: todayKey,
+    todayDate: todayKey,
+    dailyGoal: 10,
+    reviewedWordIdsToday: initialLearnedIds,
+    reviewedCountToday: initialLearnedIds.length,
+  };
+
+  if (typeof window === 'undefined') return fallback;
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DAILY_STUDY_PROGRESS);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEY_DAILY_STUDY_PROGRESS, JSON.stringify(fallback));
+      return fallback;
+    }
+    const parsed = JSON.parse(raw) as Partial<DailyStudyProgress>;
+    const validGoal: DailyGoalTarget =
+      parsed.dailyGoal === 5 || parsed.dailyGoal === 10 || parsed.dailyGoal === 20
+        ? parsed.dailyGoal
+        : 10;
+
+    const storedToday = String(parsed.todayDate || '');
+    const storedLastActive = String(parsed.lastActiveDate || '');
+    const storedStreak = Math.max(1, Number(parsed.streakDays) || 1);
+
+    if (storedToday === todayKey) {
+      const ids = Array.isArray(parsed.reviewedWordIdsToday)
+        ? parsed.reviewedWordIdsToday.map(String)
+        : initialLearnedIds;
+      const count = Math.max(ids.length, Number(parsed.reviewedCountToday) || 0);
+      return {
+        streakDays: storedStreak,
+        lastActiveDate: storedLastActive || todayKey,
+        todayDate: todayKey,
+        dailyGoal: validGoal,
+        reviewedWordIdsToday: ids,
+        reviewedCountToday: count,
+      };
+    }
+
+    // New day transition
+    const isConsecutiveFromYesterday =
+      storedLastActive === yesterdayKey || storedToday === yesterdayKey;
+    const nextStreak = isConsecutiveFromYesterday ? storedStreak : 1;
+    const rolled: DailyStudyProgress = {
+      streakDays: nextStreak,
+      lastActiveDate: storedLastActive || yesterdayKey,
+      todayDate: todayKey,
+      dailyGoal: validGoal,
+      reviewedWordIdsToday: [],
+      reviewedCountToday: 0,
+    };
+    localStorage.setItem(STORAGE_KEY_DAILY_STUDY_PROGRESS, JSON.stringify(rolled));
+    return rolled;
+  } catch {
+    return fallback;
+  }
+}
+
+export function recordDailyWordReview(
+  wordIdOrHanzi: string,
+  slides: VocabSlide[] = [],
+  nowDate: Date = new Date()
+): DailyStudyProgress {
+  const current = getDailyStudyProgress(slides, nowDate);
+  const todayKey = getLocalDateKey(nowDate);
+  const yesterdayKey = getYesterdayDateKey(nowDate);
+  const cleanId = String(wordIdOrHanzi || '').trim();
+
+  let nextStreak = current.streakDays;
+  if (current.lastActiveDate !== todayKey) {
+    if (current.lastActiveDate === yesterdayKey) {
+      nextStreak = current.streakDays + 1;
+    } else {
+      nextStreak = Math.max(1, current.streakDays);
+    }
+  }
+
+  const nextSet = new Set(current.reviewedWordIdsToday);
+  const wasNewWordToday = cleanId ? !nextSet.has(cleanId) : true;
+  if (cleanId) {
+    nextSet.add(cleanId);
+  }
+  const nextIds = Array.from(nextSet);
+  const nextCount = Math.max(
+    nextIds.length,
+    wasNewWordToday ? current.reviewedCountToday + 1 : current.reviewedCountToday
+  );
+
+  const updated: DailyStudyProgress = {
+    streakDays: Math.max(1, nextStreak),
+    lastActiveDate: todayKey,
+    todayDate: todayKey,
+    dailyGoal: current.dailyGoal,
+    reviewedWordIdsToday: nextIds,
+    reviewedCountToday: nextCount,
+  };
+
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY_DAILY_STUDY_PROGRESS, JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('hanu_daily_progress_updated', { detail: updated }));
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return updated;
+}
+
+export function setDailyStudyGoal(
+  goal: DailyGoalTarget,
+  slides: VocabSlide[] = [],
+  nowDate: Date = new Date()
+): DailyStudyProgress {
+  const current = getDailyStudyProgress(slides, nowDate);
+  const validGoal: DailyGoalTarget = goal === 5 || goal === 10 || goal === 20 ? goal : 10;
+  const updated: DailyStudyProgress = {
+    ...current,
+    dailyGoal: validGoal,
+  };
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY_DAILY_STUDY_PROGRESS, JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('hanu_daily_progress_updated', { detail: updated }));
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return updated;
+}
+
+// ============================================================================
+// SMART UNLEARNED WORDS FILTER & DIACRITIC-INSENSITIVE SEARCH (HOME DASHBOARD)
+// ============================================================================
+
+export function normalizeFoldedSearchText(input: string): string {
+  return (input || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .replace(/ü/gi, 'v')
+    .toLowerCase()
+    .trim();
+}
+
+export function normalizePrimaryPartOfSpeech(rawPos?: string): string {
+  const upper = (rawPos || '').toUpperCase().trim();
+  if (!upper) return 'Khác';
+  if (upper.includes('DANH TỪ')) return 'Danh từ';
+  if (upper.includes('ĐỘNG TỪ')) return 'Động từ';
+  if (upper.includes('TÍNH TỪ')) return 'Tính từ';
+  if (upper.includes('ĐẠI TỪ')) return 'Đại từ';
+  if (upper.includes('PHÓ TỪ')) return 'Phó từ';
+  if (upper.includes('LƯỢNG TỪ')) return 'Lượng từ';
+  if (upper.includes('LIÊN TỪ')) return 'Liên từ';
+  if (upper.includes('GIỚI TỪ')) return 'Giới từ';
+  if (upper.includes('TRỢ TỪ')) return 'Trợ từ';
+  if (upper.includes('SỐ TỪ')) return 'Số từ';
+  if (upper.includes('THÀNH NGỮ')) return 'Thành ngữ';
+  const clean = rawPos!.trim();
+  return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase();
+}
+
+export function extractUnlearnedPosCategories(slides: VocabSlide[]): string[] {
+  const unlearned = slides.filter((s) => !s.learned);
+  const seen = new Set<string>();
+  for (const s of unlearned) {
+    if (s.partOfSpeech) {
+      seen.add(normalizePrimaryPartOfSpeech(s.partOfSpeech));
+    }
+  }
+  return Array.from(seen);
+}
+
+export function filterUnlearnedSlides(
+  slides: VocabSlide[],
+  srsRecords: Record<string, SrsWordRecord>,
+  options: {
+    query?: string;
+    filter?: string; // 'all' | 'hard' | 'new' | 'pos:<Category>'
+  } = {}
+): Array<{ s: VocabSlide; i: number; isHard: boolean; isNew: boolean }> {
+  const rawQuery = (options.query || '').trim();
+  const foldedQuery = normalizeFoldedSearchText(rawQuery);
+  const activeFilter = options.filter || 'all';
+
+  return slides
+    .map((s, i) => {
+      const rec = srsRecords[s.id];
+      const isHard = Boolean(
+        rec &&
+          (rec.inMistakeBook ||
+            rec.rating === 'forgot' ||
+            rec.rating === 'hard' ||
+            rec.rating === 'again')
+      );
+      const isNew = !rec || (rec.reviewCount || 0) === 0;
+      return { s, i, isHard, isNew };
+    })
+    .filter(({ s, isHard, isNew }) => {
+      if (s.learned) return false;
+
+      if (activeFilter === 'hard' && !isHard) return false;
+      if (activeFilter === 'new' && !isNew) return false;
+      if (activeFilter.startsWith('pos:')) {
+        const targetPos = activeFilter.slice(4);
+        if (normalizePrimaryPartOfSpeech(s.partOfSpeech) !== targetPos) {
+          return false;
+        }
+      }
+
+      if (!foldedQuery) return true;
+
+      if (s.hanzi.includes(rawQuery)) return true;
+      if (normalizeFoldedSearchText(s.pinyin).includes(foldedQuery)) return true;
+      if (
+        normalizeFoldedSearchText(s.pinyin)
+          .replace(/\s+/g, '')
+          .includes(foldedQuery.replace(/\s+/g, ''))
+      ) {
+        return true;
+      }
+      if (normalizeFoldedSearchText(s.meaning).includes(foldedQuery)) return true;
+      if (s.hanViet && normalizeFoldedSearchText(s.hanViet).includes(foldedQuery)) return true;
+
+      return false;
+    });
+}
+
+
 
 

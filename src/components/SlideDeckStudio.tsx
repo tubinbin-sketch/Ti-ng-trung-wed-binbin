@@ -101,10 +101,16 @@ import {
   getMistakeNotebookList,
   isSrsDueToday,
   loadStoredSrsRecords,
+  recordDailyWordReview,
   saveStoredSrsRecords,
   SrsRating,
   SrsWordRecord,
 } from '../utils/hskStudyHelpers';
+import {
+  PronunciationPracticeButton,
+  PronunciationResultBanner,
+  usePronunciationPractice,
+} from './PronunciationPracticeWidget';
 
 interface SlideDeckStudioProps {
   slides: VocabSlide[];
@@ -407,11 +413,18 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
     return () => window.removeEventListener('hanu_srs_updated', syncSrs);
   }, [slides]);
 
+  const wordPronunciation = usePronunciationPractice(
+    currentSlide.hanzi,
+    currentSlide.pinyin,
+    currentSlide.id
+  );
+
   const handleRateCurrentWordSrs = useCallback(
     (rating: SrsRating) => {
       const nextRecords = applySrsRatingToRecords(srsRecords, currentSlide, rating);
       setSrsRecords(nextRecords);
       saveStoredSrsRecords(nextRecords);
+      recordDailyWordReview(currentSlide.id, slides);
       playGentleChime(
         rating === 'good' || rating === 'mastered' ? 783.99 : rating === 'hard' ? 587.33 : 440,
         0.18
@@ -2071,6 +2084,42 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   </div>
                 </div>
 
+                {/* Flashcard Audio & SpeechRecognition Pronunciation Practice Bar */}
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    data-testid="flashcard-pronounce-word-btn"
+                    onClick={() => speakChinese(currentSlide.hanzi, speechRate)}
+                    className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors cursor-pointer"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    <span>Phát âm</span>
+                  </button>
+                  <PronunciationPracticeButton
+                    isRecording={wordPronunciation.isRecording}
+                    onClick={() => wordPronunciation.startOrStopPractice()}
+                    testId="flashcard-pronounce-practice-btn"
+                  />
+                  {currentSlide.exampleHanzi && (
+                    <button
+                      type="button"
+                      onClick={() => speakChinese(currentSlide.exampleHanzi, speechRate)}
+                      className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl border border-border bg-surface hover:bg-surface-2 text-ink text-sm font-medium transition-colors cursor-pointer"
+                    >
+                      <Volume2 className="w-4 h-4 text-primary" />
+                      <span>Nghe câu ví dụ</span>
+                    </button>
+                  )}
+                </div>
+
+                <PronunciationResultBanner
+                  result={wordPronunciation.result}
+                  targetHanzi={currentSlide.hanzi}
+                  onRetry={wordPronunciation.startOrStopPractice}
+                  onClose={wordPronunciation.clearResult}
+                  testId="flashcard-pronunciation-result"
+                />
+
                 <div>
                   <div className="text-xs text-ink-muted text-center mb-2">
                     {isCardFlipped
@@ -2352,6 +2401,11 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       <Rewind className="w-4 h-4 text-ink-muted" />
                       <span>Đọc chậm</span>
                     </button>
+                    <PronunciationPracticeButton
+                      isRecording={wordPronunciation.isRecording}
+                      onClick={() => wordPronunciation.startOrStopPractice()}
+                      testId="lesson-pronounce-practice-btn"
+                    />
                   </div>
 
                   <div className="flex flex-wrap items-center justify-center gap-2">
@@ -2391,6 +2445,14 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                     </button>
                   </div>
                 </div>
+
+                <PronunciationResultBanner
+                  result={wordPronunciation.result}
+                  targetHanzi={currentSlide.hanzi}
+                  onRetry={wordPronunciation.startOrStopPractice}
+                  onClose={wordPronunciation.clearResult}
+                  testId="lesson-pronunciation-result"
+                />
 
                 {/* Details: character breakdown, grammar, collocations */}
                 <div className="pt-1">
