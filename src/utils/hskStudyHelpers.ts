@@ -275,6 +275,81 @@ export function saveStoredSrsRecords(
   }
 }
 
+export function mergeRemoteFirestoreSrsIntoLocal(
+  slides: VocabSlide[],
+  remoteSrsMap: Record<
+    string,
+    {
+      wordId: string;
+      hanzi: string;
+      learned: boolean;
+      intervalDays: number;
+      easeFactor: number;
+      repetitions: number;
+      dueAt: number;
+    }
+  >,
+  studentId?: string
+): Record<string, SrsWordRecord> {
+  const current = loadStoredSrsRecords(slides, studentId);
+  const next: Record<string, SrsWordRecord> = { ...current };
+  const slideById = new Map<string, VocabSlide>();
+  const slideByHanzi = new Map<string, VocabSlide>();
+
+  for (const s of slides) {
+    slideById.set(s.id, s);
+    slideByHanzi.set(s.hanzi, s);
+  }
+
+  for (const [docId, remote] of Object.entries(remoteSrsMap)) {
+    const matchedSlide =
+      slideById.get(remote.wordId) ||
+      slideById.get(docId) ||
+      slideByHanzi.get(remote.hanzi);
+    const targetSlideId = matchedSlide?.id || remote.wordId || docId;
+    const prev = next[targetSlideId];
+
+    const inferredRating: SrsRating = remote.learned
+      ? remote.intervalDays >= 4
+        ? 'mastered'
+        : 'good'
+      : remote.easeFactor <= 1.5
+      ? 'forgot'
+      : 'hard';
+
+    const inMistakeBook = !remote.learned && (inferredRating === 'forgot' || inferredRating === 'hard');
+    const intervalLabel =
+      inferredRating === 'mastered'
+        ? 'Đã thuộc làu (4 ngày)'
+        : inferredRating === 'good'
+        ? 'Nhớ tốt (1 ngày)'
+        : inferredRating === 'hard'
+        ? 'Cần củng cố (10 phút)'
+        : 'Ôn lại ngay (1 phút)';
+
+    next[targetSlideId] = {
+      slideId: targetSlideId,
+      hanzi: matchedSlide?.hanzi || remote.hanzi || prev?.hanzi || targetSlideId,
+      pinyin: matchedSlide?.pinyin || prev?.pinyin || '',
+      hanViet: matchedSlide?.hanViet || prev?.hanViet || '',
+      meaning: matchedSlide?.meaning || prev?.meaning || '',
+      hskLevel: matchedSlide?.hskLevel || prev?.hskLevel || 'HSK 3',
+      rating: inferredRating,
+      intervalLabel,
+      reviewCount: Math.max(prev?.reviewCount || 0, Number(remote.repetitions || 1)),
+      inMistakeBook,
+      nextReviewTimestamp: Number(remote.dueAt || prev?.nextReviewTimestamp || Date.now()),
+      updatedAt: 'Đồng bộ Đám mây',
+    };
+  }
+
+  saveStoredSrsRecords(next, studentId);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('hanu_srs_updated'));
+  }
+  return next;
+}
+
 export function isSrsDueToday(record?: SrsWordRecord | null): boolean {
   if (!record) return false;
   if (record.inMistakeBook) return true;
@@ -1450,7 +1525,9 @@ export function filterUnlearnedSlides(
 ): Array<{ s: VocabSlide; i: number; isHard: boolean; isNew: boolean }> {
   const rawQuery = (options.query || '').trim();
   const foldedQuery = normalizeFoldedSearchText(rawQuery);
+  const compactFoldedQuery = foldedQuery.replace(/\s+/g, '');
   const activeFilter = options.filter || 'all';
+  const targetPos = activeFilter.startsWith('pos:') ? activeFilter.slice(4) : '';
 
   return slides
     .map((s, i) => {
@@ -1470,22 +1547,16 @@ export function filterUnlearnedSlides(
 
       if (activeFilter === 'hard' && !isHard) return false;
       if (activeFilter === 'new' && !isNew) return false;
-      if (activeFilter.startsWith('pos:')) {
-        const targetPos = activeFilter.slice(4);
-        if (normalizePrimaryPartOfSpeech(s.partOfSpeech) !== targetPos) {
-          return false;
-        }
+      if (targetPos && normalizePrimaryPartOfSpeech(s.partOfSpeech) !== targetPos) {
+        return false;
       }
 
       if (!foldedQuery) return true;
 
       if (s.hanzi.includes(rawQuery)) return true;
-      if (normalizeFoldedSearchText(s.pinyin).includes(foldedQuery)) return true;
-      if (
-        normalizeFoldedSearchText(s.pinyin)
-          .replace(/\s+/g, '')
-          .includes(foldedQuery.replace(/\s+/g, ''))
-      ) {
+      const foldedPinyin = normalizeFoldedSearchText(s.pinyin);
+      if (foldedPinyin.includes(foldedQuery)) return true;
+      if (compactFoldedQuery && foldedPinyin.replace(/\s+/g, '').includes(compactFoldedQuery)) {
         return true;
       }
       if (normalizeFoldedSearchText(s.meaning).includes(foldedQuery)) return true;

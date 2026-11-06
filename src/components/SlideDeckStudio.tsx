@@ -46,6 +46,8 @@ import {
   getStoredHsk3FilterState,
   saveStoredHsk3FilterState,
 } from '../utils/storageService';
+import { auth, saveStudentSrsWordToFirestore } from '../firebase';
+import { appStore } from '../context/AppStoreContext';
 import { LazyErrorBoundary } from './LazyErrorBoundary';
 
 import { AddVocabModal } from './AddVocabModal';
@@ -416,7 +418,18 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
       const nextRecords = applySrsRatingToRecords(srsRecords, currentSlide, rating);
       setSrsRecords(nextRecords);
       saveStoredSrsRecords(nextRecords);
+      window.dispatchEvent(new CustomEvent('hanu_srs_updated'));
+      appStore.notifySrsUpdated();
       recordDailyWordReview(currentSlide.id, slides);
+
+      if (auth.currentUser?.uid && nextRecords[currentSlide.id]) {
+        const isLearnedRating = rating === 'good' || rating === 'mastered';
+        void saveStudentSrsWordToFirestore(auth.currentUser.uid, currentSlide.id, {
+          ...nextRecords[currentSlide.id],
+          learned: isLearnedRating,
+        }).catch(() => {});
+      }
+
       playGentleChime(
         rating === 'good' || rating === 'mastered' ? 783.99 : rating === 'hard' ? 587.33 : 440,
         0.18

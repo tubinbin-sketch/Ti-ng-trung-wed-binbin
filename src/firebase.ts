@@ -990,6 +990,18 @@ export async function saveStudentSrsWordToFirestore(
     ? (hanziOrRecord as Record<string, unknown>)
     : ((srsRecordArg as unknown as Record<string, unknown>) || {});
 
+  const rating = typeof rec.rating === 'string' ? rec.rating : '';
+  const defaultIntervalDays =
+    rating === 'mastered' ? 4 : rating === 'good' ? 1 : learned ? 3 : 0;
+  const defaultEaseFactor =
+    rating === 'forgot' || rating === 'again'
+      ? 1.3
+      : rating === 'hard'
+      ? 1.8
+      : rating === 'mastered'
+      ? 2.8
+      : 2.5;
+
   try {
     await setDoc(
       doc(db, 'users', studentUid, 'srs', cleanWordId),
@@ -997,10 +1009,12 @@ export async function saveStudentSrsWordToFirestore(
         wordId: cleanWordId,
         hanzi: hanzi.slice(0, 40),
         learned,
-        intervalDays: Number(rec.intervalDays ?? (learned ? 3 : 0)),
-        easeFactor: Number(rec.easeFactor ?? 2.5),
-        repetitions: Number(rec.repetitions ?? (learned ? 1 : 0)),
-        dueAt: Number(rec.nextReviewAt ?? rec.dueAt ?? Date.now()),
+        intervalDays: Number(rec.intervalDays ?? defaultIntervalDays),
+        easeFactor: Number(rec.easeFactor ?? defaultEaseFactor),
+        repetitions: Number(rec.repetitions ?? rec.reviewCount ?? (learned ? 1 : 0)),
+        dueAt: Number(
+          rec.nextReviewTimestamp ?? rec.nextReviewAt ?? rec.dueAt ?? Date.now()
+        ),
         lastReviewedAt: new Date().toISOString(),
       },
       { merge: true }

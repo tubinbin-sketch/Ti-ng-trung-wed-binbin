@@ -86,7 +86,10 @@ import {
   setTeacherSessionUnlocked,
   SyncStatus,
 } from './utils/storageService';
-import { recordDailyWordReview } from './utils/hskStudyHelpers';
+import {
+  mergeRemoteFirestoreSrsIntoLocal,
+  recordDailyWordReview,
+} from './utils/hskStudyHelpers';
 import { saveStoredAssignment } from './utils/assignmentParser';
 import {
   auth,
@@ -348,20 +351,23 @@ export default function App() {
     if (!uid || uid.startsWith('demo-')) return;
 
     const unsubSrs = subscribeToStudentSrs(uid, (srsMap) => {
+      if (Object.keys(srsMap).length === 0) return;
       const learnedIds = new Set<string>();
       Object.entries(srsMap).forEach(([wordId, data]) => {
         if (data?.learned) {
           learnedIds.add(wordId);
         }
       });
-      if (learnedIds.size > 0) {
-        const studentKey = userProfile.studentCode || selectedStudentName || uid;
-        saveStudentLearnedSlideIds(learnedIds, studentKey);
-        setSlides((prev) => applyStudentLearnedToSlides(prev, studentKey));
-      }
+      const studentKey = userProfile.studentCode || selectedStudentName || uid;
+      saveStudentLearnedSlideIds(learnedIds, studentKey);
+      setSlides((prev) => {
+        mergeRemoteFirestoreSrsIntoLocal(prev, srsMap, studentKey);
+        return applyStudentLearnedToSlides(prev, studentKey);
+      });
+      appStore.notifySrsUpdated();
     });
     return () => unsubSrs();
-  }, [userProfile.uid, userProfile.role, isDemoMode]);
+  }, [userProfile.uid, userProfile.role, userProfile.studentCode, selectedStudentName, isDemoMode]);
 
   const totalVocabBankCount = React.useMemo(() => {
     const dictKeys = Object.keys(SMART_HANZI_DICTIONARY);
