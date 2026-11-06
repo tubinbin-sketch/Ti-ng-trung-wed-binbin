@@ -3886,6 +3886,16 @@ const RANDOM_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 export function generateRandomAlphanumericCode(length = 6): string {
   const safeLen = Math.max(6, Math.min(24, Math.floor(length)));
   let result = '';
+  const cryptoObj = typeof globalThis !== 'undefined' ? globalThis.crypto : undefined;
+  if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
+    const bytes = new Uint8Array(safeLen);
+    cryptoObj.getRandomValues(bytes);
+    for (let i = 0; i < safeLen; i++) {
+      // RANDOM_CODE_ALPHABET has 32 chars (2^5), so bitwise mask & 31 has zero modulo bias
+      result += RANDOM_CODE_ALPHABET[bytes[i]! & 31];
+    }
+    return result;
+  }
   for (let i = 0; i < safeLen; i++) {
     const idx = Math.floor(Math.random() * RANDOM_CODE_ALPHABET.length);
     result += RANDOM_CODE_ALPHABET[idx];

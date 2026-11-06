@@ -5,6 +5,11 @@ export type ClassStudent = ClassStudentRecord;
 
 export const STORAGE_KEY_STUDENTS = 'hanu_classroom_students_roster_v2';
 
+/**
+ * DỮ LIỆU MẪU MINH HỌA (FICTIONAL DEMO DATA):
+ * Danh sách dưới đây gồm các tên giả định phục vụ riêng chế độ Demo cục bộ (`classroomMode === 'demo'`).
+ * Khi chuyển sang chế độ Lớp học thực tế (`firestore`), danh sách này bị bỏ qua hoàn toàn (`getStoredStudentRoster()` trả về `[]` cho đến khi tải từ Cloud Firestore).
+ */
 export const DEFAULT_STUDENTS: ClassStudent[] = [
   {
     id: 'st-1',

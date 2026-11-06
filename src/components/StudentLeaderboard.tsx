@@ -4,9 +4,31 @@ import {
   Flame,
   Clock,
   Crown,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { LeaderboardEntry } from '../data/chineseData';
 import { getStoredStudentRoster, ClassStudent } from './ClassroomManager';
+
+function maskStudentCodeForPrivacy(code?: string, isMe?: boolean): string {
+  if (!code) return '';
+  if (isMe) return code;
+  if (code.length <= 4) return `${code.slice(0, 2)}**`;
+  return `${code.slice(0, 3)}***${code.slice(-2)}`;
+}
+
+function maskStudentNameForPrivacy(fullName: string, isMe?: boolean): string {
+  if (isMe) return fullName;
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return fullName;
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  const midInitials = parts
+    .slice(1, -1)
+    .map((p) => `${p[0]?.toUpperCase() || ''}.`)
+    .join(' ');
+  return midInitials ? `${first} ${midInitials} ${last}` : `${first} ${last[0]?.toUpperCase() || ''}.`;
+}
 
 export interface ClassLeaderboardItem extends LeaderboardEntry {
   studentCode?: string;
@@ -33,7 +55,26 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
   hasSubmitted = false,
 }) => {
   const [filterPeriod, setFilterPeriod] = useState<'today' | 'week' | 'all'>('today');
+  const [privacyMaskEnabled, setPrivacyMaskEnabled] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('hanu_leaderboard_privacy_mask_v1') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [roster, setRoster] = useState<ClassStudent[]>(() => getStoredStudentRoster());
+
+  const togglePrivacyMask = () => {
+    setPrivacyMaskEnabled((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('hanu_leaderboard_privacy_mask_v1', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     const syncRoster = () => {
@@ -180,26 +221,52 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
           </div>
         </div>
 
-        {/* Period Filter Pills */}
-        <div className="inline-flex items-center p-1 rounded-xl bg-primary-soft border border-border self-start sm:self-auto">
-          {[
-            { id: 'today', label: 'Hôm nay' },
-            { id: 'week', label: 'Tuần này' },
-            { id: 'all', label: 'Toàn khóa' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setFilterPeriod(tab.id as 'today' | 'week' | 'all')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                filterPeriod === tab.id
-                  ? 'bg-inverse text-white shadow-2xs'
-                  : 'text-ink-muted hover:text-ink'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        {/* Period Filter Pills & Privacy Mask Toggle */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            data-testid="leaderboard-privacy-mask-toggle"
+            onClick={togglePrivacyMask}
+            title="Ẩn bớt Mã học viên & Họ tên khi chiếu bảng xếp hạng trên lớp"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+              privacyMaskEnabled
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                : 'bg-surface border-border text-ink-muted hover:text-ink'
+            }`}
+          >
+            {privacyMaskEnabled ? (
+              <>
+                <EyeOff className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Đã che Mã HV</span>
+              </>
+            ) : (
+              <>
+                <Eye className="w-3.5 h-3.5" />
+                <span>Che Mã HV</span>
+              </>
+            )}
+          </button>
+
+          <div className="inline-flex items-center p-1 rounded-xl bg-primary-soft border border-border">
+            {[
+              { id: 'today', label: 'Hôm nay' },
+              { id: 'week', label: 'Tuần này' },
+              { id: 'all', label: 'Toàn khóa' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setFilterPeriod(tab.id as 'today' | 'week' | 'all')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  filterPeriod === tab.id
+                    ? 'bg-inverse text-white shadow-2xs'
+                    : 'text-ink-muted hover:text-ink'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -215,10 +282,14 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
               {allEntries[1].avatarCode}
             </div>
             <div className="text-xs font-bold text-gold">
-              {allEntries[1].studentCode}
+              {privacyMaskEnabled
+                ? maskStudentCodeForPrivacy(allEntries[1].studentCode, allEntries[1].isCurrentUser)
+                : allEntries[1].studentCode}
             </div>
             <div className="text-xs sm:text-sm font-bold text-ink truncate w-full">
-              {allEntries[1].studentName}
+              {privacyMaskEnabled
+                ? maskStudentNameForPrivacy(allEntries[1].studentName, allEntries[1].isCurrentUser)
+                : allEntries[1].studentName}
             </div>
             <div className="text-xs font-semibold text-gold mt-0.5">
               {allEntries[1].score} điểm
@@ -243,10 +314,14 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
               {allEntries[0].avatarCode}
             </div>
             <div className="text-xs font-semibold text-gold">
-              {allEntries[0].studentCode}
+              {privacyMaskEnabled
+                ? maskStudentCodeForPrivacy(allEntries[0].studentCode, allEntries[0].isCurrentUser)
+                : allEntries[0].studentCode}
             </div>
             <div className="text-xs sm:text-sm font-bold text-ink truncate w-full">
-              {allEntries[0].studentName}
+              {privacyMaskEnabled
+                ? maskStudentNameForPrivacy(allEntries[0].studentName, allEntries[0].isCurrentUser)
+                : allEntries[0].studentName}
             </div>
             <div className="text-xs sm:text-sm font-bold text-gold mt-0.5">
               {allEntries[0].score} điểm
@@ -267,10 +342,14 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
               {allEntries[2].avatarCode}
             </div>
             <div className="text-xs font-bold text-gold">
-              {allEntries[2].studentCode}
+              {privacyMaskEnabled
+                ? maskStudentCodeForPrivacy(allEntries[2].studentCode, allEntries[2].isCurrentUser)
+                : allEntries[2].studentCode}
             </div>
             <div className="text-xs sm:text-sm font-bold text-ink truncate w-full">
-              {allEntries[2].studentName}
+              {privacyMaskEnabled
+                ? maskStudentNameForPrivacy(allEntries[2].studentName, allEntries[2].isCurrentUser)
+                : allEntries[2].studentName}
             </div>
             <div className="text-xs font-semibold text-gold mt-0.5">
               {allEntries[2].score} điểm
@@ -372,11 +451,15 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
                   <div className="flex flex-wrap items-center gap-1.5">
                     {item.studentCode && (
                       <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-xs font-semibold shrink-0">
-                        {item.studentCode}
+                        {privacyMaskEnabled
+                          ? maskStudentCodeForPrivacy(item.studentCode, isMe)
+                          : item.studentCode}
                       </span>
                     )}
                     <span className="text-xs sm:text-sm font-bold text-ink">
-                      {item.studentName}
+                      {privacyMaskEnabled
+                        ? maskStudentNameForPrivacy(item.studentName, isMe)
+                        : item.studentName}
                     </span>
                     {item.hskLevel && (
                       <span className="px-1.5 py-0.5 rounded bg-primary-soft text-ink-muted text-xs font-bold shrink-0">

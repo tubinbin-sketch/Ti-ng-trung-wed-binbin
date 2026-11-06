@@ -53,12 +53,14 @@ service cloud.firestore {
       allow create: if isValidId(uid) &&
         isOwner(uid) &&
         isTeacher() &&
+        request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'updatedAt', 'createdAt']) &&
         request.resource.data.uid == uid &&
         request.resource.data.role == 'teacher' &&
         isValidString(request.resource.data.displayName, 1, 120);
       allow update: if isValidId(uid) &&
         isOwner(uid) &&
         isTeacher() &&
+        request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'updatedAt', 'createdAt']) &&
         request.resource.data.uid == resource.data.uid &&
         request.resource.data.role == 'teacher' &&
         isValidString(request.resource.data.displayName, 1, 120);
@@ -75,6 +77,7 @@ service cloud.firestore {
         isValidId(code) &&
         code.size() >= 6 &&
         !exists(/databases/$(database)/documents/joinCodes/$(code)) &&
+        request.resource.data.keys().hasOnly(['classId', 'teacherUid', 'createdAt']) &&
         request.resource.data.keys().hasAll(['classId']) &&
         isValidString(request.resource.data.classId, 1, 128) &&
         isClassTeacher(request.resource.data.classId);

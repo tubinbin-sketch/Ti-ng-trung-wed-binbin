@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'node:crypto';
 import express, { Request, Response, NextFunction } from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -81,6 +82,16 @@ const adminDb =
 export const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), geolocation=(), payment=(), usb=(), microphone=(self)'
+  );
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  next();
+});
 app.use(express.json({ limit: '1mb' }));
 
 // Liveness probe for Cloud Run / uptime monitors (no auth, no rate limit).
@@ -215,11 +226,54 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 90;
 const AI_RATE_LIMIT_MAX_REQUESTS = 30;
 const AI_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const JOIN_CLASS_WINDOW_MS = 10 * 60_000; // 10 minutes
+const JOIN_CLASS_MAX_ATTEMPTS = 15;
 const RATE_LIMIT_CLEANUP_INTERVAL_MS = 10 * 60_000; // 10 minutes
 
 const clientRequestCounts = new Map<string, { count: number; resetAt: number }>();
 const aiUidMinuteCounts = new Map<string, { count: number; resetAt: number }>();
 const aiUidDailyCounts = new Map<string, { count: number; resetAt: number }>();
+const joinClassAttemptCounts = new Map<string, { count: number; resetAt: number }>();
+
+/**
+ * Dedicated brute-force rate limiter for /api/classes/join (max 15 attempts per 10 minutes per UID/IP).
+ */
+export function checkJoinClassRateLimit(
+  key: string,
+  now = Date.now()
+): { allowed: boolean; remaining: number } {
+  const cleanKey = key.trim() || 'unknown';
+  const entry = joinClassAttemptCounts.get(cleanKey);
+  if (entry && now <= entry.resetAt && entry.count >= JOIN_CLASS_MAX_ATTEMPTS) {
+    return { allowed: false, remaining: 0 };
+  }
+  if (!entry || now > entry.resetAt) {
+    joinClassAttemptCounts.set(cleanKey, { count: 1, resetAt: now + JOIN_CLASS_WINDOW_MS });
+    return { allowed: true, remaining: JOIN_CLASS_MAX_ATTEMPTS - 1 };
+  }
+  entry.count += 1;
+  return { allowed: true, remaining: Math.max(0, JOIN_CLASS_MAX_ATTEMPTS - entry.count) };
+}
+
+/**
+ * Sanitize user input sent to Gemini AI routes:
+ * - Removes control characters
+ * - Neutralizes prompt-injection overrides
+ * - Masks personal identifiers (emails and Vietnamese phone numbers) per Personal Data Protection Law
+ */
+export function sanitizeAiUserInput(raw: string, maxLen = 1500): string {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+    .replace(/<\s*\/?\s*(?:system|instruction|prompt)\s*>/gi, '')
+    .replace(/\[\s*\/?\s*INST\s*\]/gi, '')
+    .replace(/<\|(?:im_start|im_end|system|user|assistant)\|>/gi, '')
+    .replace(/ignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions/gi, '[filtered]')
+    .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[EMAIL_ĐÃ_ẨN]')
+    .replace(/(?:\+?84|0)(?:3|5|7|8|9)\d{8}\b/g, '[SĐT_ĐÃ_ẨN]')
+    .trim()
+    .slice(0, maxLen);
+}
 
 /**
  * Unified AI_DAILY_LIMIT: defaults to 60 calls/day/uid (matching .env.example).
@@ -233,6 +287,7 @@ export function resetAllRateLimitersForTest(): void {
   clientRequestCounts.clear();
   aiUidMinuteCounts.clear();
   aiUidDailyCounts.clear();
+  joinClassAttemptCounts.clear();
 }
 
 export function cleanupExpiredRateLimits(now = Date.now()): {
@@ -262,6 +317,12 @@ export function cleanupExpiredRateLimits(now = Date.now()): {
     if (now > entry.resetAt) {
       aiUidDailyCounts.delete(key);
       removedDailyEntries += 1;
+    }
+  }
+
+  for (const [key, entry] of joinClassAttemptCounts.entries()) {
+    if (now > entry.resetAt) {
+      joinClassAttemptCounts.delete(key);
     }
   }
 
@@ -471,6 +532,7 @@ export function createInMemoryServerStoreAdapter(): ServerStoreAdapter & {
 export interface VerifiedFirebaseUser {
   uid: string;
   email?: string;
+  emailVerified?: boolean;
   name?: string;
   role?: string;
   signInProvider?: string;
@@ -512,6 +574,7 @@ export async function verifyFirebaseIdToken(
   return {
     uid: decoded.uid,
     email: decoded.email,
+    emailVerified: decoded.email_verified !== false,
     name: typeof decoded.name === 'string' ? decoded.name : undefined,
     role: typeof (decoded as any).role === 'string' ? (decoded as any).role : undefined,
     signInProvider: decoded.firebase?.sign_in_provider,
@@ -859,10 +922,11 @@ async function protectAiRoute(req: Request, res: Response, next: NextFunction) {
 // ============================================================================
 const SERVER_RANDOM_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
-function generateServerRandomCode(prefix = 'HV', length = 6): string {
+export function generateServerRandomCode(prefix = 'HV', length = 6): string {
+  const safeLen = Math.max(6, Math.min(24, Math.floor(length)));
   let rand = '';
-  for (let i = 0; i < length; i++) {
-    rand += SERVER_RANDOM_ALPHABET[Math.floor(Math.random() * SERVER_RANDOM_ALPHABET.length)];
+  for (let i = 0; i < safeLen; i++) {
+    rand += SERVER_RANDOM_ALPHABET[crypto.randomInt(0, SERVER_RANDOM_ALPHABET.length)];
   }
   return `${prefix}-${rand}`;
 }
@@ -1028,6 +1092,12 @@ app.post('/api/teachers/bootstrap', async (req, res) => {
   if (!verifiedUser) return;
 
   const email = (verifiedUser.email || '').trim().toLowerCase();
+  if (verifiedUser.emailVerified === false) {
+    res.status(403).json({
+      error: 'Email tài khoản chưa được xác thực (email_verified = false).',
+    });
+    return;
+  }
   if (!isEmailInTeacherAllowlist(email)) {
     res.status(403).json({
       error: `Email "${email || '(ẩn danh)'}" không nằm trong danh sách Giảng viên được cấp phép (TEACHER_EMAIL_ALLOWLIST).`,
@@ -1060,8 +1130,9 @@ app.post('/api/teachers/bootstrap', async (req, res) => {
       teacher: teacherDoc,
     });
   } catch (err) {
+    console.error('[server] /api/teachers/bootstrap error', err);
     res.status(500).json({
-      error: err instanceof Error ? err.message : 'Không thể thiết lập quyền Giảng viên.',
+      error: 'Không thể thiết lập quyền Giảng viên lúc này. Vui lòng thử lại sau.',
     });
   }
 });
@@ -1075,6 +1146,15 @@ app.post('/api/teachers/bootstrap', async (req, res) => {
 app.post('/api/classes/join', async (req, res) => {
   const verifiedUser = await authenticateBearerRequest(req, res);
   if (!verifiedUser) return;
+
+  const rateKey = `${verifiedUser.uid}:${req.ip || 'local'}`;
+  const joinRate = checkJoinClassRateLimit(rateKey);
+  if (!joinRate.allowed) {
+    res.status(429).json({
+      error: 'Bạn đã thử nhập mã lớp quá nhiều lần. Vui lòng đợi 10 phút trước khi thử lại.',
+    });
+    return;
+  }
 
   const cleanJoinCode = String(req.body?.joinCode || '')
     .trim()
@@ -1264,8 +1344,9 @@ app.post('/api/classes/join', async (req, res) => {
       },
     });
   } catch (err) {
+    console.error('[server] /api/classes/join error', err);
     res.status(500).json({
-      error: err instanceof Error ? err.message : 'Không thể tham gia lớp học lúc này.',
+      error: 'Không thể tham gia lớp học lúc này. Vui lòng thử lại sau.',
     });
   }
 });
@@ -1345,8 +1426,9 @@ app.post('/api/classes/:classId/students/:studentCode/reset-slot', async (req, r
       slotId: newSlotId,
     });
   } catch (err) {
+    console.error('[server] reset-slot error', err);
     res.status(500).json({
-      error: err instanceof Error ? err.message : 'Không thể cấp lại mã học viên.',
+      error: 'Không thể cấp lại mã học viên lúc này. Vui lòng thử lại sau.',
     });
   }
 });
@@ -1525,8 +1607,9 @@ app.post('/api/submissions', async (req, res) => {
       streak: nextStreak,
     });
   } catch (err) {
+    console.error('[server] /api/submissions error', err);
     res.status(500).json({
-      error: err instanceof Error ? err.message : 'Không thể chấm bài trên server lúc này.',
+      error: 'Không thể chấm bài trên server lúc này. Vui lòng thử lại sau.',
     });
   }
 });
@@ -1619,7 +1702,7 @@ function classifyErrorStatus(err: unknown): number {
 // Server-side Gemini API route for enriching arbitrary Chinese vocabulary
 app.post('/api/hanzi/enrich', protectAiRoute, async (req, res) => {
   try {
-    const hanzi = String(req.body?.hanzi || '').trim();
+    const hanzi = sanitizeAiUserInput(String(req.body?.hanzi || ''), 40);
     if (!hanzi || hanzi.length > 40) {
       res.status(400).json({ error: 'Invalid or missing hanzi parameter (max 40 characters).' });
       return;
@@ -1716,7 +1799,7 @@ Trả về JSON chính xác gồm:
 // Server-side Gemini API route for Vocabulary Search Suggestions (/api/hanzi/suggest)
 app.post('/api/hanzi/suggest', protectAiRoute, async (req, res) => {
   try {
-    const query = String(req.body?.query || '').trim();
+    const query = sanitizeAiUserInput(String(req.body?.query || ''), 120);
     const limit = Math.min(8, Math.max(2, Number(req.body?.limit) || 6));
     if (!query || query.length > 120) {
       res.status(400).json({ error: 'Invalid or missing query parameter (max 120 characters).' });
@@ -1807,8 +1890,8 @@ Trả về JSON có thuộc tính "suggestions" là mảng các đối tượng,
 // Server-side Gemini API route for Bin Bin (彬彬) Practical Pedagogical Assistant
 app.post('/api/binbin/chat', protectAiRoute, async (req, res) => {
   try {
-    const prompt = String(req.body?.prompt || '').trim();
-    const actionType = String(req.body?.actionType || 'chat').trim();
+    const prompt = sanitizeAiUserInput(String(req.body?.prompt || ''), 1500);
+    const actionType = sanitizeAiUserInput(String(req.body?.actionType || 'chat'), 40) || 'chat';
     const contextSlide = req.body?.contextSlide || null;
     const contextQuiz = req.body?.contextQuiz || null;
     // Last few turns so BinBin can follow up ("cho thêm ví dụ", "giải thích lại").
@@ -1818,7 +1901,7 @@ app.post('/api/binbin/chat', protectAiRoute, async (req, res) => {
       .map((turn) => {
         const t = turn as { role?: unknown; text?: unknown };
         const role = t?.role === 'model' ? 'model' : t?.role === 'user' ? 'user' : null;
-        const text = typeof t?.text === 'string' ? t.text.trim().slice(0, 800) : '';
+        const text = typeof t?.text === 'string' ? sanitizeAiUserInput(t.text, 800) : '';
         return role && text ? { role, parts: [{ text }] } : null;
       })
       .filter((t): t is { role: 'user' | 'model'; parts: { text: string }[] } => t !== null);
