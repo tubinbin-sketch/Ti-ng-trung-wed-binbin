@@ -58,23 +58,11 @@ import {
   ThemePicker,
 } from './components/layout/AppShell';
 
-const StrokeWritingModal = React.lazy(() =>
-  import('./components/StrokeWritingModal').then((m) => ({ default: m.StrokeWritingModal }))
-);
-const StudentAssignmentArena = React.lazy(() =>
-  import('./components/StudentAssignmentArena').then((m) => ({
-    default: m.StudentAssignmentArena,
-  }))
-);
-const ClassroomManager = React.lazy(() =>
-  import('./components/ClassroomManager').then((m) => ({ default: m.ClassroomManager }))
-);
-const PrivacyPolicyPage = React.lazy(() =>
-  import('./components/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage }))
-);
-const BinBinPandaAI = React.lazy(() =>
-  import('./components/BinBinPandaAI').then((m) => ({ default: m.BinBinPandaAI }))
-);
+import { StrokeWritingModal } from './components/StrokeWritingModal';
+import { StudentAssignmentArena } from './components/StudentAssignmentArena';
+import { ClassroomManager } from './components/ClassroomManager';
+import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
+import { BinBinPandaAI } from './components/BinBinPandaAI';
 import { speakChinese } from './utils/speech';
 import {
   BinBinSlidePayload,
@@ -772,20 +760,6 @@ export default function App() {
     handleApplyBinBinSlidePayload(binbinApplyPayload);
     appStore.clearBinBinSlidePayload();
   }, [binbinApplyPayload]);
-
-  // Preload secondary React.lazy modules in the background 1.5s after mount for 0ms tab/modal switching
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      // Warm the cache for other sections; a failed prefetch is harmless here
-      // (the real navigation retries and has its own error boundary).
-      const ignore = () => {};
-      import('./components/StudentAssignmentArena').catch(ignore);
-      import('./components/ClassroomManager').catch(ignore);
-      import('./components/BinBinPandaAI').catch(ignore);
-      import('./components/StrokeWritingModal').catch(ignore);
-    }, 1500);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   const isDarkTheme = selectedTheme.id === 'moon-night';
   const activeClassIdForUrl = userProfile.classId || 'demo-class-722229';

@@ -45,6 +45,7 @@ import {
   ClassStudentRecord,
   generateRandomJoinCode,
   generateRandomStudentCode,
+  registerFirebaseAppCheckGetter,
   registerFirebaseTokenGetter,
 } from './utils/chineseEngine';
 import {
@@ -150,12 +151,22 @@ if (
   }
 }
 
-// Register Firebase ID Token provider for Gemini AI server routes (/api/hanzi/enrich, /api/hanzi/suggest, /api/binbin/chat)
+// Register Firebase ID Token & App Check Token providers for Gemini AI server routes (/api/hanzi/enrich, /api/hanzi/suggest, /api/binbin/chat)
 registerFirebaseTokenGetter(async () => {
   if (auth.currentUser) {
     return await auth.currentUser.getIdToken();
   }
   return null;
+});
+
+registerFirebaseAppCheckGetter(async () => {
+  if (!appCheckInstance) return '';
+  try {
+    const appCheckTokenResult = await getAppCheckToken(appCheckInstance, false);
+    return appCheckTokenResult?.token || '';
+  } catch {
+    return '';
+  }
 });
 
 export enum OperationType {
@@ -264,7 +275,9 @@ export interface FirestoreLeaderboardDoc {
  * and X-Firebase-AppCheck header (when App Check is configured) for server routes.
  */
 export async function getFirebaseAuthHeaders(): Promise<Record<string, string>> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    'X-Firebase-AppCheck': '',
+  };
   try {
     if (auth.currentUser) {
       const token = await auth.currentUser.getIdToken();

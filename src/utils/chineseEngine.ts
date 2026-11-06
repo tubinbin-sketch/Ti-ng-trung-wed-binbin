@@ -9,23 +9,41 @@ import {
 } from '../data/chineseData';
 
 let firebaseTokenGetter: (() => Promise<string | null>) | null = null;
+let firebaseAppCheckGetter: (() => Promise<string | null>) | null = null;
 
 export function registerFirebaseTokenGetter(getter: () => Promise<string | null>): void {
   firebaseTokenGetter = getter;
 }
 
+export function registerFirebaseAppCheckGetter(getter: () => Promise<string | null>): void {
+  firebaseAppCheckGetter = getter;
+}
+
 export async function getAuthBearerHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    'X-Firebase-AppCheck': '',
+  };
   try {
     if (firebaseTokenGetter) {
       const token = await firebaseTokenGetter();
       if (token) {
-        return { Authorization: `Bearer ${token}` };
+        headers.Authorization = `Bearer ${token}`;
       }
     }
   } catch {
     // ignore token lookup error
   }
-  return {};
+  try {
+    if (firebaseAppCheckGetter) {
+      const appCheckToken = await firebaseAppCheckGetter();
+      if (appCheckToken) {
+        headers['X-Firebase-AppCheck'] = appCheckToken;
+      }
+    }
+  } catch {
+    // ignore App Check token lookup error
+  }
+  return headers;
 }
 
 

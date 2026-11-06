@@ -7,11 +7,12 @@
 
 ## 1. Các Cơ Chế Bảo Vệ Đã Được Kiểm Chứng Bằng Kiểm Thử Tự Động
 
-### 1.1. Xác thực & Phân quyền Giảng viên (`POST /api/teachers/bootstrap`)
+### 1.1. Xác thực, Kiểm tra Thu hồi Phiên & Phân quyền Giảng viên (`POST /api/teachers/bootstrap` & `isTeacherUserAuthorized`)
 - **Kiểm chứng:**
   - Chỉ chấp nhận `verifiedUser.emailVerified === true` (từ chối cả `emailVerified: false` và `emailVerified: undefined` với HTTP `403`).
   - Không còn bất kỳ email quản trị mặc định nào hard-code trong `server.ts`. Nếu biến môi trường `TEACHER_EMAIL_ALLOWLIST` không được thiết lập, `getTeacherEmailAllowlist()` trả về `[]` (fail-closed) và từ chối mọi yêu cầu bootstrap.
-  - Quyền Giảng viên trên Firestore (`isTeacher()`) dựa trên custom claim `request.auth.token.role == 'teacher'` do Firebase Admin SDK cấp.
+  - **Kiểm tra thu hồi phiên (`verifyIdToken(token, true)`):** Middleware `verifyFirebaseIdToken` truyền `checkRevoked = true` và `authenticateBearerRequest` bắt lỗi `auth/id-token-revoked` để trả về HTTP `401` kèm `code: 'auth/id-token-revoked'`.
+  - **Đối chiếu kép quyền Giảng viên (`isTeacherUserAuthorized`):** Khi kiểm tra quyền Giảng viên trên server (`isUserAuthorizedForAi`, `POST /api/classes/:classId/students/:studentCode/reset-slot`), server bắt buộc đối chiếu đồng thời **cả** custom claim/bản ghi `role == 'teacher'` **lẫn** `emailVerified === true` và `isEmailInTeacherAllowlist(user.email)` để nếu một giáo viên bị xóa khỏi `TEACHER_EMAIL_ALLOWLIST`, quyền truy cập bị chặn ngay lập tức (`403 Forbidden`).
 
 ### 1.2. Chống Race Condition Khi Nhận Mã Học Viên (`POST /api/classes/join`)
 - **Kiểm chứng:**
@@ -31,10 +32,11 @@
   - Học viên chỉ được phép sửa duy nhất trường `name` trên hồ sơ lớp học của chính mình (`affectedKeys().hasOnly(['name'])`).
   - Đáp án bài tập lưu tại `/classes/{classId}/answerKeys/{assignmentId}` bị chặn đọc/ghi tuyệt đối đối với học viên.
 
-### 1.5. Hạn Mức AI Fail-Closed & Rate Limit Đa Instance
+### 1.5. App Check Fail-Closed, Hạn Mức AI Fail-Closed & Đồng Bộ Rate Limit Đa Instance (`rateLimits`)
 - **Kiểm chứng:**
-  - Khi `NODE_ENV=production` (hoặc `STRICT_FIRESTORE_AI_QUOTA=true`), nếu giao dịch Firestore `aiUsage/{uid}_{YYYY-MM-DD}` gặp lỗi, endpoint AI trả về `503 Service Unavailable` thay vì âm thầm chuyển sang bộ đếm RAM cục bộ.
-  - Các route `/api/classes/join` và `/api/teachers/bootstrap` sử dụng `checkSharedRateLimit` kết hợp bộ lọc L1 (RAM) và L2 (`rateLimits/{bucketId}` qua Firestore Transaction) để đồng bộ giới hạn thử mã trên nhiều instance Cloud Run.
+  - **App Check Fail-Closed trên Production:** Trên `NODE_ENV === 'production'`, `shouldEnforceAppCheck()` mặc định luôn trả về `true` trừ khi đặt tường minh `ENFORCE_APP_CHECK=false` (đồng thời in cảnh báo `console.warn`). Trong `.env.example`, `ENFORCE_APP_CHECK=true`. Frontend (`src/firebase.ts` và `src/utils/chineseEngine.ts`) luôn đính kèm header `X-Firebase-AppCheck` trong mọi request tới `/api/*`.
+  - **AI Quota Fail-Closed:** Khi `NODE_ENV=production` (hoặc `STRICT_FIRESTORE_AI_QUOTA=true`), nếu giao dịch Firestore `aiUsage/{uid}_{YYYY-MM-DD}` hoặc `rateLimits/ai_minute_{uid}` gặp lỗi, endpoint AI trả về `503 Service Unavailable` thay vì âm thầm chuyển sang bộ đếm RAM cục bộ.
+  - **Rate Limit Đa Instance qua Firestore (`rateLimits/{bucketId}`):** Toàn bộ giới hạn tốc độ (`api_general`, `teacher_bootstrap`, `ai_minute`, `join_class`, `assignment_start`, `reset_student_slot`) đều được đồng bộ qua collection `rateLimits` trên Firestore với ngưỡng riêng biệt trong `RATE_LIMIT_SCOPES`.
 
 ---
 

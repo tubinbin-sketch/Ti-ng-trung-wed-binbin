@@ -274,13 +274,20 @@ test('AI endpoints require Firebase ID Token (Authorization: Bearer <token>), ra
       return { uid: 'uid-student-1', email: 'student1@hanu.edu.vn' };
     }
     if (token === 'valid-token-uid-teacher-1') {
-      return { uid: 'uid-teacher-1', email: 'teacher@hanu.edu.vn', role: 'teacher' };
+      return {
+        uid: 'uid-teacher-1',
+        email: 'teacher@hanu.edu.vn',
+        emailVerified: true,
+        role: 'teacher',
+      };
     }
     throw new Error('Invalid Firebase ID token');
   });
 
   const prevDailyLimit = process.env.AI_DAILY_LIMIT;
+  const prevAllowlist = process.env.TEACHER_EMAIL_ALLOWLIST;
   process.env.AI_DAILY_LIMIT = '3';
+  process.env.TEACHER_EMAIL_ALLOWLIST = 'teacher@hanu.edu.vn';
 
   const server = app.listen(0);
   const address = server.address();
@@ -378,6 +385,8 @@ test('AI endpoints require Firebase ID Token (Authorization: Bearer <token>), ra
   } finally {
     if (prevDailyLimit === undefined) delete process.env.AI_DAILY_LIMIT;
     else process.env.AI_DAILY_LIMIT = prevDailyLimit;
+    if (prevAllowlist === undefined) delete process.env.TEACHER_EMAIL_ALLOWLIST;
+    else process.env.TEACHER_EMAIL_ALLOWLIST = prevAllowlist;
     setFirebaseTokenVerifierForTest(null);
     setServerStoreAdapterForTest(null);
     resetAllRateLimitersForTest();

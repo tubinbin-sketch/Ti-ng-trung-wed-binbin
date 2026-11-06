@@ -16,12 +16,18 @@
 - **Thời gian làm bài chuẩn từ Server — Không tin tưởng `timeSeconds` từ Client (Item 5):**
   - Thêm route `POST /api/assignments/start` ghi nhận thời điểm bắt đầu làm bài `startedAtMs` tại `classes/{classId}/assignmentStarts/{assignmentId}_{uid}`.
   - Thêm hàm `computeServerAuthoritativeTimeSeconds`: tính thời gian làm bài dựa trên `startedAtMs` của server (áp mức sàn tối thiểu `max(5, totalQuestions * 2)` giây và mức phạt mặc định `300s` nếu bỏ qua `/api/assignments/start`), loại bỏ hoàn toàn việc đọc `req.body.timeSeconds`.
-- **Bắt buộc App Check thông minh trong Production (Item 8):**
-  - Bổ sung `shouldEnforceAppCheck()`: kích hoạt xác thực App Check khi `ENFORCE_APP_CHECK=true` hoặc tự động bật khi `NODE_ENV=production` và có cấu hình `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY`.
+- **App Check Fail-Closed trên Production & Header `X-Firebase-AppCheck` toàn diện (P0 #1):**
+  - Cập nhật `shouldEnforceAppCheck()` trong `server.ts`: trên `NODE_ENV === 'production'`, App Check mặc định luôn được bật (`true`) trừ khi có biến môi trường ghi đè tường minh `ENFORCE_APP_CHECK=false`, đồng thời in cảnh báo `console.warn` rõ ràng nếu bị tắt.
+  - Đổi `ENFORCE_APP_CHECK=true` trong `.env.example`.
+  - Cập nhật `getFirebaseAuthHeaders()` (`src/firebase.ts`) và `getAuthBearerHeaders()` + `registerFirebaseAppCheckGetter` (`src/utils/chineseEngine.ts`) để luôn gửi header `X-Firebase-AppCheck` trong mọi request tới `/api/*`.
+- **Kiểm tra thu hồi phiên (`verifyIdToken(token, true)`) & Đối chiếu quyền Giáo viên thời gian thực (P0 #2):**
+  - Đổi `verifyIdToken(idToken)` thành `verifyIdToken(idToken, true)` trong `verifyFirebaseIdToken`, bắt lỗi `auth/id-token-revoked` tại `authenticateBearerRequest` để trả về HTTP `401` kèm `code: 'auth/id-token-revoked'`.
+  - Bổ sung `isTeacherUserAuthorized(user)`: đối chiếu đồng thời cả custom claim (`role === 'teacher'`) lẫn `emailVerified === true` và `TEACHER_EMAIL_ALLOWLIST` trên mọi tác vụ giáo viên (`isUserAuthorizedForAi`, `POST /api/classes/:classId/students/:studentCode/reset-slot`) để chặn ngay quyền truy cập nếu giáo viên bị xóa khỏi danh sách cho phép.
 - **AI Quota Fail-Closed trong Production (Item 9):**
-  - Bổ sung `isStrictFirestoreAiQuotaEnabled()`: khi `NODE_ENV=production` (hoặc `STRICT_FIRESTORE_AI_QUOTA=true`), nếu giao dịch Firestore `aiUsage/{uid}_{YYYY-MM-DD}` gặp lỗi, server trả về HTTP `503 Service Unavailable` thay vì âm thầm chuyển sang quota RAM cục bộ.
-- **Giới hạn tốc độ chia sẻ liên Instance (Item 10):**
-  - Bổ sung `incrementRateLimitTransaction` (`rateLimits/{bucketId}`) và `checkSharedRateLimit` kết hợp bộ lọc L1 (RAM) và L2 (Firestore Transaction) cho `/api/classes/join` và `/api/teachers/bootstrap`.
+  - Bổ sung `isStrictFirestoreAiQuotaEnabled()`: khi `NODE_ENV=production` (hoặc `STRICT_FIRESTORE_AI_QUOTA=true`), nếu giao dịch Firestore `aiUsage/{uid}_{YYYY-MM-DD}` hoặc `rateLimits/ai_minute_{uid}` gặp lỗi, server trả về HTTP `503 Service Unavailable` thay vì âm thầm chuyển sang quota RAM cục bộ.
+- **Đồng bộ Rate Limit đa Instance qua Firestore `rateLimits` (P0 #3):**
+  - Thay thế các bộ đếm rate limit lưu trên `Map` trong RAM (middleware `/api` chung `apiRateLimiter` và giới hạn AI theo phút trong `checkAndIncrementAiFirestoreQuota`) bằng bộ đếm chia sẻ qua Firestore (`rateLimits/{bucketId}`).
+  - Thiết lập ngưỡng giới hạn độc lập trong `RATE_LIMIT_SCOPES` cho: `api_general` (90/phút), `teacher_bootstrap` (10/10 phút), `ai_minute` (30/phút), `join_class` (15/10 phút), `assignment_start` (`POST /api/assignments/start` — 20/phút), và `reset_student_slot` (`POST /api/classes/:classId/students/:studentCode/reset-slot` — 15/10 phút).
 
 ### Firestore Security Rules & Tài liệu Đặc tả (`firestore.rules`, `security_spec.md`)
 - **Bổ sung `request.resource.data.keys().hasOnly([...])` toàn diện (Item 6):**

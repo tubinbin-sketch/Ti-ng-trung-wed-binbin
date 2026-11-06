@@ -220,14 +220,42 @@ const BINBIN_SYSTEM_INSTRUCTION =
   "Bạn là Gấu trúc Bin Bin (彬彬) — Trợ giảng & Gia sư Hán ngữ Thực dụng của nền tảng HANU × 阮文受 (Thầy Nguyễn Văn Thụ). Nguyên tắc bắt buộc: Trả lời trực diện, súc tích, thực dụng, KHÔNG rườm rà chào hỏi sáo rỗng, KHÔNG bao giờ ghép từ giả tạo kiểu '学习X' hay '常用X'. Luôn cung cấp: (1) Bản chất & Ngữ cảnh thực tế, (2) Collocations kết hợp từ chuẩn 100% người bản xứ, (3) Phân biệt từ dễ nhầm, (4) 2 câu ví dụ thực tế có Pinyin + Dịch nghĩa, hoặc Dịch song ngữ / Sửa câu sai / Soạn 5 câu bài tập HSK 3.0 theo đúng yêu cầu.";
 
 // ============================================================================
-// 1. RATE LIMITING BY UID & PERIODIC MEMORY CLEANUP
+// 1. MULTI-INSTANCE RATE LIMITING VIA FIRESTORE (COLLECTION `rateLimits`)
 // ============================================================================
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_REQUESTS = 90;
-const AI_RATE_LIMIT_MAX_REQUESTS = 30;
-const AI_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
-const JOIN_CLASS_WINDOW_MS = 10 * 60_000; // 10 minutes
-const JOIN_CLASS_MAX_ATTEMPTS = 15;
+export const RATE_LIMIT_WINDOW_MS = 60_000;
+export const RATE_LIMIT_MAX_REQUESTS = 90;
+
+export const AI_RATE_LIMIT_WINDOW_MS = 60_000;
+export const AI_RATE_LIMIT_MAX_REQUESTS = 30;
+export const AI_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export const TEACHER_BOOTSTRAP_WINDOW_MS = 10 * 60_000; // 10 minutes
+export const TEACHER_BOOTSTRAP_MAX_ATTEMPTS = 10;
+
+export const JOIN_CLASS_WINDOW_MS = 10 * 60_000; // 10 minutes
+export const JOIN_CLASS_MAX_ATTEMPTS = 15;
+
+export const ASSIGNMENT_START_WINDOW_MS = 60_000; // 1 minute
+export const ASSIGNMENT_START_MAX_REQUESTS = 20;
+
+export const RESET_SLOT_WINDOW_MS = 10 * 60_000; // 10 minutes
+export const RESET_SLOT_MAX_REQUESTS = 15;
+
+export const RATE_LIMIT_SCOPES = {
+  api_general: { maxRequests: RATE_LIMIT_MAX_REQUESTS, windowMs: RATE_LIMIT_WINDOW_MS },
+  teacher_bootstrap: {
+    maxRequests: TEACHER_BOOTSTRAP_MAX_ATTEMPTS,
+    windowMs: TEACHER_BOOTSTRAP_WINDOW_MS,
+  },
+  ai_minute: { maxRequests: AI_RATE_LIMIT_MAX_REQUESTS, windowMs: AI_RATE_LIMIT_WINDOW_MS },
+  join_class: { maxRequests: JOIN_CLASS_MAX_ATTEMPTS, windowMs: JOIN_CLASS_WINDOW_MS },
+  assignment_start: {
+    maxRequests: ASSIGNMENT_START_MAX_REQUESTS,
+    windowMs: ASSIGNMENT_START_WINDOW_MS,
+  },
+  reset_student_slot: { maxRequests: RESET_SLOT_MAX_REQUESTS, windowMs: RESET_SLOT_WINDOW_MS },
+} as const;
+
 const RATE_LIMIT_CLEANUP_INTERVAL_MS = 10 * 60_000; // 10 minutes
 
 const clientRequestCounts = new Map<string, { count: number; resetAt: number }>();
@@ -346,18 +374,16 @@ function resolveClientIp(req: Request): string {
     .trim();
 }
 
-function apiRateLimiter(req: Request, res: Response, next: NextFunction) {
+async function apiRateLimiter(req: Request, res: Response, next: NextFunction) {
   const clientIp = resolveClientIp(req);
-  const now = Date.now();
-  const entry = clientRequestCounts.get(clientIp);
+  const sharedRate = await checkSharedRateLimit({
+    scope: 'api_general',
+    key: clientIp,
+    maxRequests: RATE_LIMIT_SCOPES.api_general.maxRequests,
+    windowMs: RATE_LIMIT_SCOPES.api_general.windowMs,
+  });
 
-  if (!entry || now > entry.resetAt) {
-    clientRequestCounts.set(clientIp, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    next();
-    return;
-  }
-
-  if (entry.count >= RATE_LIMIT_MAX_REQUESTS) {
+  if (!sharedRate.allowed) {
     res.status(429).json({
       error: 'Too many requests. Please try again in a minute.',
       fallback: true,
@@ -365,7 +391,6 @@ function apiRateLimiter(req: Request, res: Response, next: NextFunction) {
     return;
   }
 
-  entry.count += 1;
   next();
 }
 
@@ -451,7 +476,7 @@ export interface ServerStoreAdapter {
     dateStr: string,
     dailyLimit: number
   ): Promise<{ allowed: boolean; count: number; dailyLimit: number }>;
-  incrementRateLimitTransaction?(
+  incrementRateLimitTransaction(
     bucketId: string,
     maxRequests: number,
     windowMs: number,
@@ -1465,7 +1490,8 @@ export async function verifyFirebaseIdToken(
   if (customTokenVerifierForTest) {
     return await customTokenVerifierForTest(idToken);
   }
-  const decoded = await getAdminAuth(firebaseAdminApp).verifyIdToken(idToken);
+  // Check token revocation (`checkRevoked = true`) to reject revoked sessions immediately
+  const decoded = await getAdminAuth(firebaseAdminApp).verifyIdToken(idToken, true);
   return {
     uid: decoded.uid,
     email: decoded.email,
@@ -1479,13 +1505,22 @@ export async function verifyFirebaseIdToken(
 
 export function shouldEnforceAppCheck(): boolean {
   const raw = process.env.ENFORCE_APP_CHECK?.trim().toLowerCase();
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (isProduction) {
+    // Fail-closed in production: App Check is always enforced by default unless explicitly overridden with ENFORCE_APP_CHECK=false
+    if (raw === 'false') {
+      console.warn(
+        '[SECURITY WARNING] Firebase App Check enforcement is explicitly DISABLED in production (ENFORCE_APP_CHECK=false). All /api/* endpoints are running without App Check verification.'
+      );
+      return false;
+    }
+    return true;
+  }
+
   if (raw === 'true') return true;
   if (raw === 'false') return false;
-  // In production, automatically enforce App Check when reCAPTCHA Enterprise site key is configured
-  return (
-    process.env.NODE_ENV === 'production' &&
-    Boolean(process.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY?.trim())
-  );
+  return false;
 }
 
 export async function verifyRequestAppCheck(req: Request): Promise<boolean> {
@@ -1539,6 +1574,31 @@ export function isEmailInTeacherAllowlist(email?: string): boolean {
   return allowlist.includes(clean);
 }
 
+/**
+ * Verifies teacher privileges on the server by checking BOTH:
+ * 1. Verified email (`emailVerified === true`) AND email currently present in `TEACHER_EMAIL_ALLOWLIST`
+ *    (so removing a teacher from `TEACHER_EMAIL_ALLOWLIST` blocks access immediately).
+ * 2. Custom claim `user.role === 'teacher'` (or active `/teachers/{uid}` document with `role === 'teacher'`).
+ */
+export async function isTeacherUserAuthorized(user: VerifiedFirebaseUser): Promise<boolean> {
+  if (!user?.uid) return false;
+  if (user.emailVerified !== true || !isEmailInTeacherAllowlist(user.email)) {
+    return false;
+  }
+  if (user.role === 'teacher') {
+    return true;
+  }
+  try {
+    const teacherDoc = await activeServerStore.getDoc(`teachers/${user.uid}`);
+    if (teacherDoc && teacherDoc.role === 'teacher') {
+      return true;
+    }
+  } catch {
+    // Deny if Firestore lookup fails
+  }
+  return false;
+}
+
 export function isStrictFirestoreAiQuotaEnabled(): boolean {
   const raw = process.env.STRICT_FIRESTORE_AI_QUOTA?.trim().toLowerCase();
   if (raw === 'true') return true;
@@ -1552,37 +1612,58 @@ export async function checkSharedRateLimit(params: {
   maxRequests: number;
   windowMs: number;
   nowMs?: number;
-  memoryCheck: () => { allowed: boolean };
-}): Promise<{ allowed: boolean }> {
+  memoryCheck?: () => { allowed: boolean };
+}): Promise<{ allowed: boolean; count: number; remaining: number; resetAt: number }> {
   const { scope, key, maxRequests, windowMs, nowMs = Date.now(), memoryCheck } = params;
-  const localResult = memoryCheck();
-  if (!localResult.allowed) {
-    return { allowed: false };
-  }
+  const cleanKey = (key.trim() || 'unknown').replace(/\//g, '_');
 
-  if (typeof activeServerStore.incrementRateLimitTransaction !== 'function') {
-    return localResult;
-  }
-
-  try {
-    const bucketId = `${scope}_${key}`;
-    const sharedResult = await activeServerStore.incrementRateLimitTransaction(
-      bucketId,
-      maxRequests,
-      windowMs,
-      nowMs
-    );
-    return { allowed: sharedResult.allowed };
-  } catch (err) {
-    if (
-      process.env.NODE_ENV === 'production' ||
-      process.env.STRICT_SHARED_RATE_LIMIT === 'true'
-    ) {
-      console.error('[server] Shared rate limit transaction failed in strict mode:', err);
-      return { allowed: false };
+  if (typeof activeServerStore.incrementRateLimitTransaction === 'function') {
+    try {
+      const bucketId = `${scope}_${cleanKey}`;
+      const sharedResult = await activeServerStore.incrementRateLimitTransaction(
+        bucketId,
+        maxRequests,
+        windowMs,
+        nowMs
+      );
+      return {
+        allowed: sharedResult.allowed,
+        count: sharedResult.count,
+        remaining: Math.max(0, maxRequests - sharedResult.count),
+        resetAt: sharedResult.resetAt,
+      };
+    } catch (err) {
+      if (
+        process.env.NODE_ENV === 'production' ||
+        process.env.STRICT_SHARED_RATE_LIMIT === 'true'
+      ) {
+        console.error('[server] Shared rate limit transaction failed in strict mode:', err);
+        return {
+          allowed: false,
+          count: maxRequests + 1,
+          remaining: 0,
+          resetAt: nowMs + windowMs,
+        };
+      }
     }
-    return localResult;
   }
+
+  if (memoryCheck) {
+    const localResult = memoryCheck();
+    return {
+      allowed: localResult.allowed,
+      count: localResult.allowed ? 1 : maxRequests + 1,
+      remaining: localResult.allowed ? Math.max(0, maxRequests - 1) : 0,
+      resetAt: nowMs + windowMs,
+    };
+  }
+
+  return {
+    allowed: true,
+    count: 1,
+    remaining: Math.max(0, maxRequests - 1),
+    resetAt: nowMs + windowMs,
+  };
 }
 
 export function checkAndIncrementAiUidQuota(
@@ -1632,15 +1713,22 @@ export async function checkAndIncrementAiFirestoreQuota(
   const dailyLimit = getAiDailyLimit();
   const nowMs = now.getTime();
 
-  // 1. Per-minute burst check in memory
-  const minuteEntry = aiUidMinuteCounts.get(cleanUid);
-  if (minuteEntry && nowMs <= minuteEntry.resetAt && minuteEntry.count >= AI_RATE_LIMIT_MAX_REQUESTS) {
-    return { allowed: false, reason: 'minute_limit', dailyLimit };
-  }
-  if (!minuteEntry || nowMs > minuteEntry.resetAt) {
-    aiUidMinuteCounts.set(cleanUid, { count: 1, resetAt: nowMs + RATE_LIMIT_WINDOW_MS });
-  } else {
-    minuteEntry.count += 1;
+  // 1. Multi-instance per-minute burst check via Firestore `rateLimits/ai_minute_{uid}`
+  try {
+    const minuteRate = await activeServerStore.incrementRateLimitTransaction(
+      `ai_minute_${cleanUid}`,
+      RATE_LIMIT_SCOPES.ai_minute.maxRequests,
+      RATE_LIMIT_SCOPES.ai_minute.windowMs,
+      nowMs
+    );
+    if (!minuteRate.allowed) {
+      return { allowed: false, reason: 'minute_limit', dailyLimit, count: minuteRate.count };
+    }
+  } catch (err) {
+    if (isStrictFirestoreAiQuotaEnabled()) {
+      console.error('[server] Strict Firestore AI minute rate limit unavailable:', err);
+      return { allowed: false, reason: 'quota_store_unavailable', dailyLimit };
+    }
   }
 
   // 2. Daily quota check persisted in Firestore `aiUsage/{uid}_{YYYY-MM-DD}` via transaction
@@ -1672,22 +1760,24 @@ export async function isUserAuthorizedForAi(
   user: VerifiedFirebaseUser,
   hintClassId?: string
 ): Promise<boolean> {
-  // 1. Teacher role custom claim or allowlisted teacher email (only if email is verified)
-  if (
-    user.role === 'teacher' ||
-    (user.emailVerified === true && isEmailInTeacherAllowlist(user.email))
-  ) {
+  // 1. Teacher authorization requires BOTH teacher claim/record AND active presence in TEACHER_EMAIL_ALLOWLIST
+  if (await isTeacherUserAuthorized(user)) {
     return true;
   }
 
+  // If the token carries a teacher role claim or matches a /teachers/{uid} record,
+  // but failed isTeacherUserAuthorized (e.g., removed from TEACHER_EMAIL_ALLOWLIST), deny immediately.
+  if (user.role === 'teacher') {
+    return false;
+  }
+
   try {
-    // 2. Check /teachers/{uid}
     const teacherDoc = await activeServerStore.getDoc(`teachers/${user.uid}`);
     if (teacherDoc && teacherDoc.role === 'teacher') {
-      return true;
+      return false;
     }
 
-    // 3. Check /users/{uid} enrollment profile
+    // 2. Check /users/{uid} student enrollment profile
     const userDoc = await activeServerStore.getDoc(`users/${user.uid}`);
     if (
       userDoc &&
@@ -1697,7 +1787,7 @@ export async function isUserAuthorizedForAi(
       return true;
     }
 
-    // 4. If a specific classId was passed, check /classes/{classId}/students/{uid}
+    // 3. If a specific classId was passed, check /classes/{classId}/students/{uid}
     if (hintClassId && /^[a-zA-Z0-9_-]{1,128}$/.test(hintClassId)) {
       const studentDoc = await activeServerStore.getDoc(
         `classes/${hintClassId}/students/${user.uid}`
@@ -1814,7 +1904,22 @@ async function authenticateBearerRequest(
       throw new Error('Missing uid in verified token');
     }
     return verifiedUser;
-  } catch {
+  } catch (err: any) {
+    const errCode = typeof err?.code === 'string' ? err.code : '';
+    const errMsg = typeof err?.message === 'string' ? err.message : '';
+    if (
+      errCode === 'auth/id-token-revoked' ||
+      errMsg.includes('auth/id-token-revoked') ||
+      errMsg.includes('id-token-revoked')
+    ) {
+      res.status(401).json({
+        error:
+          'Unauthorized: Phiên đăng nhập Firebase đã bị thu hồi (auth/id-token-revoked). Vui lòng đăng nhập lại.',
+        code: 'auth/id-token-revoked',
+        fallback: true,
+      });
+      return null;
+    }
     res.status(401).json({
       error: 'Unauthorized: Invalid or expired Firebase ID Token.',
       fallback: true,
@@ -2111,8 +2216,8 @@ app.post('/api/teachers/bootstrap', async (req, res) => {
   const bootstrapRate = await checkSharedRateLimit({
     scope: 'teacher_bootstrap',
     key: rateKey,
-    maxRequests: JOIN_CLASS_MAX_ATTEMPTS,
-    windowMs: JOIN_CLASS_WINDOW_MS,
+    maxRequests: RATE_LIMIT_SCOPES.teacher_bootstrap.maxRequests,
+    windowMs: RATE_LIMIT_SCOPES.teacher_bootstrap.windowMs,
     memoryCheck: () => checkJoinClassRateLimit(`bootstrap:${rateKey}`),
   });
   if (!bootstrapRate.allowed) {
@@ -2182,8 +2287,8 @@ app.post('/api/classes/join', async (req, res) => {
   const joinRate = await checkSharedRateLimit({
     scope: 'join_class',
     key: rateKey,
-    maxRequests: JOIN_CLASS_MAX_ATTEMPTS,
-    windowMs: JOIN_CLASS_WINDOW_MS,
+    maxRequests: RATE_LIMIT_SCOPES.join_class.maxRequests,
+    windowMs: RATE_LIMIT_SCOPES.join_class.windowMs,
     memoryCheck: () => checkJoinClassRateLimit(rateKey),
   });
   if (!joinRate.allowed) {
@@ -2252,6 +2357,28 @@ app.post('/api/classes/join', async (req, res) => {
 app.post('/api/classes/:classId/students/:studentCode/reset-slot', async (req, res) => {
   const verifiedUser = await authenticateBearerRequest(req, res);
   if (!verifiedUser) return;
+
+  const rateKey = `${verifiedUser.uid}:${resolveClientIp(req)}`;
+  const resetRate = await checkSharedRateLimit({
+    scope: 'reset_student_slot',
+    key: rateKey,
+    maxRequests: RATE_LIMIT_SCOPES.reset_student_slot.maxRequests,
+    windowMs: RATE_LIMIT_SCOPES.reset_student_slot.windowMs,
+  });
+  if (!resetRate.allowed) {
+    res.status(429).json({
+      error: 'Bạn đã gửi quá nhiều yêu cầu cấp lại mã học viên. Vui lòng thử lại sau ít phút.',
+    });
+    return;
+  }
+
+  if (!(await isTeacherUserAuthorized(verifiedUser))) {
+    res.status(403).json({
+      error:
+        'Forbidden: Tài khoản Giảng viên chưa được cấp quyền hoặc đã bị thu hồi khỏi TEACHER_EMAIL_ALLOWLIST.',
+    });
+    return;
+  }
 
   const classId = String(req.params.classId || '').trim();
   const targetCode = String(req.params.studentCode || '')
@@ -2339,6 +2466,20 @@ app.post('/api/classes/:classId/students/:studentCode/reset-slot', async (req, r
 app.post('/api/assignments/start', async (req, res) => {
   const verifiedUser = await authenticateBearerRequest(req, res);
   if (!verifiedUser) return;
+
+  const rateKey = `${verifiedUser.uid}:${resolveClientIp(req)}`;
+  const startRate = await checkSharedRateLimit({
+    scope: 'assignment_start',
+    key: rateKey,
+    maxRequests: RATE_LIMIT_SCOPES.assignment_start.maxRequests,
+    windowMs: RATE_LIMIT_SCOPES.assignment_start.windowMs,
+  });
+  if (!startRate.allowed) {
+    res.status(429).json({
+      error: 'Bạn đã gửi quá nhiều yêu cầu bắt đầu làm bài. Vui lòng đợi 1 phút trước khi thử lại.',
+    });
+    return;
+  }
 
   const classId = String(req.body?.classId || '').trim();
   const assignmentId = String(req.body?.assignmentId || 'default-assignment').trim();

@@ -40,7 +40,7 @@ import {
 import {
   getStoredStudentRoster,
   STORAGE_KEY_STUDENTS,
-} from './ClassroomManager';
+} from './classroom/classroomRosterData';
 import { playGentleChime, speakChinese } from '../utils/speech';
 import {
   ClassroomMiniGameMode,

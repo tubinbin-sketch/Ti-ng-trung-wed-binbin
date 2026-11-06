@@ -48,18 +48,10 @@ import {
 } from '../utils/storageService';
 import { LazyErrorBoundary } from './LazyErrorBoundary';
 
-const AddVocabModal = React.lazy(() =>
-  import('./AddVocabModal').then((m) => ({ default: m.AddVocabModal }))
-);
-const WorksheetPreviewModal = React.lazy(() =>
-  import('./WorksheetPreviewModal').then((m) => ({ default: m.WorksheetPreviewModal }))
-);
-const MeasureWordDrillModal = React.lazy(() =>
-  import('./MeasureWordDrillModal').then((m) => ({ default: m.MeasureWordDrillModal }))
-);
-const LiveTeachingToolkit = React.lazy(() =>
-  import('./LiveTeachingToolkit').then((m) => ({ default: m.LiveTeachingToolkit }))
-);
+import { AddVocabModal } from './AddVocabModal';
+import { WorksheetPreviewModal } from './WorksheetPreviewModal';
+import { MeasureWordDrillModal } from './MeasureWordDrillModal';
+import { LiveTeachingToolkit } from './LiveTeachingToolkit';
 import {
   getIsSpeaking,
   getPreferredSpeechRate,
@@ -516,17 +508,6 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
       }
     });
   }, [slides]);
-
-  // Preload React.lazy modal modules 1.5s after mount for instantaneous opening
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void import('./WorksheetPreviewModal');
-      void import('./MeasureWordDrillModal');
-      void import('./AddVocabModal');
-      void import('./LiveTeachingToolkit');
-    }, 1500);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   // Cleanup any active SpeechRecognition session on unmount
   useEffect(() => {

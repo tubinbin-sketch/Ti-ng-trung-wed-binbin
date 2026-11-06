@@ -10,7 +10,7 @@ const CHUNK_RELOAD_KEY = 'hanu_chunk_reload_at';
  */
 export function isChunkLoadError(error: unknown): boolean {
   const message = String((error as { message?: string })?.message ?? error ?? '');
-  return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading chunk [\w-]+ failed|ChunkLoadError/i.test(
+  return /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module|Loading chunk [\w-]+ failed|ChunkLoadError|Cannot read properties of null \(reading 'use|Invalid hook call/i.test(
     message
   );
 }

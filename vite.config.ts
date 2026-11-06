@@ -7,9 +7,21 @@ export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
+      dedupe: ['react', 'react-dom', 'react-router', 'react-router-dom'],
       alias: {
         '@': path.resolve(import.meta.dirname, '.'),
       },
+    },
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'react-dom/client',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
+        'react-router-dom',
+        'lucide-react',
+      ],
     },
     build: {
       rolldownOptions: {
