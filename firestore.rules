@@ -71,7 +71,9 @@ service cloud.firestore {
     // 2. Join Codes Collection: /joinCodes/{code}
     // ===============================================================
     match /joinCodes/{code} {
-      allow get: if isSignedIn() && isValidId(code);
+      // Student class joining is mediated 100% by the server (`POST /api/classes/join`) using Admin SDK.
+      // Direct client `get` is restricted to verified teachers checking code uniqueness.
+      allow get: if isTeacher() && isValidId(code);
       allow list: if false;
       allow create: if isTeacher() &&
         isValidId(code) &&
@@ -98,6 +100,16 @@ service cloud.firestore {
 
       allow create: if isTeacher() &&
         isValidId(classId) &&
+        request.resource.data.keys().hasOnly([
+          'id',
+          'teacherUid',
+          'teacherName',
+          'name',
+          'hskLevel',
+          'joinCode',
+          'createdAt',
+          'updatedAt'
+        ]) &&
         request.resource.data.teacherUid == request.auth.uid &&
         isValidString(request.resource.data.name, 1, 160) &&
         isValidString(request.resource.data.hskLevel, 1, 40) &&
@@ -105,6 +117,16 @@ service cloud.firestore {
 
       allow update: if isTeacher() &&
         isValidId(classId) &&
+        request.resource.data.keys().hasOnly([
+          'id',
+          'teacherUid',
+          'teacherName',
+          'name',
+          'hskLevel',
+          'joinCode',
+          'createdAt',
+          'updatedAt'
+        ]) &&
         resource.data.teacherUid == request.auth.uid &&
         request.resource.data.teacherUid == resource.data.teacherUid &&
         isValidString(request.resource.data.name, 1, 160) &&
@@ -129,6 +151,25 @@ service cloud.firestore {
         allow create: if isValidId(classId) &&
           isValidId(studentUid) &&
           isClassTeacher(classId) &&
+          request.resource.data.keys().hasOnly([
+            'id',
+            'studentUid',
+            'studentCode',
+            'name',
+            'hskLevel',
+            'joinedAt',
+            'vocabScore',
+            'writingScore',
+            'quizScore',
+            'totalPoints',
+            'status',
+            'feedback',
+            'reviewWords',
+            'timeSeconds',
+            'streak',
+            'lastSubmittedAt',
+            'updatedAt'
+          ]) &&
           isValidString(request.resource.data.name, 1, 120) &&
           isValidString(request.resource.data.studentCode, 6, 40);
 
@@ -137,6 +178,25 @@ service cloud.firestore {
           isValidId(studentUid) &&
           (
             (isClassTeacher(classId) &&
+              request.resource.data.keys().hasOnly([
+                'id',
+                'studentUid',
+                'studentCode',
+                'name',
+                'hskLevel',
+                'joinedAt',
+                'vocabScore',
+                'writingScore',
+                'quizScore',
+                'totalPoints',
+                'status',
+                'feedback',
+                'reviewWords',
+                'timeSeconds',
+                'streak',
+                'lastSubmittedAt',
+                'updatedAt'
+              ]) &&
               isValidString(request.resource.data.name, 1, 120) &&
               isValidString(request.resource.data.studentCode, 6, 40)) ||
             (isOwner(studentUid) &&
@@ -150,6 +210,13 @@ service cloud.firestore {
       }
 
       // =============================================================
+      // 3a-locks. Server-Only Student Code Claim Locks: /classes/{classId}/studentCodeLocks/{studentCode}
+      // =============================================================
+      match /studentCodeLocks/{studentCode} {
+        allow read, write: if false;
+      }
+
+      // =============================================================
       // 3b. Decks Subcollection: /classes/{classId}/decks/{deckId}
       // =============================================================
       match /decks/{deckId} {
@@ -157,6 +224,14 @@ service cloud.firestore {
         allow create, update: if isValidId(classId) &&
           isValidId(deckId) &&
           isClassTeacher(classId) &&
+          request.resource.data.keys().hasOnly([
+            'id',
+            'title',
+            'hskLevel',
+            'teacherUid',
+            'slides',
+            'updatedAt'
+          ]) &&
           request.resource.data.teacherUid == request.auth.uid &&
           request.resource.data.slides is list;
         allow delete: if isValidId(classId) && isValidId(deckId) && isClassTeacher(classId);
@@ -170,6 +245,26 @@ service cloud.firestore {
         allow create, update: if isValidId(classId) &&
           isValidId(assignmentId) &&
           isClassTeacher(classId) &&
+          request.resource.data.keys().hasOnly([
+            'id',
+            'title',
+            'fileName',
+            'fileType',
+            'sessionTitle',
+            'sessionNumber',
+            'uploadedAt',
+            'dueDate',
+            'teacherName',
+            'teacherUid',
+            'rawContent',
+            'multipleChoiceList',
+            'sentenceOrderingList',
+            'essayList',
+            'questions',
+            'hskLevel',
+            'description',
+            'updatedAt'
+          ]) &&
           request.resource.data.teacherUid == request.auth.uid &&
           isValidString(request.resource.data.title, 1, 240) &&
           !('answerKey' in request.resource.data);
@@ -185,8 +280,25 @@ service cloud.firestore {
         allow create, update: if isValidId(classId) &&
           isValidId(assignmentId) &&
           isClassTeacher(classId) &&
+          request.resource.data.keys().hasOnly([
+            'assignmentId',
+            'teacherUid',
+            'multipleChoiceAnswers',
+            'sentenceOrderingAnswers',
+            'essayModels',
+            'maxAttempts',
+            'updatedAt',
+            'answers'
+          ]) &&
           request.resource.data.teacherUid == request.auth.uid;
         allow delete: if isValidId(classId) && isValidId(assignmentId) && isClassTeacher(classId);
+      }
+
+      // =============================================================
+      // 3d-starts. Server-Only Assignment Start Timestamps: /classes/{classId}/assignmentStarts/{startId}
+      // =============================================================
+      match /assignmentStarts/{startId} {
+        allow read, write: if false;
       }
 
       // =============================================================
@@ -224,6 +336,20 @@ service cloud.firestore {
         allow create, update: if isValidId(studentUid) &&
           isValidId(wordId) &&
           isOwner(studentUid) &&
+          request.resource.data.keys().hasOnly([
+            'wordId',
+            'hanzi',
+            'pinyin',
+            'meaning',
+            'learned',
+            'intervalDays',
+            'easeFactor',
+            'repetitions',
+            'dueAt',
+            'nextReviewAt',
+            'lastReviewedAt',
+            'updatedAt'
+          ]) &&
           isValidString(request.resource.data.wordId, 1, 120) &&
           isValidString(request.resource.data.hanzi, 1, 40) &&
           request.resource.data.learned is bool;
@@ -232,9 +358,13 @@ service cloud.firestore {
     }
 
     // ===============================================================
-    // 5. Server-Only AI Usage Quota: /aiUsage/{usageId}
+    // 5. Server-Only AI Usage Quota & Shared Rate Limits: /aiUsage/{usageId}, /rateLimits/{bucketId}
     // ===============================================================
     match /aiUsage/{usageId} {
+      allow read, write: if false;
+    }
+
+    match /rateLimits/{bucketId} {
       allow read, write: if false;
     }
 

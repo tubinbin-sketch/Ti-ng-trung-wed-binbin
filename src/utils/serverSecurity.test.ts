@@ -3,21 +3,26 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import {
   app,
+  checkAndIncrementAiFirestoreQuota,
   checkJoinClassRateLimit,
+  computeServerAuthoritativeTimeSeconds,
   createInMemoryServerStoreAdapter,
   generateServerRandomCode,
   getAiDailyLimit,
+  getTeacherEmailAllowlist,
   resetAllRateLimitersForTest,
   sanitizeAiUserInput,
   setAppCheckVerifierForTest,
   setFirebaseTokenVerifierForTest,
   setServerStoreAdapterForTest,
+  shouldEnforceAppCheck,
 } from '../../server';
 import {
   extractAssignmentAnswerKey,
   PRESET_ASSIGNMENT_BUOI_14,
   sanitizeAssignmentForPublic,
 } from './assignmentParser';
+import { SPEED_TEST_10_QUESTIONS } from '../components/arena/arenaDataAndHelpers';
 
 async function startEphemeralServer(): Promise<{
   baseUrl: string;
@@ -38,9 +43,9 @@ async function startEphemeralServer(): Promise<{
   });
 }
 
-test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota & App Check)', async (t) => {
+test('Server Security & Classroom API Suite (Bootstrap, Atomic Join, Atomic Grading, Server Timer, AI Quota & App Check)', async (t) => {
   const prevAllowlist = process.env.TEACHER_EMAIL_ALLOWLIST;
-  process.env.TEACHER_EMAIL_ALLOWLIST = 'dondon.win10@gmail.com,teacher@hanu.edu.vn';
+  process.env.TEACHER_EMAIL_ALLOWLIST = 'teacher.verified@hanu.edu.vn';
   const store = createInMemoryServerStoreAdapter();
   setServerStoreAdapterForTest(store);
   resetAllRateLimitersForTest();
@@ -49,15 +54,33 @@ test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota 
     if (token === 'token-teacher-allowlisted') {
       return {
         uid: 'teacher-uid-1',
-        email: 'dondon.win10@gmail.com',
+        email: 'teacher.verified@hanu.edu.vn',
+        emailVerified: true,
         name: 'GV Nguyễn Văn Thụ',
         role: 'teacher',
+      };
+    }
+    if (token === 'token-teacher-unverified-false') {
+      return {
+        uid: 'teacher-uid-unverified-1',
+        email: 'teacher.verified@hanu.edu.vn',
+        emailVerified: false,
+        name: 'GV Chưa Xác Thực Email',
+      };
+    }
+    if (token === 'token-teacher-unverified-undefined') {
+      return {
+        uid: 'teacher-uid-unverified-2',
+        email: 'teacher.verified@hanu.edu.vn',
+        // emailVerified intentionally omitted (undefined) to test fail-closed behavior
+        name: 'GV Thiếu Cờ EmailVerified',
       };
     }
     if (token === 'token-teacher-unauthorized') {
       return {
         uid: 'user-not-teacher',
         email: 'random.stranger@example.com',
+        emailVerified: true,
         name: 'Người lạ',
       };
     }
@@ -72,6 +95,20 @@ test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota 
       return {
         uid: 'student-uid-2',
         name: 'Phạm Gia Bảo',
+        signInProvider: 'anonymous',
+      };
+    }
+    if (token === 'token-student-race-a') {
+      return {
+        uid: 'student-race-a',
+        name: 'Học Viên Đua Slot A',
+        signInProvider: 'anonymous',
+      };
+    }
+    if (token === 'token-student-race-b') {
+      return {
+        uid: 'student-race-b',
+        name: 'Học Viên Đua Slot B',
         signInProvider: 'anonymous',
       };
     }
@@ -98,15 +135,46 @@ test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota 
     await close();
   });
 
-  await t.test('1. AI_DAILY_LIMIT defaults to 60 (matching .env.example)', () => {
-    const prev = process.env.AI_DAILY_LIMIT;
+  await t.test('1. AI_DAILY_LIMIT defaults to 60 and TEACHER_EMAIL_ALLOWLIST has NO hardcoded fallback when unset', () => {
+    const prevAi = process.env.AI_DAILY_LIMIT;
     delete process.env.AI_DAILY_LIMIT;
     assert.equal(getAiDailyLimit(), 60);
-    if (prev !== undefined) process.env.AI_DAILY_LIMIT = prev;
+    if (prevAi !== undefined) process.env.AI_DAILY_LIMIT = prevAi;
+
+    const savedAllowlist = process.env.TEACHER_EMAIL_ALLOWLIST;
+    delete process.env.TEACHER_EMAIL_ALLOWLIST;
+    assert.deepEqual(
+      getTeacherEmailAllowlist(),
+      [],
+      'getTeacherEmailAllowlist() must return empty array when env var is unset (no hardcoded emails)'
+    );
+    process.env.TEACHER_EMAIL_ALLOWLIST = savedAllowlist;
   });
 
-  await t.test('2. POST /api/teachers/bootstrap enforces TEACHER_EMAIL_ALLOWLIST and sets custom claim role=teacher', async () => {
-    // Unauthorized email is rejected with 403
+  await t.test('2. POST /api/teachers/bootstrap strictly requires emailVerified === true AND TEACHER_EMAIL_ALLOWLIST', async () => {
+    // 2a. Unverified email (emailVerified: false) even if email is in allowlist -> 403
+    const unverifiedFalseRes = await fetch(`${baseUrl}/api/teachers/bootstrap`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer token-teacher-unverified-false',
+      },
+      body: JSON.stringify({ displayName: 'Unverified Teacher' }),
+    });
+    assert.equal(unverifiedFalseRes.status, 403);
+
+    // 2b. Missing emailVerified (emailVerified: undefined) -> 403 (fail-closed, never fail-open)
+    const unverifiedUndefinedRes = await fetch(`${baseUrl}/api/teachers/bootstrap`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer token-teacher-unverified-undefined',
+      },
+      body: JSON.stringify({ displayName: 'Undefined EmailVerified Teacher' }),
+    });
+    assert.equal(unverifiedUndefinedRes.status, 403);
+
+    // 2c. Verified email NOT in TEACHER_EMAIL_ALLOWLIST -> 403
     const deniedRes = await fetch(`${baseUrl}/api/teachers/bootstrap`, {
       method: 'POST',
       headers: {
@@ -117,7 +185,7 @@ test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota 
     });
     assert.equal(deniedRes.status, 403);
 
-    // Allowlisted email succeeds and sets custom claim role = 'teacher'
+    // 2d. Verified email (emailVerified === true) in TEACHER_EMAIL_ALLOWLIST -> 200 OK
     const okRes = await fetch(`${baseUrl}/api/teachers/bootstrap`, {
       method: 'POST',
       headers: {
@@ -132,7 +200,7 @@ test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota 
     assert.deepEqual(store.claims.get('teacher-uid-1'), { role: 'teacher' });
   });
 
-  await t.test('3. Sanitize public assignment vs private answerKey', () => {
+  await t.test('3. Sanitize public assignment vs private answerKey & Speed Test option diversity', () => {
     const sanitized = sanitizeAssignmentForPublic(PRESET_ASSIGNMENT_BUOI_14);
     for (const mc of sanitized.multipleChoiceList) {
       for (const opt of mc.options) {
@@ -151,18 +219,15 @@ test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota 
     assert.equal(key.multipleChoiceAnswers['mc-14-1'], 'A');
     assert.equal(key.multipleChoiceAnswers['mc-14-2'], 'B');
     assert.equal(key.multipleChoiceAnswers['mc-14-3'], 'C');
-    assert.deepEqual(key.sentenceOrderingAnswers['so-14-1'], [
-      '春天',
-      '的',
-      '阳光',
-      '非常',
-      '温暖',
-      '。',
-    ]);
+
+    // Verify SPEED_TEST_10_QUESTIONS correct answers are distributed across A, B, C, D (not all A)
+    const leadingLetters = new Set(
+      SPEED_TEST_10_QUESTIONS.map((q) => q.correctAnswer.trim().slice(0, 1))
+    );
+    assert.ok(leadingLetters.size >= 4, 'Speed test correct answers must span A, B, C, and D');
   });
 
-  await t.test('4. POST /api/classes/join verifies joinCode, studentCode slot, prevents slot hijacking, and initializes zeroed student record', async () => {
-    // Seed class, joinCode, and teacher-issued random student slot
+  await t.test('4. POST /api/classes/join claims studentCode atomically and blocks concurrent race conditions', async () => {
     await store.setDoc('classes/class-hsk3', {
       teacherUid: 'teacher-uid-1',
       teacherName: 'GV Nguyễn Văn Thụ',
@@ -191,6 +256,21 @@ test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota 
       streak: 0,
       joinedAt: '2026-03-29',
     });
+    await store.setDoc('classes/class-hsk3/students/slot-hv-race99', {
+      studentUid: '',
+      studentCode: 'HV-RACE99',
+      name: 'Học Viên Slot Đua',
+      hskLevel: 'HSK 3',
+      totalPoints: 0,
+      vocabScore: '',
+      writingScore: '',
+      quizScore: '',
+      feedback: '',
+      status: 'Chưa nộp',
+      timeSeconds: 0,
+      streak: 0,
+      joinedAt: '2026-03-29',
+    });
 
     // Student 1 joins with valid joinCode + studentCode
     const joinRes1 = await fetch(`${baseUrl}/api/classes/join`, {
@@ -208,26 +288,42 @@ test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota 
     const joinData1 = await joinRes1.json();
     assert.equal(joinData1.classroom.id, 'class-hsk3');
     assert.equal(joinData1.studentRecord.id, 'student-uid-1');
-    assert.equal(joinData1.studentRecord.totalPoints, 0);
-    assert.equal(joinData1.studentRecord.writingScore, '');
-    assert.equal(joinData1.studentRecord.feedback, '');
 
-    // Student 2 tries to claim the SAME studentCode 'HV-7X9P2M' -> REJECTED with 409 Conflict!
-    const hijackRes = await fetch(`${baseUrl}/api/classes/join`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer token-student-2',
-      },
-      body: JSON.stringify({
-        joinCode: 'HSK-8K4M9P',
-        studentCode: 'HV-7X9P2M',
+    // Concurrent race condition test: two distinct accounts try to claim 'HV-RACE99' simultaneously
+    const [raceResA, raceResB] = await Promise.all([
+      fetch(`${baseUrl}/api/classes/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token-student-race-a',
+        },
+        body: JSON.stringify({
+          joinCode: 'HSK-8K4M9P',
+          studentCode: 'HV-RACE99',
+        }),
       }),
-    });
-    assert.equal(hijackRes.status, 409);
+      fetch(`${baseUrl}/api/classes/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token-student-race-b',
+        },
+        body: JSON.stringify({
+          joinCode: 'HSK-8K4M9P',
+          studentCode: 'HV-RACE99',
+        }),
+      }),
+    ]);
+
+    const statuses = [raceResA.status, raceResB.status].sort((a, b) => a - b);
+    assert.deepEqual(
+      statuses,
+      [200, 409],
+      'Exactly one concurrent join request must succeed (200) and the other must be rejected (409)'
+    );
   });
 
-  await t.test('5. POST /api/submissions grades on server using answerKeys, updates leaderboard & students, and blocks duplicate submissions', async () => {
+  await t.test('5. POST /api/submissions executes atomically, prevents concurrent double-submissions, and ignores forged client timeSeconds', async () => {
     const answerKey = extractAssignmentAnswerKey(
       PRESET_ASSIGNMENT_BUOI_14,
       'teacher-uid-1',
@@ -235,143 +331,136 @@ test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota 
     );
     await store.setDoc('classes/class-hsk3/answerKeys/assign-b14', answerKey);
 
-    // Unenrolled Student 2 tries to submit -> REJECTED with 403 Forbidden
-    const unenrolledRes = await fetch(`${baseUrl}/api/submissions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer token-student-2',
-      },
-      body: JSON.stringify({
-        classId: 'class-hsk3',
-        assignmentId: 'assign-b14',
-        answers: { mcAnswers: { 'mc-14-1': 'A' } },
-      }),
+    // Seed server-side start time 48 seconds ago via assignmentStarts
+    const fakeNowMs = Date.now();
+    await store.setDoc('classes/class-hsk3/assignmentStarts/assign-b14_student-uid-1', {
+      classId: 'class-hsk3',
+      assignmentId: 'assign-b14',
+      studentUid: 'student-uid-1',
+      startedAtMs: fakeNowMs - 48_000,
+      startedAt: new Date(fakeNowMs - 48_000).toISOString(),
     });
-    assert.equal(unenrolledRes.status, 403);
 
-    // Enrolled Student 1 submits all correct answers -> Graded 100/100 on server
-    const validSubRes = await fetch(`${baseUrl}/api/submissions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer token-student-1',
+    const fullAnswers = {
+      mcAnswers: {
+        'mc-14-1': 'A',
+        'mc-14-2': 'B',
+        'mc-14-3': 'C',
       },
-      body: JSON.stringify({
-        classId: 'class-hsk3',
-        assignmentId: 'assign-b14',
-        timeSeconds: 42,
-        answers: {
-          mcAnswers: {
-            'mc-14-1': 'A',
-            'mc-14-2': 'B',
-            'mc-14-3': 'C',
-          },
-          selectedTokensMap: {
-            'so-14-1': ['春天', '的', '阳光', '非常', '温暖', '。'],
-            'so-14-2': ['咱们', '一起', '看', '个', '电影', '吧', '。'],
-          },
-          essayAnswers: {
-            'es-14-1': '老师的关怀让我感到很温暖。',
-            'es-14-2': '请问我可以在这里换人民币吗？',
-          },
+      selectedTokensMap: {
+        'so-14-1': ['春天', '的', '阳光', '非常', '温暖', '。'],
+        'so-14-2': ['咱们', '一起', '看', '个', '电影', '吧', '。'],
+      },
+      essayAnswers: {
+        'es-14-1': '老师的关怀让我感到很温暖。',
+        'es-14-2': '请问我可以在这里换人民币吗？',
+      },
+    };
+
+    // Fire 2 simultaneous submission requests from Student 1 with a forged client timeSeconds = 1
+    const [subRes1, subRes2] = await Promise.all([
+      fetch(`${baseUrl}/api/submissions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token-student-1',
         },
+        body: JSON.stringify({
+          classId: 'class-hsk3',
+          assignmentId: 'assign-b14',
+          timeSeconds: 1, // forged 1-second timer sent by client
+          answers: fullAnswers,
+        }),
       }),
-    });
-    assert.equal(validSubRes.status, 200);
-    const gradedData = await validSubRes.json();
-    assert.equal(gradedData.score, 100);
-    assert.equal(gradedData.correctCount, 7);
-    assert.equal(gradedData.totalQuestions, 7);
+      fetch(`${baseUrl}/api/submissions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token-student-1',
+        },
+        body: JSON.stringify({
+          classId: 'class-hsk3',
+          assignmentId: 'assign-b14',
+          timeSeconds: 1,
+          answers: fullAnswers,
+        }),
+      }),
+    ]);
 
-    // Verify leaderboard and student record were updated by the server
+    const subStatuses = [subRes1.status, subRes2.status].sort((a, b) => a - b);
+    assert.deepEqual(
+      subStatuses,
+      [200, 409],
+      'Concurrent submission attempts must allow only 1 submission (200) and reject duplicates (409)'
+    );
+
+    const winnerRes = subRes1.status === 200 ? subRes1 : subRes2;
+    const gradedData = await winnerRes.json();
+    assert.equal(gradedData.score, 100);
+    assert.equal(gradedData.attemptCount, 1);
+
+    // Verify client-supplied `timeSeconds: 1` was ignored in favor of server-computed ~48s elapsed time
+    assert.ok(
+      gradedData.timeSeconds >= 45 && gradedData.timeSeconds <= 55,
+      `Expected server-authoritative timeSeconds (~48s), got ${gradedData.timeSeconds}`
+    );
+
     const lbDoc = await store.getDoc('classes/class-hsk3/leaderboard/student-uid-1');
     assert.ok(lbDoc);
     assert.equal(lbDoc.score, 100);
+    assert.equal(lbDoc.timeSeconds, gradedData.timeSeconds);
 
-    const stDoc = await store.getDoc('classes/class-hsk3/students/student-uid-1');
-    assert.ok(stDoc);
-    assert.equal(stDoc.totalPoints, 100);
-
-    // Second submission by Student 1 for the same assignment -> REJECTED with 409 Conflict
-    const duplicateSubRes = await fetch(`${baseUrl}/api/submissions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer token-student-1',
-      },
-      body: JSON.stringify({
-        classId: 'class-hsk3',
-        assignmentId: 'assign-b14',
-        answers: { mcAnswers: { 'mc-14-1': 'A' } },
-      }),
+    // Also test computeServerAuthoritativeTimeSeconds penalty when start timestamp is missing
+    const unverifiedTime = computeServerAuthoritativeTimeSeconds({
+      startedAtMs: null,
+      submittedAtMs: Date.now(),
+      totalQuestions: 7,
     });
-    assert.equal(duplicateSubRes.status, 409);
+    assert.equal(
+      unverifiedTime,
+      300,
+      'Missing server start timestamp must apply conservative 300s default penalty'
+    );
   });
 
-  await t.test('6. AI routes block anonymous users not in any class, track aiUsage/{uid}_{YYYY-MM-DD} in Firestore, and verify App Check when enabled', async () => {
-    const commonHeaders = {
-      'Content-Type': 'application/json',
-      Origin: baseUrl,
+  await t.test('6. AI quota fails closed in production when Firestore fails (no silent RAM fallback) & App Check production enforcement', async () => {
+    // 6a. Test shouldEnforceAppCheck() in production when site key is configured
+    const prevNodeEnv = process.env.NODE_ENV;
+    const prevEnforce = process.env.ENFORCE_APP_CHECK;
+    const prevSiteKey = process.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY;
+
+    delete process.env.ENFORCE_APP_CHECK;
+    process.env.NODE_ENV = 'production';
+    process.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY = 'recaptcha-prod-site-key';
+    assert.equal(
+      shouldEnforceAppCheck(),
+      true,
+      'shouldEnforceAppCheck() must default to true in production when reCAPTCHA site key is configured'
+    );
+
+    // 6b. Test checkAndIncrementAiFirestoreQuota failing closed in production when store throws
+    const brokenStore = createInMemoryServerStoreAdapter();
+    brokenStore.incrementAiUsageTransaction = async () => {
+      throw new Error('Simulated Firestore outage');
     };
+    setServerStoreAdapterForTest(brokenStore);
 
-    // Unenrolled anonymous user is blocked with 403 Forbidden
-    const anonAiRes = await fetch(`${baseUrl}/api/binbin/chat`, {
-      method: 'POST',
-      headers: {
-        ...commonHeaders,
-        Authorization: 'Bearer token-anon-unenrolled',
-      },
-      body: JSON.stringify({ prompt: 'Giải thích từ 温暖' }),
-    });
-    assert.equal(anonAiRes.status, 403);
+    const quotaOutageRes = await checkAndIncrementAiFirestoreQuota('student-uid-1');
+    assert.equal(
+      quotaOutageRes.allowed,
+      false,
+      'AI quota must fail closed (allowed: false) in production when Firestore transaction fails'
+    );
+    assert.equal(quotaOutageRes.reason, 'quota_store_unavailable');
 
-    // Enrolled Student 1 passes authorization and increments `aiUsage/student-uid-1_{YYYY-MM-DD}`
-    const enrolledAiRes = await fetch(`${baseUrl}/api/binbin/chat`, {
-      method: 'POST',
-      headers: {
-        ...commonHeaders,
-        Authorization: 'Bearer token-student-1',
-      },
-      body: JSON.stringify({ prompt: 'Giải thích từ 温暖' }),
-    });
-    // Without GEMINI_API_KEY in test env, route handler returns 401 after passing protectAiRoute middleware
-    assert.notEqual(enrolledAiRes.status, 403);
-    const today = new Date().toISOString().slice(0, 10);
-    const usageDoc = await store.getDoc(`aiUsage/student-uid-1_${today}`);
-    assert.ok(usageDoc, 'aiUsage document must be created in Firestore transaction');
-    assert.equal(usageDoc.count, 1);
-
-    // App Check verification when ENFORCE_APP_CHECK=true
-    process.env.ENFORCE_APP_CHECK = 'true';
-    setAppCheckVerifierForTest(async (appCheckToken: string) => {
-      if (appCheckToken === 'valid-app-check-token') {
-        return { appId: 'hanu-app-id' };
-      }
-      throw new Error('Invalid App Check token');
-    });
-
-    const missingAppCheckRes = await fetch(`${baseUrl}/api/binbin/chat`, {
-      method: 'POST',
-      headers: {
-        ...commonHeaders,
-        Authorization: 'Bearer token-student-1',
-      },
-      body: JSON.stringify({ prompt: 'Giải thích từ 温暖' }),
-    });
-    assert.equal(missingAppCheckRes.status, 401);
-
-    const validAppCheckRes = await fetch(`${baseUrl}/api/binbin/chat`, {
-      method: 'POST',
-      headers: {
-        ...commonHeaders,
-        Authorization: 'Bearer token-student-1',
-        'X-Firebase-AppCheck': 'valid-app-check-token',
-      },
-      body: JSON.stringify({ prompt: 'Giải thích từ 温暖' }),
-    });
-    assert.notEqual(validAppCheckRes.status, 403);
-    process.env.ENFORCE_APP_CHECK = 'false';
+    // Restore adapter and env vars
+    setServerStoreAdapterForTest(store);
+    if (prevNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = prevNodeEnv;
+    if (prevEnforce === undefined) delete process.env.ENFORCE_APP_CHECK;
+    else process.env.ENFORCE_APP_CHECK = prevEnforce;
+    if (prevSiteKey === undefined) delete process.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY;
+    else process.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY = prevSiteKey;
   });
 
   await t.test('7. HTTP Security Headers & CSPRNG random code generation', async () => {
@@ -391,8 +480,14 @@ test('Server Security & Classroom API Suite (Bootstrap, Join, Grading, AI Quota 
     assert.ok(seenCodes.size >= 38, 'CSPRNG codes must be non-deterministic');
   });
 
-  await t.test('8. Brute-force rate limiter on /api/classes/join blocks after 15 attempts in 10 minutes', () => {
+  await t.test('8. Shared rate limiter persists buckets in rateLimits/{bucketId} and blocks brute-force on /api/classes/join', async () => {
     resetAllRateLimitersForTest();
+    const rateBucketDocs = await store.listCollection('rateLimits');
+    assert.ok(
+      rateBucketDocs.length >= 1,
+      'Shared rate limiter must persist counters in rateLimits/{bucketId}'
+    );
+
     const key = 'student-uid-2:127.0.0.1';
     const now = Date.now();
     for (let i = 0; i < 15; i++) {

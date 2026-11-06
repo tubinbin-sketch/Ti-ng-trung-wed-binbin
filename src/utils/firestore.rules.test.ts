@@ -156,11 +156,14 @@ class FirestoreRulesLocalVerifier {
       }
     }
 
+    const hasOnlyKeys = (obj: Record<string, any>, allowed: string[]) =>
+      Object.keys(obj || {}).every((k) => allowed.includes(k));
+
     // 2. /joinCodes/{code}
     if (segments.length === 2 && segments[0] === 'joinCodes') {
       const code = segments[1];
       if (op === 'get') {
-        return { allowed: this.isSignedIn(auth) && this.isValidId(code) };
+        return { allowed: this.isTeacher(auth) && this.isValidId(code) };
       }
       if (op === 'list' || op === 'update') {
         return { allowed: false };
@@ -171,6 +174,7 @@ class FirestoreRulesLocalVerifier {
           this.isValidId(code) &&
           code.length >= 6 &&
           !this.docs.has(`joinCodes/${code}`) &&
+          hasOnlyKeys(requestData, ['classId', 'teacherUid', 'createdAt']) &&
           typeof requestData.classId === 'string' &&
           this.isValidString(requestData.classId, 1, 128) &&
           this.isClassTeacher(auth, requestData.classId);
@@ -192,8 +196,6 @@ class FirestoreRulesLocalVerifier {
     // 3. /classes (collection list) or /classes/{classId}
     if (segments.length === 1 && segments[0] === 'classes' && op === 'list') {
       if (!this.isSignedIn(auth)) return { allowed: false };
-      // `allow list: if isSignedIn() && resource.data.teacherUid == request.auth.uid;`
-      // Listing all classes without filtering by `teacherUid == request.auth.uid` is rejected if any class belongs to another teacher
       for (const [k, v] of this.docs.entries()) {
         if (k.startsWith('classes/') && k.split('/').length === 2) {
           if (
@@ -211,6 +213,16 @@ class FirestoreRulesLocalVerifier {
     if (segments.length === 2 && segments[0] === 'classes') {
       const classId = segments[1];
       if (!this.isValidId(classId)) return { allowed: false };
+      const allowedClassKeys = [
+        'id',
+        'teacherUid',
+        'teacherName',
+        'name',
+        'hskLevel',
+        'joinCode',
+        'createdAt',
+        'updatedAt',
+      ];
       if (op === 'get') {
         return { allowed: this.isClassMember(auth, classId) };
       }
@@ -223,6 +235,7 @@ class FirestoreRulesLocalVerifier {
       if (op === 'create') {
         const allowed =
           this.isTeacher(auth) &&
+          hasOnlyKeys(requestData, allowedClassKeys) &&
           requestData.teacherUid === auth!.uid &&
           this.isValidString(requestData.name, 1, 160) &&
           this.isValidString(requestData.hskLevel, 1, 40) &&
@@ -233,6 +246,7 @@ class FirestoreRulesLocalVerifier {
       if (op === 'update') {
         const allowed =
           this.isTeacher(auth) &&
+          hasOnlyKeys(requestData, allowedClassKeys) &&
           existingData.teacherUid === auth!.uid &&
           requestData.teacherUid === existingData.teacherUid &&
           this.isValidString(requestData.name, 1, 160) &&
@@ -261,6 +275,25 @@ class FirestoreRulesLocalVerifier {
       if (!this.isValidId(classId) || !this.isValidId(studentUid)) {
         return { allowed: false };
       }
+      const allowedStudentKeys = [
+        'id',
+        'studentUid',
+        'studentCode',
+        'name',
+        'hskLevel',
+        'joinedAt',
+        'vocabScore',
+        'writingScore',
+        'quizScore',
+        'totalPoints',
+        'status',
+        'feedback',
+        'reviewWords',
+        'timeSeconds',
+        'streak',
+        'lastSubmittedAt',
+        'updatedAt',
+      ];
       if (op === 'get') {
         return {
           allowed:
@@ -273,6 +306,7 @@ class FirestoreRulesLocalVerifier {
       if (op === 'create') {
         const allowed =
           this.isClassTeacher(auth, classId) &&
+          hasOnlyKeys(requestData, allowedStudentKeys) &&
           this.isValidString(requestData.name, 1, 120) &&
           this.isValidString(requestData.studentCode, 6, 40);
         if (allowed) this.seed(cleanPath, requestData);
@@ -283,6 +317,7 @@ class FirestoreRulesLocalVerifier {
         const diffKeys = this.affectedKeys(existingData, merged);
         const teacherAllowed =
           this.isClassTeacher(auth, classId) &&
+          hasOnlyKeys(merged, allowedStudentKeys) &&
           this.isValidString(merged.name, 1, 120) &&
           this.isValidString(merged.studentCode, 6, 40);
         const studentNameOnlyAllowed =
@@ -292,6 +327,29 @@ class FirestoreRulesLocalVerifier {
           this.isValidString(merged.name, 1, 120);
         const allowed = teacherAllowed || studentNameOnlyAllowed;
         if (allowed) this.seed(cleanPath, merged);
+        return { allowed };
+      }
+      if (op === 'delete') {
+        return { allowed: this.isClassTeacher(auth, classId) };
+      }
+    }
+
+    // 3b-decks. /classes/{classId}/decks/{deckId}
+    if (segments.length === 4 && segments[0] === 'classes' && segments[2] === 'decks') {
+      const [, classId, , deckId] = segments;
+      if (!this.isValidId(classId) || !this.isValidId(deckId)) {
+        return { allowed: false };
+      }
+      if (op === 'get' || op === 'list') {
+        return { allowed: this.isClassMember(auth, classId) };
+      }
+      if (op === 'create' || op === 'update') {
+        const allowed =
+          this.isClassTeacher(auth, classId) &&
+          hasOnlyKeys(requestData, ['id', 'title', 'hskLevel', 'teacherUid', 'slides', 'updatedAt']) &&
+          requestData.teacherUid === auth!.uid &&
+          Array.isArray(requestData.slides);
+        if (allowed) this.seed(cleanPath, requestData);
         return { allowed };
       }
       if (op === 'delete') {
@@ -311,6 +369,26 @@ class FirestoreRulesLocalVerifier {
       if (op === 'create' || op === 'update') {
         const allowed =
           this.isClassTeacher(auth, classId) &&
+          hasOnlyKeys(requestData, [
+            'id',
+            'title',
+            'fileName',
+            'fileType',
+            'sessionTitle',
+            'sessionNumber',
+            'uploadedAt',
+            'dueDate',
+            'teacherName',
+            'teacherUid',
+            'rawContent',
+            'multipleChoiceList',
+            'sentenceOrderingList',
+            'essayList',
+            'questions',
+            'hskLevel',
+            'description',
+            'updatedAt',
+          ]) &&
           requestData.teacherUid === auth!.uid &&
           this.isValidString(requestData.title, 1, 240) &&
           !('answerKey' in requestData);
@@ -334,6 +412,16 @@ class FirestoreRulesLocalVerifier {
       if (op === 'create' || op === 'update') {
         const allowed =
           this.isClassTeacher(auth, classId) &&
+          hasOnlyKeys(requestData, [
+            'assignmentId',
+            'teacherUid',
+            'multipleChoiceAnswers',
+            'sentenceOrderingAnswers',
+            'essayModels',
+            'maxAttempts',
+            'updatedAt',
+            'answers',
+          ]) &&
           requestData.teacherUid === auth!.uid;
         if (allowed) this.seed(cleanPath, requestData);
         return { allowed };
@@ -373,24 +461,62 @@ class FirestoreRulesLocalVerifier {
       return { allowed: false };
     }
 
+    // 4. /users/{studentUid}/srs/{wordId}
+    if (segments.length === 4 && segments[0] === 'users' && segments[2] === 'srs') {
+      const [, studentUid, , wordId] = segments;
+      if (!this.isValidId(studentUid) || !this.isValidId(wordId)) {
+        return { allowed: false };
+      }
+      if (op === 'get' || op === 'list' || op === 'delete') {
+        return { allowed: this.isOwner(auth, studentUid) };
+      }
+      if (op === 'create' || op === 'update') {
+        const allowed =
+          this.isOwner(auth, studentUid) &&
+          hasOnlyKeys(requestData, [
+            'wordId',
+            'hanzi',
+            'pinyin',
+            'meaning',
+            'learned',
+            'intervalDays',
+            'easeFactor',
+            'repetitions',
+            'dueAt',
+            'nextReviewAt',
+            'lastReviewedAt',
+            'updatedAt',
+          ]) &&
+          this.isValidString(requestData.wordId, 1, 120) &&
+          this.isValidString(requestData.hanzi, 1, 40) &&
+          typeof requestData.learned === 'boolean';
+        if (allowed) this.seed(cleanPath, requestData);
+        return { allowed };
+      }
+    }
+
     return { allowed: false };
   }
 }
 
-test('firestore.rules structural verification — enforces all 7 security pillars', () => {
+test('firestore.rules structural verification — enforces all security pillars & keys().hasOnly() schema allowlists', () => {
   assert.ok(rulesSource.includes("request.auth.token.role == 'teacher'"));
   assert.ok(rulesSource.includes('match /joinCodes/{code}'));
+  assert.ok(rulesSource.includes('allow get: if isTeacher() && isValidId(code);'));
   assert.ok(rulesSource.includes('!exists(/databases/$(database)/documents/joinCodes/$(code))'));
   assert.ok(rulesSource.includes('allow list: if isSignedIn() && resource.data.teacherUid == request.auth.uid;'));
   assert.ok(rulesSource.includes("request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])"));
   assert.ok(rulesSource.includes('match /answerKeys/{assignmentId}'));
   assert.ok(rulesSource.includes('match /aiUsage/{usageId}'));
+  assert.ok(rulesSource.includes('match /rateLimits/{bucketId}'));
+  assert.ok(rulesSource.includes('match /studentCodeLocks/{studentCode}'));
+  assert.ok(rulesSource.includes('match /assignmentStarts/{startId}'));
 });
 
-test('6 Mandatory Attack Scenarios + Valid Flows — Rule Verification Suite', async (t) => {
+test('8 Mandatory Attack Scenarios + Valid Flows — Rule Verification Suite', async (t) => {
   const teacherA: AuthContext = {
     uid: 'teacher-uid-1',
-    token: { role: 'teacher', email: 'dondon.win10@gmail.com' },
+    token: { role: 'teacher', email: 'teacher.verified@hanu.edu.vn' },
   };
   const studentA: AuthContext = {
     uid: 'student-uid-1',
@@ -612,6 +738,81 @@ test('6 Mandatory Attack Scenarios + Valid Flows — Rule Verification Suite', a
       },
     });
     assert.equal(freshCode.allowed, true, 'Unique 6+ char joinCode by class teacher succeeds');
+  });
+
+  await t.test('Attack 7: Học sinh hoặc người lạ đọc trực tiếp /joinCodes/{code} từ Client SDK -> BỊ TỪ CHỐI (chỉ Giảng viên được get)', () => {
+    const studentReadJoinCode = verifier.evaluate({
+      op: 'get',
+      path: 'joinCodes/HSK-8K4M9P',
+      auth: studentA,
+    });
+    assert.equal(
+      studentReadJoinCode.allowed,
+      false,
+      'Student must NOT directly read /joinCodes/{code} from client SDK (must use POST /api/classes/join)'
+    );
+
+    const teacherReadJoinCode = verifier.evaluate({
+      op: 'get',
+      path: 'joinCodes/HSK-8K4M9P',
+      auth: teacherA,
+    });
+    assert.equal(teacherReadJoinCode.allowed, true, 'Teacher CAN read /joinCodes/{code} to verify uniqueness');
+  });
+
+  await t.test('Attack 8: Chèn trường lạ (shadow fields) vào classes, students, decks, assignments, answerKeys hoặc srs -> BỊ TỪ CHỐI bởi keys().hasOnly()', () => {
+    const pollutedClass = verifier.evaluate({
+      op: 'create',
+      path: 'classes/class-polluted',
+      auth: teacherA,
+      requestData: {
+        teacherUid: teacherA.uid,
+        name: 'Lớp Thử Nghiệm',
+        hskLevel: 'HSK 3',
+        joinCode: 'HSK-POLLUTE',
+        isAdminBypass: true, // disallowed key
+      },
+    });
+    assert.equal(pollutedClass.allowed, false, 'classes must reject unknown keys via keys().hasOnly()');
+
+    const pollutedDeck = verifier.evaluate({
+      op: 'create',
+      path: 'classes/class-hsk3/decks/main',
+      auth: teacherA,
+      requestData: {
+        title: 'Bộ từ HSK 3',
+        teacherUid: teacherA.uid,
+        slides: [],
+        maliciousScript: '<script>', // disallowed key
+      },
+    });
+    assert.equal(pollutedDeck.allowed, false, 'decks must reject unknown keys via keys().hasOnly()');
+
+    const pollutedSrs = verifier.evaluate({
+      op: 'create',
+      path: `users/${studentA.uid}/srs/word-1`,
+      auth: studentA,
+      requestData: {
+        wordId: 'word-1',
+        hanzi: '温暖',
+        learned: true,
+        roleEscalation: 'teacher', // disallowed key
+      },
+    });
+    assert.equal(pollutedSrs.allowed, false, 'srs must reject unknown keys via keys().hasOnly()');
+
+    const validSrs = verifier.evaluate({
+      op: 'create',
+      path: `users/${studentA.uid}/srs/word-1`,
+      auth: studentA,
+      requestData: {
+        wordId: 'word-1',
+        hanzi: '温暖',
+        learned: true,
+        intervalDays: 3,
+      },
+    });
+    assert.equal(validSrs.allowed, true, 'srs allows valid allowlisted schema');
   });
 
   // If FIRESTORE_EMULATOR_HOST is active (e.g. inside `firebase emulators:exec` in CI),

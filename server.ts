@@ -384,6 +384,62 @@ export interface ServerAnswerKeyRecord {
   updatedAt?: string;
 }
 
+export interface ClaimStudentSlotParams {
+  joinCode: string;
+  studentCode: string;
+  uid: string;
+  userName?: string;
+  nowIso: string;
+}
+
+export type ClaimStudentSlotResult =
+  | {
+      status: 'ok';
+      classroom: Record<string, any>;
+      studentRecord: Record<string, any>;
+    }
+  | {
+      status: 'error';
+      httpStatus: number;
+      error: string;
+    };
+
+export interface SubmitAssignmentTransactionParams {
+  classId: string;
+  assignmentId: string;
+  uid: string;
+  userName?: string;
+  answers: Record<string, any>;
+  configuredMaxAttempts: number;
+  nowMs: number;
+}
+
+export type SubmitAssignmentTransactionResult =
+  | {
+      status: 'ok';
+      payload: {
+        submissionId: string;
+        score: number;
+        correctCount: number;
+        totalQuestions: number;
+        attemptCount: number;
+        maxAttempts: number;
+        quizScore: string;
+        vocabScore: string;
+        writingScore: string;
+        reviewWords: string[];
+        status: 'Đã chấm tự động' | 'Cần kèm thêm';
+        feedback: string;
+        timeSeconds: number;
+        streak: number;
+      };
+    }
+  | {
+      status: 'error';
+      httpStatus: number;
+      error: string;
+    };
+
 export interface ServerStoreAdapter {
   getDoc(docPath: string): Promise<Record<string, any> | null>;
   setDoc(docPath: string, data: Record<string, any>, options?: { merge?: boolean }): Promise<void>;
@@ -395,6 +451,16 @@ export interface ServerStoreAdapter {
     dateStr: string,
     dailyLimit: number
   ): Promise<{ allowed: boolean; count: number; dailyLimit: number }>;
+  incrementRateLimitTransaction?(
+    bucketId: string,
+    maxRequests: number,
+    windowMs: number,
+    nowMs?: number
+  ): Promise<{ allowed: boolean; count: number; resetAt: number }>;
+  claimStudentSlotTransaction?(params: ClaimStudentSlotParams): Promise<ClaimStudentSlotResult>;
+  submitAssignmentTransaction?(
+    params: SubmitAssignmentTransactionParams
+  ): Promise<SubmitAssignmentTransactionResult>;
   setTeacherCustomClaim(uid: string): Promise<void>;
 }
 
@@ -447,6 +513,436 @@ const firestoreServerStoreAdapter: ServerStoreAdapter = {
       return { allowed: true, count: nextCount, dailyLimit };
     });
   },
+  async incrementRateLimitTransaction(
+    bucketId: string,
+    maxRequests: number,
+    windowMs: number,
+    nowMs = Date.now()
+  ) {
+    const safeId = bucketId.replace(/[^a-zA-Z0-9_.:-]/g, '_').slice(0, 180);
+    const docRef = adminDb.doc(`rateLimits/${safeId}`);
+    return await adminDb.runTransaction(async (tx) => {
+      const snap = await tx.get(docRef);
+      const data = snap.exists ? (snap.data() as Record<string, any>) : null;
+      const existingResetAt = Number(data?.resetAt || 0);
+      const existingCount = Number(data?.count || 0);
+
+      if (!data || nowMs > existingResetAt) {
+        const resetAt = nowMs + windowMs;
+        tx.set(docRef, {
+          bucketId: safeId,
+          count: 1,
+          resetAt,
+          updatedAt: new Date(nowMs).toISOString(),
+        });
+        return { allowed: true, count: 1, resetAt };
+      }
+
+      if (existingCount >= maxRequests) {
+        return { allowed: false, count: existingCount, resetAt: existingResetAt };
+      }
+
+      const nextCount = existingCount + 1;
+      tx.set(
+        docRef,
+        {
+          bucketId: safeId,
+          count: nextCount,
+          resetAt: existingResetAt,
+          updatedAt: new Date(nowMs).toISOString(),
+        },
+        { merge: true }
+      );
+      return { allowed: true, count: nextCount, resetAt: existingResetAt };
+    });
+  },
+  async claimStudentSlotTransaction(params: ClaimStudentSlotParams): Promise<ClaimStudentSlotResult> {
+    const { joinCode, studentCode, uid, userName, nowIso } = params;
+    const joinCodeRef = adminDb.doc(`joinCodes/${joinCode}`);
+
+    return await adminDb.runTransaction(async (tx) => {
+      const joinCodeSnap = await tx.get(joinCodeRef);
+      const joinCodeDoc = joinCodeSnap.exists ? (joinCodeSnap.data() as Record<string, any>) : null;
+      if (!joinCodeDoc || !joinCodeDoc.classId) {
+        return {
+          status: 'error',
+          httpStatus: 404,
+          error: `Không tìm thấy lớp học với mã lớp "${joinCode}".`,
+        };
+      }
+
+      const classId = String(joinCodeDoc.classId);
+      const classRef = adminDb.doc(`classes/${classId}`);
+      const ownStudentRef = adminDb.doc(`classes/${classId}/students/${uid}`);
+      const userRef = adminDb.doc(`users/${uid}`);
+
+      const [classSnap, ownStudentSnap, userSnap] = await Promise.all([
+        tx.get(classRef),
+        tx.get(ownStudentRef),
+        tx.get(userRef),
+      ]);
+
+      if (!classSnap.exists) {
+        return {
+          status: 'error',
+          httpStatus: 404,
+          error: 'Lớp học không còn tồn tại trên hệ thống.',
+        };
+      }
+
+      const classData = classSnap.data() as Record<string, any>;
+      const classroom = {
+        id: classId,
+        teacherUid: String(classData.teacherUid || ''),
+        teacherName: String(classData.teacherName || 'Giảng viên HSK'),
+        name: String(classData.name || 'Lớp HSK 3.0'),
+        hskLevel: String(classData.hskLevel || 'HSK 3'),
+        joinCode: String(classData.joinCode || joinCode),
+        createdAt: String(classData.createdAt || nowIso),
+        updatedAt: classData.updatedAt ? String(classData.updatedAt) : undefined,
+      };
+
+      if (ownStudentSnap.exists) {
+        const existingOwnStudent = ownStudentSnap.data() as Record<string, any>;
+        if (
+          studentCode &&
+          existingOwnStudent.studentCode &&
+          String(existingOwnStudent.studentCode).toUpperCase() !== studentCode
+        ) {
+          return {
+            status: 'error',
+            httpStatus: 403,
+            error: `Tài khoản của bạn đã gắn với mã học sinh ${existingOwnStudent.studentCode}. Không thể đổi sang mã ${studentCode}.`,
+          };
+        }
+
+        return {
+          status: 'ok',
+          classroom,
+          studentRecord: {
+            id: uid,
+            studentCode: String(existingOwnStudent.studentCode || studentCode),
+            name: String(existingOwnStudent.name || userName || 'Học viên'),
+            hskLevel: String(existingOwnStudent.hskLevel || classroom.hskLevel),
+            vocabScore: String(existingOwnStudent.vocabScore ?? ''),
+            writingScore: String(existingOwnStudent.writingScore ?? ''),
+            quizScore: String(existingOwnStudent.quizScore ?? ''),
+            totalPoints: Number(existingOwnStudent.totalPoints || 0),
+            status: String(existingOwnStudent.status || 'Chưa nộp'),
+            feedback: String(existingOwnStudent.feedback ?? ''),
+            timeSeconds: Number(existingOwnStudent.timeSeconds || 0),
+            streak: Number(existingOwnStudent.streak || 0),
+            reviewWords: Array.isArray(existingOwnStudent.reviewWords)
+              ? existingOwnStudent.reviewWords
+              : [],
+          },
+        };
+      }
+
+      if (!studentCode || studentCode.length < 6) {
+        return {
+          status: 'error',
+          httpStatus: 400,
+          error: 'Vui lòng nhập Mã học sinh hợp lệ (tối thiểu 6 ký tự) do Giảng viên cấp.',
+        };
+      }
+
+      const slotSlug = studentCode.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      const canonicalSlotRef = adminDb.doc(`classes/${classId}/students/slot-${slotSlug}`);
+      const lockRef = adminDb.doc(`classes/${classId}/studentCodeLocks/${studentCode}`);
+      const slotQuery = adminDb
+        .collection(`classes/${classId}/students`)
+        .where('studentCode', '==', studentCode);
+
+      const [canonicalSlotSnap, lockSnap, querySnap] = await Promise.all([
+        tx.get(canonicalSlotRef),
+        tx.get(lockRef),
+        tx.get(slotQuery),
+      ]);
+
+      const lockData = lockSnap.exists ? (lockSnap.data() as Record<string, any>) : null;
+      const lockedUid = String(lockData?.studentUid || '').trim();
+      if (lockedUid && lockedUid !== uid) {
+        return {
+          status: 'error',
+          httpStatus: 409,
+          error: `Mã học sinh "${studentCode}" đã được kích hoạt bởi một tài khoản khác.`,
+        };
+      }
+
+      let matchedSlotId: string | null = null;
+      let matchedSlotData: Record<string, any> | null = null;
+
+      if (canonicalSlotSnap.exists) {
+        matchedSlotId = canonicalSlotSnap.id;
+        matchedSlotData = canonicalSlotSnap.data() as Record<string, any>;
+      }
+
+      for (const docSnap of querySnap.docs) {
+        const d = docSnap.data() as Record<string, any>;
+        const boundUid = String(d.studentUid || '').trim();
+        if (boundUid && boundUid !== uid) {
+          return {
+            status: 'error',
+            httpStatus: 409,
+            error: `Mã học sinh "${studentCode}" đã được kích hoạt bởi một tài khoản khác.`,
+          };
+        }
+        if (!matchedSlotData) {
+          matchedSlotId = docSnap.id;
+          matchedSlotData = d;
+        }
+      }
+
+      if (!matchedSlotData || !matchedSlotId) {
+        return {
+          status: 'error',
+          httpStatus: 404,
+          error: `Mã học sinh "${studentCode}" chưa được Giảng viên cấp trong lớp "${classroom.name}".`,
+        };
+      }
+
+      const existingBoundUid = String(matchedSlotData.studentUid || '').trim();
+      if (existingBoundUid && existingBoundUid !== uid) {
+        return {
+          status: 'error',
+          httpStatus: 409,
+          error: `Mã học sinh "${studentCode}" đã được kích hoạt bởi một tài khoản khác.`,
+        };
+      }
+
+      const studentName = String(matchedSlotData.name || userName || studentCode)
+        .trim()
+        .slice(0, 120);
+      const hskLevel = String(matchedSlotData.hskLevel || classroom.hskLevel || 'HSK 3');
+      const joinedAt = String(matchedSlotData.joinedAt || nowIso.slice(0, 10));
+
+      const newStudentDoc = {
+        studentUid: uid,
+        studentCode,
+        name: studentName,
+        hskLevel,
+        joinedAt,
+        vocabScore: String(matchedSlotData.vocabScore ?? ''),
+        writingScore: String(matchedSlotData.writingScore ?? ''),
+        quizScore: String(matchedSlotData.quizScore ?? ''),
+        totalPoints: Number(matchedSlotData.totalPoints || 0),
+        status: String(matchedSlotData.status || 'Chưa nộp'),
+        feedback: String(matchedSlotData.feedback ?? ''),
+        timeSeconds: Number(matchedSlotData.timeSeconds || 0),
+        streak: Number(matchedSlotData.streak || 0),
+        reviewWords: Array.isArray(matchedSlotData.reviewWords) ? matchedSlotData.reviewWords : [],
+        updatedAt: nowIso,
+      };
+
+      tx.set(ownStudentRef, newStudentDoc);
+      tx.set(lockRef, {
+        studentCode,
+        studentUid: uid,
+        claimedAt: nowIso,
+      });
+
+      if (matchedSlotId !== uid) {
+        tx.set(
+          adminDb.doc(`classes/${classId}/students/${matchedSlotId}`),
+          {
+            ...matchedSlotData,
+            studentUid: uid,
+            updatedAt: nowIso,
+          },
+          { merge: true }
+        );
+      }
+
+      const existingUserDoc = userSnap.exists ? (userSnap.data() as Record<string, any>) : null;
+      const prevClasses = Array.isArray(existingUserDoc?.enrolledClassIds)
+        ? (existingUserDoc!.enrolledClassIds as string[])
+        : [];
+      const nextClasses = Array.from(new Set([...prevClasses, classId]));
+
+      tx.set(
+        userRef,
+        {
+          uid,
+          enrolledClassIds: nextClasses,
+          activeClassId: classId,
+          updatedAt: nowIso,
+        },
+        { merge: true }
+      );
+
+      return {
+        status: 'ok',
+        classroom,
+        studentRecord: {
+          id: uid,
+          ...newStudentDoc,
+        },
+      };
+    });
+  },
+  async submitAssignmentTransaction(
+    params: SubmitAssignmentTransactionParams
+  ): Promise<SubmitAssignmentTransactionResult> {
+    const { classId, assignmentId, uid, userName, answers, configuredMaxAttempts, nowMs } = params;
+    const studentRef = adminDb.doc(`classes/${classId}/students/${uid}`);
+    const answerKeyRef = adminDb.doc(`classes/${classId}/answerKeys/${assignmentId}`);
+    const submissionId = `${assignmentId}_${uid}`;
+    const submissionRef = adminDb.doc(`classes/${classId}/submissions/${submissionId}`);
+    const startRef = adminDb.doc(`classes/${classId}/assignmentStarts/${submissionId}`);
+    const leaderboardRef = adminDb.doc(`classes/${classId}/leaderboard/${uid}`);
+
+    return await adminDb.runTransaction(async (tx) => {
+      const [studentSnap, answerKeySnap, submissionSnap, startSnap] = await Promise.all([
+        tx.get(studentRef),
+        tx.get(answerKeyRef),
+        tx.get(submissionRef),
+        tx.get(startRef),
+      ]);
+
+      if (!studentSnap.exists) {
+        return {
+          status: 'error',
+          httpStatus: 403,
+          error: 'Forbidden: Bạn chưa tham gia lớp học này nên không thể nộp bài.',
+        };
+      }
+
+      const studentDoc = studentSnap.data() as Record<string, any>;
+      const storedAnswerKey = answerKeySnap.exists
+        ? (answerKeySnap.data() as ServerAnswerKeyRecord)
+        : null;
+      const answerKey: ServerAnswerKeyRecord | null =
+        storedAnswerKey || BUILTIN_SERVER_ANSWER_KEYS[assignmentId] || null;
+
+      if (!answerKey) {
+        return {
+          status: 'error',
+          httpStatus: 404,
+          error: `Không tìm thấy đáp án chấm điểm cho bài tập "${assignmentId}".`,
+        };
+      }
+
+      const maxAttempts = Math.max(
+        1,
+        Math.floor(Number(answerKey.maxAttempts || configuredMaxAttempts || 1))
+      );
+      const existingSub = submissionSnap.exists
+        ? (submissionSnap.data() as Record<string, any>)
+        : null;
+      const prevAttempts = existingSub ? Number(existingSub.attemptCount || 1) : 0;
+
+      if (prevAttempts >= maxAttempts) {
+        return {
+          status: 'error',
+          httpStatus: 409,
+          error: `Bạn đã nộp bài tập này (${prevAttempts}/${maxAttempts} lượt cho phép).`,
+        };
+      }
+
+      const studentCode = String(studentDoc.studentCode || 'HV-RANDOM');
+      const slotId = `slot-${studentCode.toLowerCase().replace(/[^a-z0-9_-]/g, '')}`;
+      const slotRef = adminDb.doc(`classes/${classId}/students/${slotId}`);
+      const slotSnap = slotId !== uid ? await tx.get(slotRef) : null;
+
+      const graded = gradeSubmissionPayloadOnServer({
+        answerKey,
+        answers,
+      });
+
+      const startData = startSnap.exists ? (startSnap.data() as Record<string, any>) : null;
+      const startedAtMs = Number(startData?.startedAtMs || 0);
+      const timeSeconds = computeServerAuthoritativeTimeSeconds({
+        startedAtMs: startedAtMs > 0 ? startedAtMs : null,
+        submittedAtMs: nowMs,
+        totalQuestions: graded.totalQuestions,
+      });
+
+      const nowIso = new Date(nowMs).toISOString();
+      const prevStreak = Number(studentDoc.streak || 0);
+      const nextStreak = prevStreak + 1;
+      const attemptCount = prevAttempts + 1;
+      const studentName = String(studentDoc.name || userName || 'Học viên');
+      const hskLevel = String(studentDoc.hskLevel || 'HSK 3');
+
+      const submissionDoc = {
+        id: submissionId,
+        studentUid: uid,
+        studentCode,
+        studentName,
+        assignmentId,
+        score: graded.score,
+        attemptCount,
+        quizScore: graded.quizScore,
+        vocabScore: graded.vocabScore,
+        writingScore: graded.writingScore,
+        reviewWords: graded.reviewWords,
+        feedback: graded.feedback,
+        answers,
+        timeSeconds,
+        submittedAt: nowIso,
+      };
+
+      tx.set(submissionRef, submissionDoc);
+      tx.set(leaderboardRef, {
+        studentUid: uid,
+        studentCode,
+        name: studentName,
+        hskLevel,
+        score: graded.score,
+        timeSeconds,
+        streak: nextStreak,
+        updatedAt: nowIso,
+      });
+
+      const updatedStudentFields = {
+        vocabScore: graded.vocabScore,
+        writingScore: graded.writingScore,
+        quizScore: graded.quizScore,
+        totalPoints: graded.score,
+        status: graded.status,
+        feedback: graded.feedback,
+        reviewWords: graded.reviewWords,
+        timeSeconds,
+        streak: nextStreak,
+        lastSubmittedAt: nowIso,
+        updatedAt: nowIso,
+      };
+
+      tx.set(studentRef, updatedStudentFields, { merge: true });
+
+      if (slotSnap && slotSnap.exists) {
+        tx.set(
+          slotRef,
+          {
+            ...updatedStudentFields,
+            studentUid: uid,
+          },
+          { merge: true }
+        );
+      }
+
+      return {
+        status: 'ok',
+        payload: {
+          submissionId,
+          score: graded.score,
+          correctCount: graded.correctCount,
+          totalQuestions: graded.totalQuestions,
+          attemptCount,
+          maxAttempts,
+          quizScore: graded.quizScore,
+          vocabScore: graded.vocabScore,
+          writingScore: graded.writingScore,
+          reviewWords: graded.reviewWords,
+          status: graded.status,
+          feedback: graded.feedback,
+          timeSeconds,
+          streak: nextStreak,
+        },
+      };
+    });
+  },
   async setTeacherCustomClaim(uid: string) {
     await getAdminAuth(firebaseAdminApp).setCustomUserClaims(uid, { role: 'teacher' });
   },
@@ -466,6 +962,17 @@ export function createInMemoryServerStoreAdapter(): ServerStoreAdapter & {
   const claims = new Map<string, Record<string, any>>();
 
   const normalize = (p: string) => p.replace(/^\/+|\/+$/g, '');
+
+  // Promise-queue mutex to guarantee strict serializability for transactions in concurrent unit tests
+  let txQueue: Promise<unknown> = Promise.resolve();
+  const runAtomic = <T>(fn: () => Promise<T>): Promise<T> => {
+    const next = txQueue.then(fn, fn);
+    txQueue = next.then(
+      () => undefined,
+      () => undefined
+    );
+    return next;
+  };
 
   return {
     docs,
@@ -505,20 +1012,408 @@ export function createInMemoryServerStoreAdapter(): ServerStoreAdapter & {
       dateStr: string,
       dailyLimit: number
     ) {
-      const key = normalize(`aiUsage/${usageId}`);
-      const existing = docs.get(key);
-      const currentCount = existing ? Number(existing.count || 0) : 0;
-      if (currentCount >= dailyLimit) {
-        return { allowed: false, count: currentCount, dailyLimit };
-      }
-      const nextCount = currentCount + 1;
-      docs.set(key, {
-        uid,
-        date: dateStr,
-        count: nextCount,
-        updatedAt: new Date().toISOString(),
+      return await runAtomic(async () => {
+        const key = normalize(`aiUsage/${usageId}`);
+        const existing = docs.get(key);
+        const currentCount = existing ? Number(existing.count || 0) : 0;
+        if (currentCount >= dailyLimit) {
+          return { allowed: false, count: currentCount, dailyLimit };
+        }
+        const nextCount = currentCount + 1;
+        docs.set(key, {
+          uid,
+          date: dateStr,
+          count: nextCount,
+          updatedAt: new Date().toISOString(),
+        });
+        return { allowed: true, count: nextCount, dailyLimit };
       });
-      return { allowed: true, count: nextCount, dailyLimit };
+    },
+    async incrementRateLimitTransaction(
+      bucketId: string,
+      maxRequests: number,
+      windowMs: number,
+      nowMs = Date.now()
+    ) {
+      return await runAtomic(async () => {
+        const safeId = bucketId.replace(/[^a-zA-Z0-9_.:-]/g, '_').slice(0, 180);
+        const key = normalize(`rateLimits/${safeId}`);
+        const existing = docs.get(key);
+        const existingResetAt = Number(existing?.resetAt || 0);
+        const existingCount = Number(existing?.count || 0);
+
+        if (!existing || nowMs > existingResetAt) {
+          const resetAt = nowMs + windowMs;
+          docs.set(key, {
+            bucketId: safeId,
+            count: 1,
+            resetAt,
+            updatedAt: new Date(nowMs).toISOString(),
+          });
+          return { allowed: true, count: 1, resetAt };
+        }
+
+        if (existingCount >= maxRequests) {
+          return { allowed: false, count: existingCount, resetAt: existingResetAt };
+        }
+
+        const nextCount = existingCount + 1;
+        docs.set(key, {
+          bucketId: safeId,
+          count: nextCount,
+          resetAt: existingResetAt,
+          updatedAt: new Date(nowMs).toISOString(),
+        });
+        return { allowed: true, count: nextCount, resetAt: existingResetAt };
+      });
+    },
+    async claimStudentSlotTransaction(
+      params: ClaimStudentSlotParams
+    ): Promise<ClaimStudentSlotResult> {
+      return await runAtomic(async () => {
+        const { joinCode, studentCode, uid, userName, nowIso } = params;
+        const joinCodeDoc = docs.get(normalize(`joinCodes/${joinCode}`));
+        if (!joinCodeDoc || !joinCodeDoc.classId) {
+          return {
+            status: 'error',
+            httpStatus: 404,
+            error: `Không tìm thấy lớp học với mã lớp "${joinCode}".`,
+          };
+        }
+
+        const classId = String(joinCodeDoc.classId);
+        const classData = docs.get(normalize(`classes/${classId}`));
+        if (!classData) {
+          return {
+            status: 'error',
+            httpStatus: 404,
+            error: 'Lớp học không còn tồn tại trên hệ thống.',
+          };
+        }
+
+        const classroom = {
+          id: classId,
+          teacherUid: String(classData.teacherUid || ''),
+          teacherName: String(classData.teacherName || 'Giảng viên HSK'),
+          name: String(classData.name || 'Lớp HSK 3.0'),
+          hskLevel: String(classData.hskLevel || 'HSK 3'),
+          joinCode: String(classData.joinCode || joinCode),
+          createdAt: String(classData.createdAt || nowIso),
+          updatedAt: classData.updatedAt ? String(classData.updatedAt) : undefined,
+        };
+
+        const ownStudentKey = normalize(`classes/${classId}/students/${uid}`);
+        const existingOwnStudent = docs.get(ownStudentKey);
+        if (existingOwnStudent) {
+          if (
+            studentCode &&
+            existingOwnStudent.studentCode &&
+            String(existingOwnStudent.studentCode).toUpperCase() !== studentCode
+          ) {
+            return {
+              status: 'error',
+              httpStatus: 403,
+              error: `Tài khoản của bạn đã gắn với mã học sinh ${existingOwnStudent.studentCode}. Không thể đổi sang mã ${studentCode}.`,
+            };
+          }
+
+          return {
+            status: 'ok',
+            classroom,
+            studentRecord: {
+              id: uid,
+              studentCode: String(existingOwnStudent.studentCode || studentCode),
+              name: String(existingOwnStudent.name || userName || 'Học viên'),
+              hskLevel: String(existingOwnStudent.hskLevel || classroom.hskLevel),
+              vocabScore: String(existingOwnStudent.vocabScore ?? ''),
+              writingScore: String(existingOwnStudent.writingScore ?? ''),
+              quizScore: String(existingOwnStudent.quizScore ?? ''),
+              totalPoints: Number(existingOwnStudent.totalPoints || 0),
+              status: String(existingOwnStudent.status || 'Chưa nộp'),
+              feedback: String(existingOwnStudent.feedback ?? ''),
+              timeSeconds: Number(existingOwnStudent.timeSeconds || 0),
+              streak: Number(existingOwnStudent.streak || 0),
+              reviewWords: Array.isArray(existingOwnStudent.reviewWords)
+                ? structuredClone(existingOwnStudent.reviewWords)
+                : [],
+            },
+          };
+        }
+
+        if (!studentCode || studentCode.length < 6) {
+          return {
+            status: 'error',
+            httpStatus: 400,
+            error: 'Vui lòng nhập Mã học sinh hợp lệ (tối thiểu 6 ký tự) do Giảng viên cấp.',
+          };
+        }
+
+        const lockKey = normalize(`classes/${classId}/studentCodeLocks/${studentCode}`);
+        const existingLock = docs.get(lockKey);
+        if (existingLock && existingLock.studentUid && existingLock.studentUid !== uid) {
+          return {
+            status: 'error',
+            httpStatus: 409,
+            error: `Mã học sinh "${studentCode}" đã được kích hoạt bởi một tài khoản khác.`,
+          };
+        }
+
+        const prefix = normalize(`classes/${classId}/students`) + '/';
+        let matchedSlot: { id: string; data: Record<string, any> } | null = null;
+        for (const [k, v] of docs.entries()) {
+          if (k.startsWith(prefix)) {
+            const remainder = k.slice(prefix.length);
+            if (!remainder.includes('/')) {
+              if (String(v.studentCode || '').toUpperCase() === studentCode) {
+                const boundUid = String(v.studentUid || '').trim();
+                if (boundUid && boundUid !== uid) {
+                  return {
+                    status: 'error',
+                    httpStatus: 409,
+                    error: `Mã học sinh "${studentCode}" đã được kích hoạt bởi một tài khoản khác.`,
+                  };
+                }
+                if (!matchedSlot) {
+                  matchedSlot = { id: remainder, data: structuredClone(v) };
+                }
+              }
+            }
+          }
+        }
+
+        if (!matchedSlot) {
+          return {
+            status: 'error',
+            httpStatus: 404,
+            error: `Mã học sinh "${studentCode}" chưa được Giảng viên cấp trong lớp "${classroom.name}".`,
+          };
+        }
+
+        const boundUid = String(matchedSlot.data.studentUid || '').trim();
+        if (boundUid && boundUid !== uid) {
+          return {
+            status: 'error',
+            httpStatus: 409,
+            error: `Mã học sinh "${studentCode}" đã được kích hoạt bởi một tài khoản khác.`,
+          };
+        }
+
+        const studentName = String(matchedSlot.data.name || userName || studentCode)
+          .trim()
+          .slice(0, 120);
+        const hskLevel = String(matchedSlot.data.hskLevel || classroom.hskLevel || 'HSK 3');
+        const joinedAt = String(matchedSlot.data.joinedAt || nowIso.slice(0, 10));
+
+        const newStudentDoc = {
+          studentUid: uid,
+          studentCode,
+          name: studentName,
+          hskLevel,
+          joinedAt,
+          vocabScore: String(matchedSlot.data.vocabScore ?? ''),
+          writingScore: String(matchedSlot.data.writingScore ?? ''),
+          quizScore: String(matchedSlot.data.quizScore ?? ''),
+          totalPoints: Number(matchedSlot.data.totalPoints || 0),
+          status: String(matchedSlot.data.status || 'Chưa nộp'),
+          feedback: String(matchedSlot.data.feedback ?? ''),
+          timeSeconds: Number(matchedSlot.data.timeSeconds || 0),
+          streak: Number(matchedSlot.data.streak || 0),
+          reviewWords: Array.isArray(matchedSlot.data.reviewWords)
+            ? structuredClone(matchedSlot.data.reviewWords)
+            : [],
+          updatedAt: nowIso,
+        };
+
+        docs.set(ownStudentKey, structuredClone(newStudentDoc));
+        docs.set(lockKey, {
+          studentCode,
+          studentUid: uid,
+          claimedAt: nowIso,
+        });
+
+        if (matchedSlot.id !== uid) {
+          const slotKey = normalize(`classes/${classId}/students/${matchedSlot.id}`);
+          docs.set(slotKey, {
+            ...structuredClone(matchedSlot.data),
+            studentUid: uid,
+            updatedAt: nowIso,
+          });
+        }
+
+        const userKey = normalize(`users/${uid}`);
+        const existingUserDoc = docs.get(userKey);
+        const prevClasses = Array.isArray(existingUserDoc?.enrolledClassIds)
+          ? (existingUserDoc!.enrolledClassIds as string[])
+          : [];
+        const nextClasses = Array.from(new Set([...prevClasses, classId]));
+        docs.set(userKey, {
+          ...(existingUserDoc ? structuredClone(existingUserDoc) : {}),
+          uid,
+          enrolledClassIds: nextClasses,
+          activeClassId: classId,
+          updatedAt: nowIso,
+        });
+
+        return {
+          status: 'ok',
+          classroom,
+          studentRecord: {
+            id: uid,
+            ...newStudentDoc,
+          },
+        };
+      });
+    },
+    async submitAssignmentTransaction(
+      params: SubmitAssignmentTransactionParams
+    ): Promise<SubmitAssignmentTransactionResult> {
+      return await runAtomic(async () => {
+        const { classId, assignmentId, uid, userName, answers, configuredMaxAttempts, nowMs } =
+          params;
+        const studentDocKey = normalize(`classes/${classId}/students/${uid}`);
+        const studentDoc = docs.get(studentDocKey);
+        if (!studentDoc) {
+          return {
+            status: 'error',
+            httpStatus: 403,
+            error: 'Forbidden: Bạn chưa tham gia lớp học này nên không thể nộp bài.',
+          };
+        }
+
+        const storedAnswerKey = docs.get(
+          normalize(`classes/${classId}/answerKeys/${assignmentId}`)
+        ) as ServerAnswerKeyRecord | undefined;
+        const answerKey: ServerAnswerKeyRecord | null =
+          storedAnswerKey || BUILTIN_SERVER_ANSWER_KEYS[assignmentId] || null;
+
+        if (!answerKey) {
+          return {
+            status: 'error',
+            httpStatus: 404,
+            error: `Không tìm thấy đáp án chấm điểm cho bài tập "${assignmentId}".`,
+          };
+        }
+
+        const maxAttempts = Math.max(
+          1,
+          Math.floor(Number(answerKey.maxAttempts || configuredMaxAttempts || 1))
+        );
+        const submissionId = `${assignmentId}_${uid}`;
+        const submissionKey = normalize(`classes/${classId}/submissions/${submissionId}`);
+        const existingSub = docs.get(submissionKey);
+        const prevAttempts = existingSub ? Number(existingSub.attemptCount || 1) : 0;
+
+        if (prevAttempts >= maxAttempts) {
+          return {
+            status: 'error',
+            httpStatus: 409,
+            error: `Bạn đã nộp bài tập này (${prevAttempts}/${maxAttempts} lượt cho phép).`,
+          };
+        }
+
+        const graded = gradeSubmissionPayloadOnServer({
+          answerKey,
+          answers,
+        });
+
+        const startKey = normalize(`classes/${classId}/assignmentStarts/${submissionId}`);
+        const startDoc = docs.get(startKey);
+        const startedAtMs = Number(startDoc?.startedAtMs || 0);
+        const timeSeconds = computeServerAuthoritativeTimeSeconds({
+          startedAtMs: startedAtMs > 0 ? startedAtMs : null,
+          submittedAtMs: nowMs,
+          totalQuestions: graded.totalQuestions,
+        });
+
+        const nowIso = new Date(nowMs).toISOString();
+        const prevStreak = Number(studentDoc.streak || 0);
+        const nextStreak = prevStreak + 1;
+        const attemptCount = prevAttempts + 1;
+
+        const studentCode = String(studentDoc.studentCode || 'HV-RANDOM');
+        const studentName = String(studentDoc.name || userName || 'Học viên');
+        const hskLevel = String(studentDoc.hskLevel || 'HSK 3');
+
+        const submissionDoc = {
+          id: submissionId,
+          studentUid: uid,
+          studentCode,
+          studentName,
+          assignmentId,
+          score: graded.score,
+          attemptCount,
+          quizScore: graded.quizScore,
+          vocabScore: graded.vocabScore,
+          writingScore: graded.writingScore,
+          reviewWords: graded.reviewWords,
+          feedback: graded.feedback,
+          answers: structuredClone(answers),
+          timeSeconds,
+          submittedAt: nowIso,
+        };
+
+        docs.set(submissionKey, structuredClone(submissionDoc));
+        docs.set(normalize(`classes/${classId}/leaderboard/${uid}`), {
+          studentUid: uid,
+          studentCode,
+          name: studentName,
+          hskLevel,
+          score: graded.score,
+          timeSeconds,
+          streak: nextStreak,
+          updatedAt: nowIso,
+        });
+
+        const updatedStudentFields = {
+          vocabScore: graded.vocabScore,
+          writingScore: graded.writingScore,
+          quizScore: graded.quizScore,
+          totalPoints: graded.score,
+          status: graded.status,
+          feedback: graded.feedback,
+          reviewWords: graded.reviewWords,
+          timeSeconds,
+          streak: nextStreak,
+          lastSubmittedAt: nowIso,
+          updatedAt: nowIso,
+        };
+
+        docs.set(studentDocKey, {
+          ...structuredClone(studentDoc),
+          ...updatedStudentFields,
+        });
+
+        const slotId = `slot-${studentCode.toLowerCase().replace(/[^a-z0-9_-]/g, '')}`;
+        const slotKey = normalize(`classes/${classId}/students/${slotId}`);
+        const existingSlot = docs.get(slotKey);
+        if (existingSlot) {
+          docs.set(slotKey, {
+            ...structuredClone(existingSlot),
+            ...updatedStudentFields,
+            studentUid: uid,
+          });
+        }
+
+        return {
+          status: 'ok',
+          payload: {
+            submissionId,
+            score: graded.score,
+            correctCount: graded.correctCount,
+            totalQuestions: graded.totalQuestions,
+            attemptCount,
+            maxAttempts,
+            quizScore: graded.quizScore,
+            vocabScore: graded.vocabScore,
+            writingScore: graded.writingScore,
+            reviewWords: graded.reviewWords,
+            status: graded.status,
+            feedback: graded.feedback,
+            timeSeconds,
+            streak: nextStreak,
+          },
+        };
+      });
     },
     async setTeacherCustomClaim(uid: string) {
       claims.set(uid, { role: 'teacher' });
@@ -574,16 +1469,28 @@ export async function verifyFirebaseIdToken(
   return {
     uid: decoded.uid,
     email: decoded.email,
-    emailVerified: decoded.email_verified !== false,
+    // Strictly require boolean true; never treat undefined/missing email_verified as verified
+    emailVerified: decoded.email_verified === true,
     name: typeof decoded.name === 'string' ? decoded.name : undefined,
     role: typeof (decoded as any).role === 'string' ? (decoded as any).role : undefined,
     signInProvider: decoded.firebase?.sign_in_provider,
   };
 }
 
+export function shouldEnforceAppCheck(): boolean {
+  const raw = process.env.ENFORCE_APP_CHECK?.trim().toLowerCase();
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  // In production, automatically enforce App Check when reCAPTCHA Enterprise site key is configured
+  return (
+    process.env.NODE_ENV === 'production' &&
+    Boolean(process.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY?.trim())
+  );
+}
+
 export async function verifyRequestAppCheck(req: Request): Promise<boolean> {
   const token = String(req.headers['x-firebase-appcheck'] || '').trim();
-  const enforce = process.env.ENFORCE_APP_CHECK === 'true';
+  const enforce = shouldEnforceAppCheck();
 
   if (customAppCheckVerifierForTest) {
     if (!token) {
@@ -614,9 +1521,10 @@ export async function verifyRequestAppCheck(req: Request): Promise<boolean> {
 }
 
 export function getTeacherEmailAllowlist(): string[] {
-  const raw =
-    process.env.TEACHER_EMAIL_ALLOWLIST?.trim() ||
-    'dondon.win10@gmail.com,teacher@hanu.edu.vn';
+  const raw = process.env.TEACHER_EMAIL_ALLOWLIST?.trim() || '';
+  if (!raw) {
+    return [];
+  }
   return raw
     .split(',')
     .map((s) => s.trim().toLowerCase())
@@ -629,6 +1537,52 @@ export function isEmailInTeacherAllowlist(email?: string): boolean {
   if (!clean) return false;
   const allowlist = getTeacherEmailAllowlist();
   return allowlist.includes(clean);
+}
+
+export function isStrictFirestoreAiQuotaEnabled(): boolean {
+  const raw = process.env.STRICT_FIRESTORE_AI_QUOTA?.trim().toLowerCase();
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return process.env.NODE_ENV === 'production';
+}
+
+export async function checkSharedRateLimit(params: {
+  scope: string;
+  key: string;
+  maxRequests: number;
+  windowMs: number;
+  nowMs?: number;
+  memoryCheck: () => { allowed: boolean };
+}): Promise<{ allowed: boolean }> {
+  const { scope, key, maxRequests, windowMs, nowMs = Date.now(), memoryCheck } = params;
+  const localResult = memoryCheck();
+  if (!localResult.allowed) {
+    return { allowed: false };
+  }
+
+  if (typeof activeServerStore.incrementRateLimitTransaction !== 'function') {
+    return localResult;
+  }
+
+  try {
+    const bucketId = `${scope}_${key}`;
+    const sharedResult = await activeServerStore.incrementRateLimitTransaction(
+      bucketId,
+      maxRequests,
+      windowMs,
+      nowMs
+    );
+    return { allowed: sharedResult.allowed };
+  } catch (err) {
+    if (
+      process.env.NODE_ENV === 'production' ||
+      process.env.STRICT_SHARED_RATE_LIMIT === 'true'
+    ) {
+      console.error('[server] Shared rate limit transaction failed in strict mode:', err);
+      return { allowed: false };
+    }
+    return localResult;
+  }
 }
 
 export function checkAndIncrementAiUidQuota(
@@ -668,7 +1622,12 @@ export function checkAndIncrementAiUidQuota(
 export async function checkAndIncrementAiFirestoreQuota(
   uid: string,
   now = new Date()
-): Promise<{ allowed: boolean; reason?: 'minute_limit' | 'daily_limit'; dailyLimit: number; count?: number }> {
+): Promise<{
+  allowed: boolean;
+  reason?: 'minute_limit' | 'daily_limit' | 'quota_store_unavailable';
+  dailyLimit: number;
+  count?: number;
+}> {
   const cleanUid = uid.trim();
   const dailyLimit = getAiDailyLimit();
   const nowMs = now.getTime();
@@ -698,8 +1657,12 @@ export async function checkAndIncrementAiFirestoreQuota(
       return { allowed: false, reason: 'daily_limit', dailyLimit, count: txRes.count };
     }
     return { allowed: true, dailyLimit, count: txRes.count };
-  } catch {
-    // Fallback to in-memory daily counter only if local ADC is unavailable in dev
+  } catch (err) {
+    if (isStrictFirestoreAiQuotaEnabled()) {
+      console.error('[server] Strict Firestore AI quota store unavailable:', err);
+      return { allowed: false, reason: 'quota_store_unavailable', dailyLimit };
+    }
+    // Fallback to in-memory daily counter only in local dev when ADC is unavailable
     const fallback = checkAndIncrementAiUidQuota(cleanUid, nowMs);
     return fallback;
   }
@@ -709,8 +1672,11 @@ export async function isUserAuthorizedForAi(
   user: VerifiedFirebaseUser,
   hintClassId?: string
 ): Promise<boolean> {
-  // 1. Teacher role custom claim or allowlisted teacher email
-  if (user.role === 'teacher' || isEmailInTeacherAllowlist(user.email)) {
+  // 1. Teacher role custom claim or allowlisted teacher email (only if email is verified)
+  if (
+    user.role === 'teacher' ||
+    (user.emailVerified === true && isEmailInTeacherAllowlist(user.email))
+  ) {
     return true;
   }
 
@@ -899,6 +1865,14 @@ async function protectAiRoute(req: Request, res: Response, next: NextFunction) {
   // Rate-limit by verified Firebase UID (minute burst + Firestore transaction aiUsage/{uid}_{YYYY-MM-DD})
   const quotaResult = await checkAndIncrementAiFirestoreQuota(verifiedUser.uid);
   if (!quotaResult.allowed) {
+    if (quotaResult.reason === 'quota_store_unavailable') {
+      res.status(503).json({
+        error:
+          'Hệ thống kiểm soát hạn mức AI tạm thời gián đoạn. Vui lòng thử lại sau ít phút.',
+        fallback: true,
+      });
+      return;
+    }
     if (quotaResult.reason === 'minute_limit') {
       res.status(429).json({
         error: 'AI rate limit exceeded for this user (uid). Please wait a moment.',
@@ -932,6 +1906,37 @@ export function generateServerRandomCode(prefix = 'HV', length = 6): string {
 }
 
 /**
+ * Computes authoritative elapsed time on the server without trusting client `timeSeconds`.
+ * - If a server-recorded `startedAtMs` exists, computes `Math.round((submittedAtMs - startedAtMs) / 1000)`
+ *   clamped to `[minFloorSeconds, 3600]`, where `minFloorSeconds = Math.max(5, totalQuestions * 2)`.
+ * - If `startedAtMs` is absent or invalid, applies a conservative unverified default penalty (`300s`),
+ *   preventing clients from forging fast leaderboard times by skipping `/api/assignments/start`.
+ */
+export function computeServerAuthoritativeTimeSeconds(params: {
+  startedAtMs?: number | null;
+  submittedAtMs: number;
+  totalQuestions: number;
+}): number {
+  const { startedAtMs, submittedAtMs, totalQuestions } = params;
+  const safeQuestions = Math.max(1, Math.floor(Number(totalQuestions || 1)));
+  const minFloorSeconds = Math.max(5, safeQuestions * 2);
+  const maxCeilingSeconds = 3600;
+  const unverifiedPenaltySeconds = Math.max(minFloorSeconds, 300);
+
+  if (
+    typeof startedAtMs === 'number' &&
+    Number.isFinite(startedAtMs) &&
+    startedAtMs > 0 &&
+    submittedAtMs >= startedAtMs
+  ) {
+    const elapsedSeconds = Math.round((submittedAtMs - startedAtMs) / 1000);
+    return Math.max(minFloorSeconds, Math.min(maxCeilingSeconds, elapsedSeconds));
+  }
+
+  return unverifiedPenaltySeconds;
+}
+
+/**
  * Built-in server fallback answer keys for preset assignments (`assign-b14`, `assign-b15`, `speedtest-10`)
  * when a teacher assigns a preset package before saving a custom answerKey doc.
  */
@@ -959,8 +1964,8 @@ const BUILTIN_SERVER_ANSWER_KEYS: Record<string, ServerAnswerKeyRecord> = {
     teacherUid: 'system',
     multipleChoiceAnswers: {
       'mc-15-1': 'A',
-      'mc-15-2': 'A',
-      'mc-15-3': 'A',
+      'mc-15-2': 'B',
+      'mc-15-3': 'C',
     },
     sentenceOrderingAnswers: {
       'so-15-1': ['下午', '我', '想', '去', '超市', '买', '一件', '外套', '。'],
@@ -976,22 +1981,32 @@ const BUILTIN_SERVER_ANSWER_KEYS: Record<string, ServerAnswerKeyRecord> = {
     assignmentId: 'speedtest-10',
     teacherUid: 'system',
     multipleChoiceAnswers: {
-      'st-1': '温暖',
-      'st-2': '咱们',
-      'st-3': '愿意',
-      'st-4': '空调',
-      'st-5': '洗衣机',
-      'st-6': '换',
-      'st-7': '初中',
-      'st-8': '花园',
-      'st-9': '刻',
-      'st-10': '幸福',
+      'stq-1': 'B. wēn nuǎn',
+      'stq-2': 'C. 咱们 (zánmen)',
+      'stq-3': 'A. 办法 (bànfǎ - cách giải quyết)',
+      'stq-4': 'D. 我明天去图书馆复习。',
+      'stq-5': 'B. Khá là / rất (nhấn mạnh mức độ vừa phải, tự nhiên)',
+      'stq-6': 'C. Bộ Tài gẩy (扌)',
+      'stq-7': 'D. Thanh 2 (ní hǎo / hén hǎo)',
+      'stq-8': 'A. Chăm sóc, quan tâm',
+      'stq-9': 'B. 我很愿意帮助你。',
+      'stq-10': 'C. 一年有四个季节：春、夏、秋、冬。',
     },
     sentenceOrderingAnswers: {},
     essayModels: {},
     maxAttempts: 1,
   },
 };
+
+function matchesExpectedMultipleChoiceOption(actualRaw: string, expectedRaw: string): boolean {
+  const actual = actualRaw.trim().toUpperCase();
+  const expected = expectedRaw.trim().toUpperCase();
+  if (!actual || !expected) return false;
+  if (actual === expected) return true;
+  if (expected.length === 1 && actual.startsWith(`${expected}.`)) return true;
+  if (actual.length === 1 && expected.startsWith(`${actual}.`)) return true;
+  return false;
+}
 
 export function gradeSubmissionPayloadOnServer(params: {
   answerKey: ServerAnswerKeyRecord;
@@ -1025,7 +2040,7 @@ export function gradeSubmissionPayloadOnServer(params: {
   for (const [qId, expectedKey] of Object.entries(answerKey.multipleChoiceAnswers || {})) {
     totalQuestions += 1;
     const actual = String(mcAnswers[qId] ?? (answers as any)?.[qId] ?? '').trim();
-    if (actual && actual.toUpperCase() === String(expectedKey).trim().toUpperCase()) {
+    if (matchesExpectedMultipleChoiceOption(actual, String(expectedKey))) {
       correctCount += 1;
     }
   }
@@ -1084,17 +2099,33 @@ export function gradeSubmissionPayloadOnServer(params: {
 
 /**
  * 4A. Teacher Bootstrap Route: POST /api/teachers/bootstrap
- * Verifies that the authenticated user's email is in TEACHER_EMAIL_ALLOWLIST,
- * sets custom claim `role = 'teacher'`, and creates/updates `/teachers/{uid}`.
+ * Verifies that the authenticated user's email is verified (`emailVerified === true`)
+ * AND present in TEACHER_EMAIL_ALLOWLIST, sets custom claim `role = 'teacher'`,
+ * and creates/updates `/teachers/{uid}`.
  */
 app.post('/api/teachers/bootstrap', async (req, res) => {
   const verifiedUser = await authenticateBearerRequest(req, res);
   if (!verifiedUser) return;
 
+  const rateKey = `${verifiedUser.uid}:${resolveClientIp(req)}`;
+  const bootstrapRate = await checkSharedRateLimit({
+    scope: 'teacher_bootstrap',
+    key: rateKey,
+    maxRequests: JOIN_CLASS_MAX_ATTEMPTS,
+    windowMs: JOIN_CLASS_WINDOW_MS,
+    memoryCheck: () => checkJoinClassRateLimit(`bootstrap:${rateKey}`),
+  });
+  if (!bootstrapRate.allowed) {
+    res.status(429).json({
+      error: 'Bạn đã gửi quá nhiều yêu cầu xác thực Giảng viên. Vui lòng thử lại sau ít phút.',
+    });
+    return;
+  }
+
   const email = (verifiedUser.email || '').trim().toLowerCase();
-  if (verifiedUser.emailVerified === false) {
+  if (verifiedUser.emailVerified !== true) {
     res.status(403).json({
-      error: 'Email tài khoản chưa được xác thực (email_verified = false).',
+      error: 'Email tài khoản chưa được xác thực (yêu cầu emailVerified === true).',
     });
     return;
   }
@@ -1140,15 +2171,21 @@ app.post('/api/teachers/bootstrap', async (req, res) => {
 /**
  * 4B. Server-Mediated Class Joining Route: POST /api/classes/join
  * Body: { joinCode: string, studentCode?: string }
- * Uses firebase-admin to verify joinCode -> classId, studentCode slot availability,
- * and writes `classes/{classId}/students/{uid}` with zeroed initial score/feedback fields.
+ * Uses an atomic transaction (`claimStudentSlotTransaction`) to verify joinCode -> classId,
+ * enforce studentCode slot uniqueness against race conditions, and write `classes/{classId}/students/{uid}`.
  */
 app.post('/api/classes/join', async (req, res) => {
   const verifiedUser = await authenticateBearerRequest(req, res);
   if (!verifiedUser) return;
 
-  const rateKey = `${verifiedUser.uid}:${req.ip || 'local'}`;
-  const joinRate = checkJoinClassRateLimit(rateKey);
+  const rateKey = `${verifiedUser.uid}:${resolveClientIp(req)}`;
+  const joinRate = await checkSharedRateLimit({
+    scope: 'join_class',
+    key: rateKey,
+    maxRequests: JOIN_CLASS_MAX_ATTEMPTS,
+    windowMs: JOIN_CLASS_WINDOW_MS,
+    memoryCheck: () => checkJoinClassRateLimit(rateKey),
+  });
   if (!joinRate.allowed) {
     res.status(429).json({
       error: 'Bạn đã thử nhập mã lớp quá nhiều lần. Vui lòng đợi 10 phút trước khi thử lại.',
@@ -1173,175 +2210,30 @@ app.post('/api/classes/join', async (req, res) => {
   }
 
   try {
-    // 1. Lookup joinCodes/{joinCode}
-    const joinCodeDoc = await activeServerStore.getDoc(`joinCodes/${cleanJoinCode}`);
-    if (!joinCodeDoc || !joinCodeDoc.classId) {
-      res.status(404).json({
-        error: `Không tìm thấy lớp học với mã lớp "${cleanJoinCode}".`,
+    const nowIso = new Date().toISOString();
+    if (typeof activeServerStore.claimStudentSlotTransaction === 'function') {
+      const txResult = await activeServerStore.claimStudentSlotTransaction({
+        joinCode: cleanJoinCode,
+        studentCode: cleanStudentCode,
+        uid: verifiedUser.uid,
+        userName: verifiedUser.name,
+        nowIso,
       });
-      return;
-    }
 
-    const classId = String(joinCodeDoc.classId);
-    const classData = await activeServerStore.getDoc(`classes/${classId}`);
-    if (!classData) {
-      res.status(404).json({
-        error: 'Lớp học không còn tồn tại trên hệ thống.',
-      });
-      return;
-    }
-
-    const classroom = {
-      id: classId,
-      teacherUid: String(classData.teacherUid || ''),
-      teacherName: String(classData.teacherName || 'Giảng viên HSK'),
-      name: String(classData.name || 'Lớp HSK 3.0'),
-      hskLevel: String(classData.hskLevel || 'HSK 3'),
-      joinCode: String(classData.joinCode || cleanJoinCode),
-      createdAt: String(classData.createdAt || new Date().toISOString()),
-      updatedAt: classData.updatedAt ? String(classData.updatedAt) : undefined,
-    };
-
-    // 2. Check if student already has a record at classes/{classId}/students/{uid}
-    const existingOwnStudent = await activeServerStore.getDoc(
-      `classes/${classId}/students/${verifiedUser.uid}`
-    );
-    if (existingOwnStudent) {
-      if (
-        cleanStudentCode &&
-        existingOwnStudent.studentCode &&
-        String(existingOwnStudent.studentCode).toUpperCase() !== cleanStudentCode
-      ) {
-        res.status(403).json({
-          error: `Tài khoản của bạn đã gắn với mã học sinh ${existingOwnStudent.studentCode}. Không thể đổi sang mã ${cleanStudentCode}.`,
-        });
+      if (txResult.status === 'error') {
+        res.status(txResult.httpStatus).json({ error: txResult.error });
         return;
       }
 
-      const studentRecord = {
-        id: verifiedUser.uid,
-        studentCode: String(existingOwnStudent.studentCode || cleanStudentCode),
-        name: String(existingOwnStudent.name || verifiedUser.name || 'Học viên'),
-        hskLevel: String(existingOwnStudent.hskLevel || classroom.hskLevel),
-        vocabScore: String(existingOwnStudent.vocabScore ?? ''),
-        writingScore: String(existingOwnStudent.writingScore ?? ''),
-        quizScore: String(existingOwnStudent.quizScore ?? ''),
-        totalPoints: Number(existingOwnStudent.totalPoints || 0),
-        status: String(existingOwnStudent.status || 'Chưa nộp'),
-        feedback: String(existingOwnStudent.feedback ?? ''),
-        timeSeconds: Number(existingOwnStudent.timeSeconds || 0),
-        streak: Number(existingOwnStudent.streak || 0),
-        reviewWords: Array.isArray(existingOwnStudent.reviewWords)
-          ? existingOwnStudent.reviewWords
-          : [],
-      };
-
-      res.status(200).json({ classroom, studentRecord });
-      return;
-    }
-
-    // 3. Require a valid teacher-issued studentCode slot that has not been claimed by another uid
-    if (!cleanStudentCode || cleanStudentCode.length < 6) {
-      res.status(400).json({
-        error: 'Vui lòng nhập Mã học sinh hợp lệ (tối thiểu 6 ký tự) do Giảng viên cấp.',
+      res.status(200).json({
+        classroom: txResult.classroom,
+        studentRecord: txResult.studentRecord,
       });
       return;
     }
 
-    const allStudentDocs = await activeServerStore.listCollection(
-      `classes/${classId}/students`
-    );
-    const matchedSlot = allStudentDocs.find(
-      (docItem) =>
-        String(docItem.data.studentCode || '').toUpperCase() === cleanStudentCode
-    );
-
-    if (!matchedSlot) {
-      res.status(404).json({
-        error: `Mã học sinh "${cleanStudentCode}" chưa được Giảng viên cấp trong lớp "${classroom.name}".`,
-      });
-      return;
-    }
-
-    const boundUid = String(matchedSlot.data.studentUid || '').trim();
-    if (boundUid && boundUid !== verifiedUser.uid) {
-      res.status(409).json({
-        error: `Mã học sinh "${cleanStudentCode}" đã được kích hoạt bởi một tài khoản khác.`,
-      });
-      return;
-    }
-
-    const nowIso = new Date().toISOString();
-    const studentName = String(
-      matchedSlot.data.name || verifiedUser.name || cleanStudentCode
-    )
-      .trim()
-      .slice(0, 120);
-    const hskLevel = String(matchedSlot.data.hskLevel || classroom.hskLevel || 'HSK 3');
-    const joinedAt = String(matchedSlot.data.joinedAt || nowIso.slice(0, 10));
-
-    const newStudentDoc = {
-      studentUid: verifiedUser.uid,
-      studentCode: cleanStudentCode,
-      name: studentName,
-      hskLevel,
-      joinedAt,
-      vocabScore: String(matchedSlot.data.vocabScore ?? ''),
-      writingScore: String(matchedSlot.data.writingScore ?? ''),
-      quizScore: String(matchedSlot.data.quizScore ?? ''),
-      totalPoints: Number(matchedSlot.data.totalPoints || 0),
-      status: String(matchedSlot.data.status || 'Chưa nộp'),
-      feedback: String(matchedSlot.data.feedback ?? ''),
-      timeSeconds: Number(matchedSlot.data.timeSeconds || 0),
-      streak: Number(matchedSlot.data.streak || 0),
-      reviewWords: Array.isArray(matchedSlot.data.reviewWords)
-        ? matchedSlot.data.reviewWords
-        : [],
-      updatedAt: nowIso,
-    };
-
-    // Write canonical student doc keyed by student's UID
-    await activeServerStore.setDoc(
-      `classes/${classId}/students/${verifiedUser.uid}`,
-      newStudentDoc
-    );
-
-    // Mark the teacher slot as claimed by this studentUid
-    if (matchedSlot.id !== verifiedUser.uid) {
-      await activeServerStore.setDoc(
-        `classes/${classId}/students/${matchedSlot.id}`,
-        {
-          ...matchedSlot.data,
-          studentUid: verifiedUser.uid,
-          updatedAt: nowIso,
-        },
-        { merge: true }
-      );
-    }
-
-    // Record enrollment in users/{uid} so AI routes know this student belongs to a class
-    const existingUserDoc = await activeServerStore.getDoc(`users/${verifiedUser.uid}`);
-    const prevClasses = Array.isArray(existingUserDoc?.enrolledClassIds)
-      ? (existingUserDoc!.enrolledClassIds as string[])
-      : [];
-    const nextClasses = Array.from(new Set([...prevClasses, classId]));
-    await activeServerStore.setDoc(
-      `users/${verifiedUser.uid}`,
-      {
-        uid: verifiedUser.uid,
-        enrolledClassIds: nextClasses,
-        activeClassId: classId,
-        updatedAt: nowIso,
-      },
-      { merge: true }
-    );
-
-    res.status(200).json({
-      classroom,
-      studentRecord: {
-        id: verifiedUser.uid,
-        ...newStudentDoc,
-      },
+    res.status(500).json({
+      error: 'Cơ chế giao dịch nhận lớp chưa sẵn sàng.',
     });
   } catch (err) {
     console.error('[server] /api/classes/join error', err);
@@ -1402,11 +2294,15 @@ app.post('/api/classes/:classId/students/:studentCode/reset-slot', async (req, r
       if (oldUid && docItem.id === oldUid) {
         baseRecord = docItem.data;
         await activeServerStore.deleteDoc(`classes/${classId}/students/${oldUid}`);
-      } else if (!docItem.id.startsWith('slot-')) {
-        await activeServerStore.deleteDoc(`classes/${classId}/students/${docItem.id}`);
       } else {
         await activeServerStore.deleteDoc(`classes/${classId}/students/${docItem.id}`);
       }
+    }
+
+    // Clear previous studentCode lock so the re-issued slot can be claimed cleanly
+    await activeServerStore.deleteDoc(`classes/${classId}/studentCodeLocks/${targetCode}`);
+    if (nextStudentCode !== targetCode) {
+      await activeServerStore.deleteDoc(`classes/${classId}/studentCodeLocks/${nextStudentCode}`);
     }
 
     const newSlotId = `slot-${nextStudentCode.toLowerCase().replace(/[^a-z0-9_-]/g, '')}`;
@@ -1434,10 +2330,91 @@ app.post('/api/classes/:classId/students/:studentCode/reset-slot', async (req, r
 });
 
 /**
+ * 4D-Start. Server-Side Assignment Timer Start Route: POST /api/assignments/start
+ * Body: { classId, assignmentId }
+ * Records an authoritative server-side `startedAtMs` timestamp at
+ * `classes/{classId}/assignmentStarts/{assignmentId}_{uid}` so `/api/submissions`
+ * computes elapsed `timeSeconds` without trusting client-reported timers.
+ */
+app.post('/api/assignments/start', async (req, res) => {
+  const verifiedUser = await authenticateBearerRequest(req, res);
+  if (!verifiedUser) return;
+
+  const classId = String(req.body?.classId || '').trim();
+  const assignmentId = String(req.body?.assignmentId || 'default-assignment').trim();
+
+  if (!classId || !/^[a-zA-Z0-9_-]{1,128}$/.test(classId)) {
+    res.status(400).json({ error: 'classId không hợp lệ.' });
+    return;
+  }
+  if (!assignmentId || !/^[a-zA-Z0-9_-]{1,128}$/.test(assignmentId)) {
+    res.status(400).json({ error: 'assignmentId không hợp lệ.' });
+    return;
+  }
+
+  try {
+    const studentDoc = await activeServerStore.getDoc(
+      `classes/${classId}/students/${verifiedUser.uid}`
+    );
+    if (!studentDoc) {
+      res.status(403).json({
+        error: 'Forbidden: Bạn chưa tham gia lớp học này.',
+      });
+      return;
+    }
+
+    const startId = `${assignmentId}_${verifiedUser.uid}`;
+    const startPath = `classes/${classId}/assignmentStarts/${startId}`;
+    const existingStart = await activeServerStore.getDoc(startPath);
+    const existingSub = await activeServerStore.getDoc(
+      `classes/${classId}/submissions/${startId}`
+    );
+
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+
+    // Preserve initial start time if an active unsubmitted session already exists
+    if (existingStart && Number(existingStart.startedAtMs || 0) > 0 && !existingSub) {
+      res.status(200).json({
+        ok: true,
+        classId,
+        assignmentId,
+        startedAtMs: Number(existingStart.startedAtMs),
+        startedAt: String(existingStart.startedAt || nowIso),
+      });
+      return;
+    }
+
+    await activeServerStore.setDoc(startPath, {
+      classId,
+      assignmentId,
+      studentUid: verifiedUser.uid,
+      startedAtMs: nowMs,
+      startedAt: nowIso,
+    });
+
+    res.status(200).json({
+      ok: true,
+      classId,
+      assignmentId,
+      startedAtMs: nowMs,
+      startedAt: nowIso,
+    });
+  } catch (err) {
+    console.error('[server] /api/assignments/start error', err);
+    res.status(500).json({
+      error: 'Không thể khởi tạo phiên làm bài lúc này.',
+    });
+  }
+});
+
+/**
  * 4D. Server-Side Homework Grading Route: POST /api/submissions
- * Body: { classId, assignmentId, answers, timeSeconds? }
- * Verifies student membership in classId, enforces max attempts, grades against
- * `classes/{classId}/answerKeys/{assignmentId}`, and writes `submissions`, `leaderboard`, and `students`.
+ * Body: { classId, assignmentId, answers }
+ * Executes a single atomic transaction (`submitAssignmentTransaction`) that verifies
+ * student membership, checks `attemptCount < maxAttempts`, grades against
+ * `classes/{classId}/answerKeys/{assignmentId}`, computes server-authoritative `timeSeconds`,
+ * and writes `submissions`, `leaderboard`, and `students`.
  */
 app.post('/api/submissions', async (req, res) => {
   const verifiedUser = await authenticateBearerRequest(req, res);
@@ -1449,7 +2426,6 @@ app.post('/api/submissions', async (req, res) => {
     req.body?.answers && typeof req.body.answers === 'object'
       ? (req.body.answers as Record<string, any>)
       : null;
-  const rawTimeSeconds = Number(req.body?.timeSeconds || 0);
 
   if (!classId || !/^[a-zA-Z0-9_-]{1,128}$/.test(classId)) {
     res.status(400).json({ error: 'classId không hợp lệ.' });
@@ -1465,146 +2441,29 @@ app.post('/api/submissions', async (req, res) => {
   }
 
   try {
-    // 1. Verify student is enrolled in this class
-    const studentDocPath = `classes/${classId}/students/${verifiedUser.uid}`;
-    const studentDoc = await activeServerStore.getDoc(studentDocPath);
-    if (!studentDoc) {
-      res.status(403).json({
-        error: 'Forbidden: Bạn chưa tham gia lớp học này nên không thể nộp bài.',
-      });
-      return;
-    }
-
-    // 2. Load secret answerKey from Firestore (or fallback to built-in preset answer key)
-    const storedAnswerKey = (await activeServerStore.getDoc(
-      `classes/${classId}/answerKeys/${assignmentId}`
-    )) as ServerAnswerKeyRecord | null;
-    const answerKey: ServerAnswerKeyRecord | null =
-      storedAnswerKey || BUILTIN_SERVER_ANSWER_KEYS[assignmentId] || null;
-
-    if (!answerKey) {
-      res.status(404).json({
-        error: `Không tìm thấy đáp án chấm điểm cho bài tập "${assignmentId}".`,
-      });
-      return;
-    }
-
-    // 3. Enforce max submission attempts on deterministic submission doc ID `{assignmentId}_{uid}`
     const configuredMax = Number(process.env.MAX_SUBMISSION_ATTEMPTS || 1);
-    const maxAttempts = Math.max(
-      1,
-      Math.floor(Number(answerKey.maxAttempts || configuredMax || 1))
-    );
-    const submissionId = `${assignmentId}_${verifiedUser.uid}`;
-    const submissionPath = `classes/${classId}/submissions/${submissionId}`;
-    const existingSub = await activeServerStore.getDoc(submissionPath);
-    const prevAttempts = existingSub ? Number(existingSub.attemptCount || 1) : 0;
-
-    if (prevAttempts >= maxAttempts) {
-      res.status(409).json({
-        error: `Bạn đã nộp bài tập này (${prevAttempts}/${maxAttempts} lượt cho phép).`,
+    if (typeof activeServerStore.submitAssignmentTransaction === 'function') {
+      const txResult = await activeServerStore.submitAssignmentTransaction({
+        classId,
+        assignmentId,
+        uid: verifiedUser.uid,
+        userName: verifiedUser.name,
+        answers,
+        configuredMaxAttempts: configuredMax,
+        nowMs: Date.now(),
       });
+
+      if (txResult.status === 'error') {
+        res.status(txResult.httpStatus).json({ error: txResult.error });
+        return;
+      }
+
+      res.status(200).json(txResult.payload);
       return;
     }
 
-    // 4. Grade answers on the server against answerKey
-    const graded = gradeSubmissionPayloadOnServer({
-      answerKey,
-      answers,
-    });
-
-    const nowIso = new Date().toISOString();
-    const timeSeconds =
-      Number.isFinite(rawTimeSeconds) && rawTimeSeconds > 0
-        ? Math.max(5, Math.min(3600, Math.round(rawTimeSeconds)))
-        : 30;
-    const prevStreak = Number(studentDoc.streak || 0);
-    const nextStreak = prevStreak + 1;
-    const attemptCount = prevAttempts + 1;
-
-    const studentCode = String(studentDoc.studentCode || 'HV-RANDOM');
-    const studentName = String(studentDoc.name || verifiedUser.name || 'Học viên');
-    const hskLevel = String(studentDoc.hskLevel || 'HSK 3');
-
-    const submissionDoc = {
-      id: submissionId,
-      studentUid: verifiedUser.uid,
-      studentCode,
-      studentName,
-      assignmentId,
-      score: graded.score,
-      attemptCount,
-      quizScore: graded.quizScore,
-      vocabScore: graded.vocabScore,
-      writingScore: graded.writingScore,
-      reviewWords: graded.reviewWords,
-      feedback: graded.feedback,
-      answers,
-      submittedAt: nowIso,
-    };
-
-    await activeServerStore.setDoc(submissionPath, submissionDoc);
-
-    // 5. Update leaderboard summary via Admin SDK
-    await activeServerStore.setDoc(`classes/${classId}/leaderboard/${verifiedUser.uid}`, {
-      studentUid: verifiedUser.uid,
-      studentCode,
-      name: studentName,
-      hskLevel,
-      score: graded.score,
-      timeSeconds,
-      streak: nextStreak,
-      updatedAt: nowIso,
-    });
-
-    // 6. Update student's score/status/feedback fields in classes/{classId}/students/{uid}
-    const updatedStudentFields = {
-      vocabScore: graded.vocabScore,
-      writingScore: graded.writingScore,
-      quizScore: graded.quizScore,
-      totalPoints: graded.score,
-      status: graded.status,
-      feedback: graded.feedback,
-      reviewWords: graded.reviewWords,
-      timeSeconds,
-      streak: nextStreak,
-      lastSubmittedAt: nowIso,
-      updatedAt: nowIso,
-    };
-
-    await activeServerStore.setDoc(studentDocPath, updatedStudentFields, { merge: true });
-
-    // Also keep any pre-registered slot doc in sync for teacher roster view
-    const slotId = `slot-${studentCode.toLowerCase().replace(/[^a-z0-9_-]/g, '')}`;
-    const existingSlot = await activeServerStore.getDoc(
-      `classes/${classId}/students/${slotId}`
-    );
-    if (existingSlot) {
-      await activeServerStore.setDoc(
-        `classes/${classId}/students/${slotId}`,
-        {
-          ...updatedStudentFields,
-          studentUid: verifiedUser.uid,
-        },
-        { merge: true }
-      );
-    }
-
-    res.status(200).json({
-      submissionId,
-      score: graded.score,
-      correctCount: graded.correctCount,
-      totalQuestions: graded.totalQuestions,
-      attemptCount,
-      maxAttempts,
-      quizScore: graded.quizScore,
-      vocabScore: graded.vocabScore,
-      writingScore: graded.writingScore,
-      reviewWords: graded.reviewWords,
-      status: graded.status,
-      feedback: graded.feedback,
-      timeSeconds,
-      streak: nextStreak,
+    res.status(500).json({
+      error: 'Cơ chế giao dịch chấm bài chưa sẵn sàng.',
     });
   } catch (err) {
     console.error('[server] /api/submissions error', err);

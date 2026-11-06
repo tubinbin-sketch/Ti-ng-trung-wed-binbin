@@ -831,10 +831,66 @@ export async function deleteTeacherStudentSlotFromFirestore(
   }
 }
 
+export interface ServerSubmissionResponse {
+  submissionId: string;
+  score: number;
+  correctCount: number;
+  totalQuestions: number;
+  attemptCount: number;
+  maxAttempts: number;
+  quizScore: string;
+  vocabScore: string;
+  writingScore: string;
+  reviewWords: string[];
+  status: 'Đã chấm tự động' | 'Cần kèm thêm';
+  feedback: string;
+  timeSeconds: number;
+  streak: number;
+}
+
+/**
+ * Notifies the server (`POST /api/assignments/start`) that the authenticated student
+ * has begun working on `assignmentId` in `classId` so the server records an authoritative
+ * `startedAtMs` timestamp for leaderboard ranking.
+ */
+export async function startStudentAssignmentOnServer(params: {
+  classId: string;
+  assignmentId: string;
+}): Promise<{ ok: boolean; startedAtMs?: number }> {
+  if (!params.classId || !params.assignmentId) {
+    return { ok: false };
+  }
+  try {
+    const authHeaders = await getFirebaseAuthHeaders();
+    const response = await fetch('/api/assignments/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+      },
+      body: JSON.stringify({
+        classId: params.classId,
+        assignmentId: params.assignmentId,
+      }),
+    });
+    if (!response.ok) {
+      return { ok: false };
+    }
+    const payload = await response.json().catch(() => ({}));
+    return {
+      ok: true,
+      startedAtMs: typeof payload?.startedAtMs === 'number' ? payload.startedAtMs : undefined,
+    };
+  } catch {
+    return { ok: false };
+  }
+}
+
 /**
  * Student submits an assignment through the server (`POST /api/submissions`).
  * The server verifies class membership, checks maxAttempts, grades against `answerKeys`,
- * and writes `submissions/{assignmentId}_{uid}`, `leaderboard/{uid}`, and `students/{uid}`.
+ * computes server-authoritative elapsed `timeSeconds`, and writes `submissions/{assignmentId}_{uid}`,
+ * `leaderboard/{uid}`, and `students/{uid}` inside a single atomic transaction.
  */
 export async function submitStudentAssignmentToFirestore(params: {
   classId: string;
@@ -853,7 +909,7 @@ export async function submitStudentAssignmentToFirestore(params: {
   quizCorrectCount?: number;
   quizTotalCount?: number;
   reviewWords?: string[];
-}): Promise<string> {
+}): Promise<ServerSubmissionResponse> {
   const authHeaders = await getFirebaseAuthHeaders();
   const response = await fetch('/api/submissions', {
     method: 'POST',
@@ -865,7 +921,6 @@ export async function submitStudentAssignmentToFirestore(params: {
       classId: params.classId,
       assignmentId: params.assignmentId || 'default-assignment',
       answers: params.answers || {},
-      timeSeconds: params.timeSeconds,
     }),
   });
 
@@ -876,7 +931,23 @@ export async function submitStudentAssignmentToFirestore(params: {
     );
   }
 
-  return String(payload.submissionId || `${params.assignmentId}_${params.studentUid}`);
+  return {
+    submissionId: String(payload.submissionId || `${params.assignmentId}_${params.studentUid}`),
+    score: Number(payload.score ?? params.score ?? 0),
+    correctCount: Number(payload.correctCount ?? 0),
+    totalQuestions: Number(payload.totalQuestions ?? 1),
+    attemptCount: Number(payload.attemptCount ?? 1),
+    maxAttempts: Number(payload.maxAttempts ?? 1),
+    quizScore: String(payload.quizScore || ''),
+    vocabScore: String(payload.vocabScore || ''),
+    writingScore: String(payload.writingScore || ''),
+    reviewWords: Array.isArray(payload.reviewWords) ? payload.reviewWords : [],
+    status:
+      payload.status === 'Cần kèm thêm' ? 'Cần kèm thêm' : 'Đã chấm tự động',
+    feedback: String(payload.feedback || ''),
+    timeSeconds: Number(payload.timeSeconds ?? 300),
+    streak: Number(payload.streak ?? 1),
+  };
 }
 
 /**

@@ -43,6 +43,7 @@ import {
 import {
   auth,
   saveStudentSrsWordToFirestore,
+  startStudentAssignmentOnServer,
   submitStudentAssignmentToFirestore,
 } from '../firebase';
 import { appStore, useAppStoreSelector } from '../context/AppStoreContext';
@@ -227,7 +228,25 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
     setEssayAnswers({});
     setIsSubmitted(false);
     setPandaMood('idle');
+    const activeSession = loadActiveClassroomSession();
+    if (getClassroomDataMode() !== 'demo' && activeSession?.classId) {
+      void startStudentAssignmentOnServer({
+        classId: activeSession.classId,
+        assignmentId: assignmentPackage.id || 'homework-hsk3',
+      });
+    }
   }, [assignmentPackage.id]);
+
+  useEffect(() => {
+    if (!isSpeedTestRunning) return;
+    const activeSession = loadActiveClassroomSession();
+    if (getClassroomDataMode() !== 'demo' && activeSession?.classId) {
+      void startStudentAssignmentOnServer({
+        classId: activeSession.classId,
+        assignmentId: 'speedtest-10',
+      });
+    }
+  }, [isSpeedTestRunning]);
 
   const syncMistakeWordsToSrsBook = (wrongHanzis: string[]) => {
     const cleanWords = Array.from(new Set(wrongHanzis.map((w) => w.trim()).filter(Boolean)));
@@ -354,8 +373,45 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
           quizCorrectCount: params.quizCorrect,
           quizTotalCount: params.quizTotal,
           reviewWords: params.reviewWords,
-          timeSeconds: params.elapsedSec,
-        }).catch(() => {});
+        })
+          .then((serverRes) => {
+            const authoritativeRoster = applyStudentSubmissionToRoster(getStoredStudentRoster(), {
+              studentName: activeStudentName,
+              totalScore: serverRes.score,
+              learnedVocabCount: params.learnedVocab,
+              totalVocabCount: params.totalVocab,
+              writingAccuracy: params.writingAccuracy,
+              quizCorrectCount: serverRes.correctCount || params.quizCorrect,
+              quizTotalCount: serverRes.totalQuestions || params.quizTotal,
+              reviewWords:
+                serverRes.reviewWords.length > 0 ? serverRes.reviewWords : params.reviewWords,
+              timeSeconds: serverRes.timeSeconds,
+              streakDelta: 0,
+            });
+            localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(authoritativeRoster));
+            setRoster(authoritativeRoster);
+            setLastSubmittedTimeSeconds(serverRes.timeSeconds);
+            setLastSubmittedStreak(serverRes.streak);
+            if (params.assignmentId === 'speedtest-10') {
+              setSpeedTestScore(serverRes.score);
+            }
+            const rankMeta = computeRankFromRoster(authoritativeRoster, activeStudentName);
+            setSyncedSubmissionSummary((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    totalScore: serverRes.score,
+                    timeSeconds: serverRes.timeSeconds,
+                    streak: serverRes.streak,
+                    rank: rankMeta.rank,
+                    reviewWords:
+                      serverRes.reviewWords.length > 0 ? serverRes.reviewWords : prev.reviewWords,
+                  }
+                : prev
+            );
+            appStore.notifyStudentsUpdated(authoritativeRoster.length);
+          })
+          .catch(() => {});
       }
     } catch {
       // ignore
