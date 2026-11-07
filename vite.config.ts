@@ -2,10 +2,131 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import {VitePWA} from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: [
+          'favicon.svg',
+          'icon.svg',
+          'apple-touch-icon.png',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
+          'pwa-maskable-512x512.png',
+          'illustrations/*.svg',
+        ],
+        manifest: {
+          name: 'HANU HSK — Học tiếng Trung chuẩn HSK 3.0',
+          short_name: 'Bin-Bin HSK',
+          description:
+            'Nền tảng học tiếng Trung HSK 1–9, luyện viết chữ Hán ô Mễ Tự Cách, ôn tập Flashcard SRS ngoại tuyến và quản lý lớp học.',
+          theme_color: '#b83227',
+          background_color: '#faf7f2',
+          display: 'standalone',
+          orientation: 'portrait',
+          scope: '/',
+          start_url: '/hoc',
+          lang: 'vi',
+          icons: [
+            {
+              src: '/pwa-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: '/pwa-maskable-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+            {
+              src: '/icon.svg',
+              sizes: 'any',
+              type: 'image/svg+xml',
+              purpose: 'any',
+            },
+          ],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,webmanifest}'],
+          navigateFallback: '/index.html',
+          navigateFallbackDenylist: [/^\/api\//, /^\/hanzi-data\//],
+          runtimeCaching: [
+            {
+              urlPattern: /^\/(hanzi-data\/.*\.json|api\/hanzi\/char\/.*)$/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'hanzi-stroke-data-cache',
+                expiration: {
+                  maxEntries: 1500,
+                  maxAgeSeconds: 60 * 60 * 24 * 90,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /^\/illustrations\/.*\.svg$/i,
+              handler: 'StaleWhileRevalidate',
+              options: {
+                cacheName: 'vocab-illustrations-cache',
+                expiration: {
+                  maxEntries: 200,
+                  maxAgeSeconds: 60 * 60 * 24 * 60,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'google-fonts-cache',
+                expiration: {
+                  maxEntries: 10,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'gstatic-fonts-cache',
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+          ],
+        },
+        devOptions: {
+          enabled: false,
+        },
+      }),
+    ],
     resolve: {
       dedupe: ['react', 'react-dom', 'react-router', 'react-router-dom'],
       alias: {
@@ -19,58 +140,58 @@ export default defineConfig(() => {
         'react-dom/client',
         'react/jsx-runtime',
         'react/jsx-dev-runtime',
+        'react-router',
         'react-router-dom',
         'lucide-react',
+        'firebase/app',
+        'firebase/auth',
+        'firebase/firestore',
+        'firebase/app-check',
       ],
     },
     build: {
       rolldownOptions: {
         output: {
-          codeSplitting: {
-            groups: [
-              {
-                debugName: 'hanu-bundle-split',
-                name(moduleId) {
-                  if (moduleId.includes('node_modules')) {
-                    if (
-                      moduleId.includes('@firebase/firestore') ||
-                      moduleId.includes('firebase/firestore')
-                    ) {
-                      return 'vendor-firebase-firestore';
-                    }
-                    if (
-                      moduleId.includes('firebase') ||
-                      moduleId.includes('@firebase')
-                    ) {
-                      return 'vendor-firebase-core';
-                    }
-                    if (moduleId.includes('lucide-react')) {
-                      return 'vendor-icons';
-                    }
-                    if (
-                      moduleId.includes('react-dom') ||
-                      moduleId.includes('react-router') ||
-                      moduleId.includes('/react/') ||
-                      moduleId.includes('scheduler')
-                    ) {
-                      return 'vendor-react';
-                    }
-                    return 'vendor-misc';
-                  }
-                  if (moduleId.includes('/src/data/chineseData')) {
-                    return 'hsk-vocab-data';
-                  }
-                  if (
-                    moduleId.includes('/src/utils/chineseEngine') ||
-                    moduleId.includes('/src/utils/hsk3Engine') ||
-                    moduleId.includes('/src/utils/hskStudyHelpers')
-                  ) {
-                    return 'hsk-engine';
-                  }
-                  return null;
-                },
-              },
-            ],
+          manualChunks(moduleId) {
+            if (moduleId.includes('node_modules')) {
+              if (
+                moduleId.includes('@firebase/firestore') ||
+                moduleId.includes('firebase/firestore')
+              ) {
+                return 'vendor-firebase-firestore';
+              }
+              if (
+                moduleId.includes('firebase') ||
+                moduleId.includes('@firebase')
+              ) {
+                return 'vendor-firebase-core';
+              }
+              if (moduleId.includes('lucide-react')) {
+                return 'vendor-icons';
+              }
+              if (moduleId.includes('react-router')) {
+                return 'vendor-router';
+              }
+              if (
+                moduleId.includes('react-dom') ||
+                moduleId.includes('/react/') ||
+                moduleId.includes('scheduler')
+              ) {
+                return 'vendor-react';
+              }
+              return 'vendor-misc';
+            }
+            if (moduleId.includes('/src/data/chineseData')) {
+              return 'hsk-vocab-data';
+            }
+            if (
+              moduleId.includes('/src/utils/chineseEngine') ||
+              moduleId.includes('/src/utils/hsk3Engine') ||
+              moduleId.includes('/src/utils/hskStudyHelpers')
+            ) {
+              return 'hsk-engine';
+            }
+            return undefined;
           },
         },
       },

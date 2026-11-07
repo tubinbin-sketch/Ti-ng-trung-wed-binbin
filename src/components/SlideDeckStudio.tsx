@@ -50,10 +50,18 @@ import { auth, saveStudentSrsWordToFirestore } from '../firebase';
 import { appStore } from '../context/AppStoreContext';
 import { LazyErrorBoundary } from './LazyErrorBoundary';
 
-import { AddVocabModal } from './AddVocabModal';
-import { WorksheetPreviewModal } from './WorksheetPreviewModal';
-import { MeasureWordDrillModal } from './MeasureWordDrillModal';
-import { LiveTeachingToolkit } from './LiveTeachingToolkit';
+const AddVocabModal = React.lazy(() =>
+  import('./AddVocabModal').then((m) => ({ default: m.AddVocabModal }))
+);
+const WorksheetPreviewModal = React.lazy(() =>
+  import('./WorksheetPreviewModal').then((m) => ({ default: m.WorksheetPreviewModal }))
+);
+const MeasureWordDrillModal = React.lazy(() =>
+  import('./MeasureWordDrillModal').then((m) => ({ default: m.MeasureWordDrillModal }))
+);
+const LiveTeachingToolkit = React.lazy(() =>
+  import('./LiveTeachingToolkit').then((m) => ({ default: m.LiveTeachingToolkit }))
+);
 import {
   getIsSpeaking,
   getPreferredSpeechRate,
@@ -2018,13 +2026,27 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   role="button"
                   tabIndex={0}
                   aria-pressed={isCardFlipped}
-                  aria-label={isCardFlipped ? 'Xem mặt trước' : 'Lật thẻ xem đáp án'}
+                  aria-label={
+                    isCardFlipped
+                      ? `Thẻ từ ${currentSlide.hanzi} (${currentSlide.pinyin}: ${currentSlide.meaning}) — đang xem mặt sau. Nhấn Space hoặc Enter để lật thẻ, mũi tên Trái/Phải để chuyển từ, phím 1 đến 4 để đánh giá mức độ thuộc.`
+                      : `Thẻ từ ${currentSlide.hanzi} — đang xem mặt trước. Nhấn Space hoặc Enter để lật thẻ xem đáp án, mũi tên Trái/Phải để chuyển từ.`
+                  }
                   data-testid="flashcard-flip-toggle-btn"
                   onClick={() => setIsCardFlipped((f) => !f)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
+                      e.stopPropagation();
                       setIsCardFlipped((f) => !f);
+                      speakChinese(currentSlide.hanzi, speechRate);
+                    } else if (e.key === 'ArrowLeft') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handlePrev();
+                    } else if (e.key === 'ArrowRight') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleNext();
                     }
                   }}
                   className="flip-scene relative rounded-3xl bg-surface border border-border shadow-sm hover:shadow-md transition-shadow cursor-pointer min-h-[340px] sm:min-h-[380px] flex flex-col items-center justify-center px-6 py-10 text-center select-none"
@@ -2690,6 +2712,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   <svg
                     ref={inlineSvgRef}
                     viewBox="0 0 100 100"
+                    role="img"
+                    aria-label={`Ô Mễ Tự Cách luyện viết chữ Hán ${currentChar.char} (${totalStrokes} nét)`}
                     className="w-full h-full cursor-crosshair"
                     onMouseDown={handlePointerDown}
                     onMouseMove={handlePointerMove}

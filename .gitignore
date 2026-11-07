@@ -12,4 +12,5 @@ coverage/
 /dist-server/
 /*.png
 *.mp4
+*.zip
 

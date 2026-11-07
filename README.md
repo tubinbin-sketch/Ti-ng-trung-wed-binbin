@@ -58,20 +58,35 @@
 5. **Lấy cấu hình Web App**:
    - Vào **Project Settings → General → Your apps → Web app (`</>`)**.
    - Điền các giá trị vào file `.env` (theo mẫu `.env.example`) hoặc cập nhật `firebase-applet-config.json`.
+6. **Cấu hình Firebase App Check (reCAPTCHA Enterprise) — Bắt buộc trên Production**:
+   - **Điều gì xảy ra nếu `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY` bị để trống trên Production (`NODE_ENV=production`)?**:
+     1. Ở **Frontend (`src/firebase.ts`)**: Khi `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY` rỗng (hoặc ngắn hơn 20 ký tự), `initializeAppCheck(app, ...)` không được khởi tạo (`appCheckInstance = null`), dẫn tới mọi request gửi lên `/api/*` chỉ đính kèm header rỗng `X-Firebase-AppCheck: ""`.
+     2. Ở **Backend (`server/middleware/authAndRateLimitMiddleware.ts`)**: Khi `NODE_ENV=production`, hàm `shouldEnforceAppCheck()` mặc định bật chế độ **fail-closed (`true`)**. Hàm `verifyRequestAppCheck()` sẽ từ chối mọi request thiếu token App Check hợp lệ và trả về **`HTTP 401 Unauthorized: Missing or invalid Firebase App Check token`** cho tất cả các API (`/api/teachers/bootstrap`, `/api/classes/join`, `/api/assignments/start`, `/api/submissions`, `/api/hanzi/*`, `/api/binbin/chat`), đồng thời in cảnh báo `[SECURITY CONFIG WARNING]` ra log server.
+   - **Cách cấu hình chuẩn trên Production (Khuyến nghị)**:
+     1. Vào [Google Cloud Console → reCAPTCHA Enterprise](https://console.cloud.google.com/security/recaptcha) và tạo một **Web Site Key (Score-based /無 checkbox)** cho tên miền Cloud Run / custom domain của bạn.
+     2. Vào **Firebase Console → Build → App Check → Apps**, chọn ứng dụng Web của bạn, bấm **Register** với **reCAPTCHA Enterprise** và dán Site Key vừa tạo.
+     3. Truyền biến `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=<SITE_KEY_CỦA_BẠN>` **cả lúc `vite build` (build-time)** lẫn trong môi trường chạy Cloud Run, giữ `ENFORCE_APP_CHECK=true`.
+   - **Chế độ chuyển tiếp tạm thời (Chỉ dùng khi chưa kịp cấp reCAPTCHA Enterprise Site Key)**:
+     - Đặt tường minh `ENFORCE_APP_CHECK=false` trong biến môi trường Cloud Run để tạm tắt kiểm tra App Check (server sẽ ghi `[SECURITY WARNING]` vào log để nhắc quản trị viên bật lại ngay khi có Site Key).
 
 ---
 
 ## 3. Chạy thử tại máy cục bộ (Local Development & Firebase Emulator)
 
+Dự án hỗ trợ cài đặt bằng cả **npm** và **Bun** (khớp với `bun.lock`; gói `esbuild` đã được nâng lên `^0.28.0` để tương thích với `vite ^8.3.0` và `tsx ^4.21.0`, không còn lỗi xung đột peer dependency `ERESOLVE`):
+
 ```bash
-# 1. Cài đặt dependencies
+# 1. Cài đặt dependencies (chọn npm hoặc bun)
 npm install
+# hoặc:
+bun install
 
 # 2. Tạo file .env từ .env.example
 cp .env.example .env
 
 # 3. Chạy server phát triển (Express + Vite tại http://localhost:3000)
 npm run dev
+# hoặc: bun run dev
 ```
 
 ### Chạy kiểm thử tự động (`npm test`) & Kiểm thử Firestore Rules với Emulator:
@@ -88,15 +103,35 @@ npx firebase-tools emulators:exec --only firestore "npm test"
 
 ## 4. Triển khai lên Google Cloud Run
 
+> **Lưu ý quan trọng về App Check khi build & deploy Production**:
+> Vì Vite nhúng các biến `VITE_*` vào bundle tĩnh lúc chạy `vite build`, bạn cần khai báo `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY` trong `.env` (hoặc `--set-build-env-vars`) trước khi build. Nếu chưa có khóa reCAPTCHA Enterprise, bạn phải đặt tường minh `ENFORCE_APP_CHECK=false` trên Cloud Run, nếu không toàn bộ API `/api/*` sẽ trả về `401 Unauthorized` (do cơ chế fail-closed trên production).
+
 ```bash
-# 1. Kiểm tra bản build Production
-npm run build
+# 1. Kiểm tra bản build Production (đảm bảo đã điền VITE_RECAPTCHA_ENTERPRISE_SITE_KEY trong .env)
+VITE_RECAPTCHA_ENTERPRISE_SITE_KEY="6Lc..." npm run build
 
 # 2. Deploy lên Cloud Run (sử dụng Application Default Credentials cho firebase-admin)
 gcloud run deploy hanu-hsk3-classroom \
   --source . \
   --region asia-southeast1 \
   --allow-unauthenticated \
-  --set-env-vars="NODE_ENV=production,FIREBASE_PROJECT_ID=YOUR_PROJECT_ID,AI_DAILY_LIMIT=60" \
+  --set-build-env-vars="VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=YOUR_RECAPTCHA_ENTERPRISE_SITE_KEY" \
+  --set-env-vars="NODE_ENV=production,FIREBASE_PROJECT_ID=YOUR_PROJECT_ID,ENFORCE_APP_CHECK=true,VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=YOUR_RECAPTCHA_ENTERPRISE_SITE_KEY,TEACHER_EMAIL_ALLOWLIST=teacher@example.edu.vn,AI_DAILY_LIMIT=60" \
   --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest"
 ```
+
+---
+
+## 5. Tài liệu Kỹ thuật, Bảo mật & Báo cáo Kiểm toán (`docs/`)
+
+Toàn bộ tài liệu kiến trúc bảo mật, báo cáo audit và chính sách bảo vệ dữ liệu đã được hợp nhất và quy hoạch trong thư mục [`docs/`](./docs/):
+
+- **Đặc tả Kiến trúc Bảo mật & Phân quyền (Hợp nhất)**: [`docs/SECURITY_SPEC.md`](./docs/SECURITY_SPEC.md)
+- **Báo cáo Rà soát Bảo mật Cuối cùng**: [`docs/FINAL_SECURITY_REVIEW.md`](./docs/FINAL_SECURITY_REVIEW.md)
+- **Báo cáo Kiểm toán & Nâng cấp Hệ thống**: [`docs/UPGRADE_AUDIT.md`](./docs/UPGRADE_AUDIT.md)
+- **Chính sách Bảo vệ Dữ liệu & Tuân thủ**: [`docs/DATA_PROTECTION.md`](./docs/DATA_PROTECTION.md)
+- **Chính sách Quyền riêng tư**: [`docs/PRIVACY_POLICY.md`](./docs/PRIVACY_POLICY.md)
+- **Hệ thống Thiết kế Giao diện (Design System)**: [`docs/DESIGN.md`](./docs/DESIGN.md)
+- **Nhật ký Thay đổi (Changelog)**: [`docs/CHANGELOG.md`](./docs/CHANGELOG.md)
+
+

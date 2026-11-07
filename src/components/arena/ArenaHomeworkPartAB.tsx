@@ -79,6 +79,36 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
             return (
               <div
                 key={q.id}
+                tabIndex={0}
+                role="group"
+                aria-label={`Câu trắc nghiệm ${idx + 1}: ${q.question}. Nhấn phím 1 đến 4 hoặc A đến D để chọn đáp án, Space để nghe câu.`}
+                onKeyDown={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.altKey) return;
+                  if (e.key === ' ' || e.code === 'Space') {
+                    const targetEl = e.target as HTMLElement | null;
+                    if (targetEl?.tagName !== 'BUTTON') {
+                      e.preventDefault();
+                      speakChinese(fullSpokenSentence);
+                    }
+                  } else if (!isSubmitted) {
+                    const keyUpper = e.key.toUpperCase();
+                    const optIdx =
+                      keyUpper === '1' || keyUpper === 'A'
+                        ? 0
+                        : keyUpper === '2' || keyUpper === 'B'
+                        ? 1
+                        : keyUpper === '3' || keyUpper === 'C'
+                        ? 2
+                        : keyUpper === '4' || keyUpper === 'D'
+                        ? 3
+                        : -1;
+                    const chosenOpt = optIdx >= 0 ? q.options[optIdx] : undefined;
+                    if (chosenOpt) {
+                      e.preventDefault();
+                      onSelectMcAnswer(q.id, chosenOpt.key, chosenOpt.label);
+                    }
+                  }
+                }}
                 className="rounded-2xl bg-canvas border border-border p-4 sm:p-5 space-y-3"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -90,10 +120,11 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                       <button
                         type="button"
                         data-testid={`part-a-listen-btn-${q.id}`}
+                        aria-label={`Nghe câu tiếng Trung câu ${idx + 1}`}
                         onClick={() => speakChinese(fullSpokenSentence)}
                         className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-primary text-on-primary text-xs font-bold cursor-pointer"
                       >
-                        <Volume2 className="w-3.5 h-3.5" />
+                        <Volume2 className="w-3.5 h-3.5" aria-hidden="true" />
                         <span>Nghe câu (<span lang="zh-CN">听力</span>)</span>
                       </button>
                     </div>
@@ -104,7 +135,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         className="mt-2 p-3 rounded-xl bg-surface border border-dashed border-primary/35 flex flex-wrap items-center justify-between gap-2"
                       >
                         <div className="text-xs font-bold text-ink flex items-center gap-2">
-                          <Headphones className="w-4 h-4 text-accent shrink-0" />
+                          <Headphones className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
                           <span>
                             Chế độ Nghe hiểu HSK (<span lang="zh-CN">听力</span>): Đang ẩn chữ Hán gốc — Hãy bấm{' '}
                             <strong>&ldquo;🔊 Nghe câu&rdquo;</strong> để chọn đáp án đúng!
@@ -129,7 +160,11 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-2.5"
+                  role="radiogroup"
+                  aria-label={`Các đáp án câu ${idx + 1}`}
+                >
                   {q.options.map((opt) => {
                     const isChosen = userChoice === opt.key;
                     let optionStyle =
@@ -153,6 +188,9 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                       <button
                         key={opt.key}
                         type="button"
+                        role="radio"
+                        aria-checked={isChosen}
+                        aria-label={`Đáp án ${opt.key}: ${opt.label}`}
                         disabled={isSubmitted}
                         onClick={() => onSelectMcAnswer(q.id, opt.key, opt.label)}
                         className={`p-3 rounded-2xl border text-left text-xs transition-all flex items-center justify-between gap-2 cursor-pointer ${optionStyle}`}
@@ -173,10 +211,10 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         </div>
 
                         {isSubmitted && opt.isCorrect && (
-                          <CheckCircle2 className="w-4 h-4 text-gold shrink-0" />
+                          <CheckCircle2 className="w-4 h-4 text-gold shrink-0" aria-hidden="true" />
                         )}
                         {isSubmitted && isChosen && !opt.isCorrect && (
-                          <AlertCircle className="w-4 h-4 text-white shrink-0" />
+                          <AlertCircle className="w-4 h-4 text-white shrink-0" aria-hidden="true" />
                         )}
                       </button>
                     );

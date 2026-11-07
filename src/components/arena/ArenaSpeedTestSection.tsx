@@ -36,6 +36,64 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
   onSubmitSpeedTest,
   onAskBinBinAboutQuestion,
 }) => {
+  const [activeQuestionIdx, setActiveQuestionIdx] = React.useState(0);
+  const questionCardRefs = React.useRef<Array<HTMLDivElement | null>>([]);
+
+  React.useEffect(() => {
+    const handleQuizKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const total = SPEED_TEST_10_QUESTIONS.length;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        const nextIdx = (activeQuestionIdx + 1) % total;
+        setActiveQuestionIdx(nextIdx);
+        questionCardRefs.current[nextIdx]?.focus();
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const prevIdx = (activeQuestionIdx - 1 + total) % total;
+        setActiveQuestionIdx(prevIdx);
+        questionCardRefs.current[prevIdx]?.focus();
+      } else if (e.key === ' ' || e.code === 'Space') {
+        const currentQ = SPEED_TEST_10_QUESTIONS[activeQuestionIdx];
+        if (currentQ && target?.tagName !== 'BUTTON') {
+          e.preventDefault();
+          speakChinese(currentQ.targetWord);
+        }
+      } else if (!isSpeedTestSubmitted) {
+        const keyUpper = e.key.toUpperCase();
+        const optIdx =
+          keyUpper === '1' || keyUpper === 'A'
+            ? 0
+            : keyUpper === '2' || keyUpper === 'B'
+            ? 1
+            : keyUpper === '3' || keyUpper === 'C'
+            ? 2
+            : keyUpper === '4' || keyUpper === 'D'
+            ? 3
+            : -1;
+        const currentQ = SPEED_TEST_10_QUESTIONS[activeQuestionIdx];
+        if (optIdx >= 0 && currentQ && currentQ.options[optIdx]) {
+          e.preventDefault();
+          onSelectSpeedTestAnswer(currentQ.id, currentQ.options[optIdx]);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleQuizKeyDown);
+    return () => window.removeEventListener('keydown', handleQuizKeyDown);
+  }, [activeQuestionIdx, isSpeedTestSubmitted, onSelectSpeedTestAnswer]);
+
   return (
     <div
       data-testid="speed-test-10-arena"
@@ -49,6 +107,9 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
           <h3 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
             🏆 Bài Kiểm Tra Nhanh 10 Câu Toàn Diện (Nghe · Đọc · Ngữ Pháp · Hán Tự · Dịch)
           </h3>
+          <p className="text-xs text-ink-muted mt-1" data-testid="quiz-keyboard-shortcuts-hint">
+            ⌨️ Điều hướng bàn phím: <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">↑/↓</kbd> hoặc <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">←/→</kbd> chuyển câu · <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">1–4</kbd> / <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">A–D</kbd> chọn đáp án · <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">Space</kbd> nghe phát âm
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -149,15 +210,26 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5" role="list" aria-label="Danh sách 10 câu hỏi kiểm tra nhanh">
         {SPEED_TEST_10_QUESTIONS.map((q, qIdx) => {
           const selected = speedTestAnswers[q.id];
           const isAnsweredWrong = isSpeedTestSubmitted && selected !== q.correctAnswer;
+          const isActiveCard = activeQuestionIdx === qIdx;
           return (
             <div
               key={q.id}
+              ref={(el) => {
+                questionCardRefs.current[qIdx] = el;
+              }}
+              tabIndex={0}
+              role="group"
+              aria-label={`Câu hỏi ${qIdx + 1}: ${q.skillLabel} — ${q.prompt}`}
+              onFocus={() => setActiveQuestionIdx(qIdx)}
+              onClick={() => setActiveQuestionIdx(qIdx)}
               data-testid={`speed-test-q-${q.id}`}
-              className="p-4 rounded-2xl bg-canvas border border-border space-y-2.5 flex flex-col justify-between"
+              className={`p-4 rounded-2xl bg-canvas border space-y-2.5 flex flex-col justify-between transition-colors ${
+                isActiveCard ? 'border-primary ring-1 ring-primary/30' : 'border-border'
+              }`}
             >
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
@@ -167,10 +239,11 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
                   <button
                     type="button"
                     data-testid={`speed-test-listen-btn-${q.id}`}
+                    aria-label={`Nghe phát âm từ ${q.targetWord} của câu ${qIdx + 1}`}
                     onClick={() => speakChinese(q.targetWord)}
                     className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-primary text-on-primary border border-transparent text-xs font-bold cursor-pointer"
                   >
-                    <Volume2 className="w-3 h-3" />
+                    <Volume2 className="w-3 h-3" aria-hidden="true" />
                     <span lang="zh-CN" className="font-['Noto_Sans_SC']">
                       {isListeningExamMode && !isSpeedTestSubmitted
                         ? `🔊 Nghe câu #${qIdx + 1}`
@@ -198,16 +271,22 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
                 )}
               </div>
 
-              <div className="space-y-1.5 pt-1">
-                {q.options.map((opt) => {
+              <div className="space-y-1.5 pt-1" role="radiogroup" aria-label={`Các lựa chọn cho câu ${qIdx + 1}`}>
+                {q.options.map((opt, optIdx) => {
                   const isPicked = selected === opt;
                   const isCorrect = opt === q.correctAnswer;
                   return (
                     <button
                       key={opt}
                       type="button"
+                      role="radio"
+                      aria-checked={isPicked}
+                      aria-label={`Lựa chọn ${optIdx + 1}: ${opt}`}
                       disabled={isSpeedTestSubmitted}
-                      onClick={() => onSelectSpeedTestAnswer(q.id, opt)}
+                      onClick={() => {
+                        setActiveQuestionIdx(qIdx);
+                        onSelectSpeedTestAnswer(q.id, opt);
+                      }}
                       className={`w-full text-left px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex items-center justify-between gap-2 ${
                         isSpeedTestSubmitted
                           ? isCorrect
@@ -222,7 +301,7 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
                     >
                       <span lang="zh-CN" className="font-['Noto_Sans_SC']">{opt}</span>
                       {isSpeedTestSubmitted && isCorrect && (
-                        <Check className="w-4 h-4 text-success shrink-0" />
+                        <Check className="w-4 h-4 text-success shrink-0" aria-hidden="true" />
                       )}
                     </button>
                   );

@@ -186,6 +186,7 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
     const subText = meaning ? `${pinyin ? `${pinyin} · ` : ''}${meaning}` : defaultLabel;
     return (
       <g>
+        <title>{`Minh họa từ vựng ${titleHanzi} (${subText})`}</title>
         {/* Subtle Calligraphic Seal Watermark in Top-Right Background */}
         <g transform="translate(332, 82)" opacity="0.18">
           <rect
@@ -1419,6 +1420,7 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
               value={customUrlInput}
               onChange={(e) => setCustomUrlInput(e.target.value)}
               placeholder="Dán link ảnh (https://...) hoặc để trống để tự động..."
+              aria-label={`Đường dẫn ảnh minh họa tùy chỉnh cho từ ${hanzi}`}
               data-testid="custom-vocab-image-input"
               className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface/95 text-ink text-sm border border-highlight/50 focus:outline-none"
             />

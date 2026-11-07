@@ -5,7 +5,11 @@ import { AppStoreProvider } from './context/AppStoreContext';
 import { AppErrorBoundary } from './components/LazyErrorBoundary';
 import './index.css';
 
+import { registerSW } from 'virtual:pwa-register';
+
 if (typeof window !== 'undefined') {
+  registerSW({ immediate: true });
+
   window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
     const reasonText = String(
       (event.reason as { message?: string })?.message ?? event.reason ?? ''

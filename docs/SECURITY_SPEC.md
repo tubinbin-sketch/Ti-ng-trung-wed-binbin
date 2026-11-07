@@ -1,6 +1,6 @@
 # ĐẶC TẢ KIẾN TRÚC BẢO MẬT & PHÂN QUYỀN (SECURITY SPECIFICATION)
 **Dự án:** Tiếng Trung HANU — Bin-Bin HSK 3.0  
-**Phiên bản:** 3.0 (Đồng bộ 100% với `firestore.rules` và `server.ts` trên nhánh `feat/security-hardening-v2`)
+**Phiên bản:** 3.1 (Hợp nhất từ `SECURITY_SPEC.md` và `security_spec.md`, đồng bộ 100% với `firestore.rules` và `server.ts`)
 
 ---
 
@@ -16,19 +16,20 @@
    - Khi học viên mở đề bài hoặc bắt đầu bài kiểm tra nhanh, client gọi `POST /api/assignments/start` để server ghi mốc thời gian `startedAtMs` tại `classes/{classId}/assignmentStarts/{assignmentId}_{uid}`.
    - Khi học viên nộp bài qua `POST /api/submissions`, toàn bộ bước kiểm tra tư cách thành viên lớp, kiểm tra số lượt nộp (`attemptCount < maxAttempts` trên khóa xác định `{assignmentId}_{uid}`), chấm điểm đối chiếu `answerKeys`, tính thời gian làm bài chuẩn từ server (`computeServerAuthoritativeTimeSeconds` — **tuyệt đối không tin tưởng `timeSeconds` do client gửi**), và ghi kết quả vào `submissions`, `leaderboard`, `students` được thực hiện trong **một giao dịch nguyên tử duy nhất (`submitAssignmentTransaction`)**.
 
-3. **Xác thực Vai trò Giảng viên (Teacher Role) Nghiêm ngặt — Fail-Closed:**
+3. **Xác thực Vai trò Giảng viên (Teacher Role) Nghiêm ngặt & Kiểm tra Thu hồi Phiên (Token Revocation) — Fail-Closed:**
    - Loại bỏ hoàn toàn mọi email quản trị mặc định hard-code trong mã nguồn (`getTeacherEmailAllowlist()` chỉ đọc từ biến môi trường `process.env.TEACHER_EMAIL_ALLOWLIST`; nếu biến môi trường trống sẽ trả về `[]` — fail-closed).
-   - `verifyFirebaseIdToken` chỉ công nhận `emailVerified: decoded.email_verified === true`.
+   - `verifyFirebaseIdToken` gọi `adminAuth.verifyIdToken(idToken, true)` (`checkRevoked = true`), bắt mã lỗi `auth/id-token-revoked` để trả về HTTP `401` tức thì, và chỉ công nhận `emailVerified: decoded.email_verified === true`.
+   - `isTeacherUserAuthorized(user)` đối chiếu đồng thời custom claim `role === 'teacher'`, `emailVerified === true` VÀ `isEmailInTeacherAllowlist(user.email)` trên mọi request để thu hồi quyền ngay lập tức nếu email bị gỡ khỏi danh sách cho phép.
    - `POST /api/teachers/bootstrap` bắt buộc `verifiedUser.emailVerified === true` VÀ `isEmailInTeacherAllowlist(email) === true` trước khi cấp custom claim `role = 'teacher'` và ghi `/teachers/{uid}`.
 
 4. **Kiểm soát Schema Nghiêm ngặt (`keys().hasOnly()`) trên `firestore.rules`:**
    - Tất cả các collection/subcollection cho phép ghi từ Client SDK (`teachers`, `joinCodes`, `classes`, `students`, `decks`, `assignments`, `answerKeys`, `srs`) đều áp dụng `request.resource.data.keys().hasOnly([...])` để chặn hoàn toàn việc chèn trường lạ (shadow fields / arbitrary payload pollution).
 
-5. **Bảo vệ Endpoint AI (`/api/gemini`), App Check & Rate Limit Đa Instance:**
+5. **Bảo vệ Endpoint AI (`/api/gemini`), App Check Fail-Closed & Rate Limit Đa Instance:**
    - Bắt buộc xác thực Firebase ID Token (`Authorization: Bearer <idToken>`).
-   - Hỗ trợ bắt buộc Firebase App Check (`shouldEnforceAppCheck()`) khi `ENFORCE_APP_CHECK=true` hoặc tự động kích hoạt trong môi trường `NODE_ENV=production` khi đã cấu hình `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY`.
+   - Bắt buộc Firebase App Check (`shouldEnforceAppCheck()`) mặc định ở chế độ **fail-closed** trên môi trường `NODE_ENV=production` (trừ khi ghi đè tường minh `ENFORCE_APP_CHECK=false`, kèm cảnh báo bảo mật rõ ràng). Mọi request từ frontend tới `/api/*` luôn đính kèm header `X-Firebase-AppCheck`.
    - Kiểm tra hạn mức ngày bằng Firestore Transaction trên `aiUsage/{uid}_{YYYY-MM-DD}`. Trong môi trường `production` (hoặc `STRICT_FIRESTORE_AI_QUOTA=true`), nếu Firestore gặp sự cố, hệ thống **fail-closed (`503 Service Unavailable`)** thay vì âm thầm chuyển sang bộ đếm RAM cục bộ.
-   - Hỗ trợ giới hạn tốc độ chia sẻ liên instance (`rateLimits/{bucketId}`) bằng Firestore Transaction kết hợp bộ nhớ L1 cho các route nhạy cảm (`/api/classes/join`, `/api/teachers/bootstrap`).
+   - Hỗ trợ giới hạn tốc độ chia sẻ liên instance (`rateLimits/{bucketId}`) bằng Firestore Transaction trên cả 6 scope (`api_general`, `teacher_bootstrap`, `ai_minute`, `join_class`, `assignment_start`, `reset_student_slot`).
 
 ---
 

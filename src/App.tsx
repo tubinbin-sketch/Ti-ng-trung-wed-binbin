@@ -38,7 +38,9 @@ import {
   TeacherThemePreset,
   VocabSlide,
 } from './data/chineseData';
-import { SlideDeckStudio } from './components/SlideDeckStudio';
+const SlideDeckStudio = React.lazy(() =>
+  import('./components/SlideDeckStudio').then((m) => ({ default: m.SlideDeckStudio }))
+);
 import {
   DEFAULT_STUDENTS,
   getStoredStudentRoster,
@@ -47,6 +49,7 @@ import {
 import { AuthModal, UserProfile, UserRole } from './components/AuthModal';
 import { LazyErrorBoundary } from './components/LazyErrorBoundary';
 import { HomeDashboard } from './components/HomeDashboard';
+import { PWAInstallButton } from './components/PWAInstallButton';
 import { PageSkeleton } from './components/ui/PageSkeleton';
 import { appStore, useAppStoreSelector } from './context/AppStoreContext';
 import {
@@ -58,11 +61,21 @@ import {
   ThemePicker,
 } from './components/layout/AppShell';
 
-import { StrokeWritingModal } from './components/StrokeWritingModal';
-import { StudentAssignmentArena } from './components/StudentAssignmentArena';
-import { ClassroomManager } from './components/ClassroomManager';
-import { PrivacyPolicyPage } from './components/PrivacyPolicyPage';
-import { BinBinPandaAI } from './components/BinBinPandaAI';
+const StrokeWritingModal = React.lazy(() =>
+  import('./components/StrokeWritingModal').then((m) => ({ default: m.StrokeWritingModal }))
+);
+const StudentAssignmentArena = React.lazy(() =>
+  import('./components/StudentAssignmentArena').then((m) => ({ default: m.StudentAssignmentArena }))
+);
+const ClassroomManager = React.lazy(() =>
+  import('./components/ClassroomManager').then((m) => ({ default: m.ClassroomManager }))
+);
+const PrivacyPolicyPage = React.lazy(() =>
+  import('./components/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage }))
+);
+const BinBinPandaAI = React.lazy(() =>
+  import('./components/BinBinPandaAI').then((m) => ({ default: m.BinBinPandaAI }))
+);
 import { speakChinese } from './utils/speech';
 import {
   BinBinSlidePayload,
@@ -967,6 +980,8 @@ export default function App() {
               </span>
             )}
 
+            <PWAInstallButton />
+
             <button
               type="button"
               onClick={() => appStore.openBinBinAssistant()}
@@ -1189,32 +1204,36 @@ export default function App() {
           <Route
             path="/hoc"
             element={
-              <SlideDeckStudio
-                slides={slides}
-                activeSlideIndex={activeSlideIndex}
-                onSelectSlideIndex={setActiveSlideIndex}
-                onOpenWritingModal={(slide) => setWritingModalSlide(slide)}
-                onToggleLearned={handleToggleLearnedSlide}
-                onAddSlides={handleAddSlides}
-                onUpdateSlide={handleUpdateSlide}
-                onReplaceAllSlides={handleReplaceAllSlides}
-                onResetDefaultSlides={handleResetDefaultSlides}
-                roleMode="student"
-                studentStudyMode="writing"
-                onChangeStudentStudyMode={(mode) => {
-                  if (mode === 'flashcard') {
-                    setStudentTab('flashcard-srs');
-                    navigate('/flashcard');
-                  } else {
-                    setStudentTab('today-lesson');
-                    navigate('/hoc');
-                  }
-                }}
-                onSwitchToStudentHomework={() => {
-                  setStudentTab('quiz-leaderboard');
-                  navigate('/bai-tap');
-                }}
-              />
+              <LazyErrorBoundary fallbackLabel="Không thể tải trang Bài học & Luyện viết.">
+                <Suspense fallback={<PageSkeleton label="Đang tải bài học…" />}>
+                  <SlideDeckStudio
+                    slides={slides}
+                    activeSlideIndex={activeSlideIndex}
+                    onSelectSlideIndex={setActiveSlideIndex}
+                    onOpenWritingModal={(slide) => setWritingModalSlide(slide)}
+                    onToggleLearned={handleToggleLearnedSlide}
+                    onAddSlides={handleAddSlides}
+                    onUpdateSlide={handleUpdateSlide}
+                    onReplaceAllSlides={handleReplaceAllSlides}
+                    onResetDefaultSlides={handleResetDefaultSlides}
+                    roleMode="student"
+                    studentStudyMode="writing"
+                    onChangeStudentStudyMode={(mode) => {
+                      if (mode === 'flashcard') {
+                        setStudentTab('flashcard-srs');
+                        navigate('/flashcard');
+                      } else {
+                        setStudentTab('today-lesson');
+                        navigate('/hoc');
+                      }
+                    }}
+                    onSwitchToStudentHomework={() => {
+                      setStudentTab('quiz-leaderboard');
+                      navigate('/bai-tap');
+                    }}
+                  />
+                </Suspense>
+              </LazyErrorBoundary>
             }
           />
 
@@ -1222,32 +1241,36 @@ export default function App() {
           <Route
             path="/flashcard"
             element={
-              <SlideDeckStudio
-                slides={slides}
-                activeSlideIndex={activeSlideIndex}
-                onSelectSlideIndex={setActiveSlideIndex}
-                onOpenWritingModal={(slide) => setWritingModalSlide(slide)}
-                onToggleLearned={handleToggleLearnedSlide}
-                onAddSlides={handleAddSlides}
-                onUpdateSlide={handleUpdateSlide}
-                onReplaceAllSlides={handleReplaceAllSlides}
-                onResetDefaultSlides={handleResetDefaultSlides}
-                roleMode="student"
-                studentStudyMode="flashcard"
-                onChangeStudentStudyMode={(mode) => {
-                  if (mode === 'flashcard') {
-                    setStudentTab('flashcard-srs');
-                    navigate('/flashcard');
-                  } else {
-                    setStudentTab('today-lesson');
-                    navigate('/hoc');
-                  }
-                }}
-                onSwitchToStudentHomework={() => {
-                  setStudentTab('quiz-leaderboard');
-                  navigate('/bai-tap');
-                }}
-              />
+              <LazyErrorBoundary fallbackLabel="Không thể tải trang Ôn tập Flashcard SRS.">
+                <Suspense fallback={<PageSkeleton label="Đang tải Flashcard…" />}>
+                  <SlideDeckStudio
+                    slides={slides}
+                    activeSlideIndex={activeSlideIndex}
+                    onSelectSlideIndex={setActiveSlideIndex}
+                    onOpenWritingModal={(slide) => setWritingModalSlide(slide)}
+                    onToggleLearned={handleToggleLearnedSlide}
+                    onAddSlides={handleAddSlides}
+                    onUpdateSlide={handleUpdateSlide}
+                    onReplaceAllSlides={handleReplaceAllSlides}
+                    onResetDefaultSlides={handleResetDefaultSlides}
+                    roleMode="student"
+                    studentStudyMode="flashcard"
+                    onChangeStudentStudyMode={(mode) => {
+                      if (mode === 'flashcard') {
+                        setStudentTab('flashcard-srs');
+                        navigate('/flashcard');
+                      } else {
+                        setStudentTab('today-lesson');
+                        navigate('/hoc');
+                      }
+                    }}
+                    onSwitchToStudentHomework={() => {
+                      setStudentTab('quiz-leaderboard');
+                      navigate('/bai-tap');
+                    }}
+                  />
+                </Suspense>
+              </LazyErrorBoundary>
             }
           />
 
@@ -1295,23 +1318,27 @@ export default function App() {
           <Route
             path="/giao-vien/soan-bai"
             element={
-              <SlideDeckStudio
-                slides={slides}
-                activeSlideIndex={activeSlideIndex}
-                onSelectSlideIndex={setActiveSlideIndex}
-                onOpenWritingModal={(slide) => setWritingModalSlide(slide)}
-                onToggleLearned={handleToggleLearnedSlide}
-                onAddSlides={handleAddSlides}
-                onUpdateSlide={handleUpdateSlide}
-                onReplaceAllSlides={handleReplaceAllSlides}
-                onResetDefaultSlides={handleResetDefaultSlides}
-                roleMode="teacher"
-                onSwitchToStudentHomework={() => {
-                  setUserProfile((prev) => ({ ...prev, role: 'student' }));
-                  setStudentTab('quiz-leaderboard');
-                  navigate('/bai-tap');
-                }}
-              />
+              <LazyErrorBoundary fallbackLabel="Không thể tải Studio Soạn bài giảng.">
+                <Suspense fallback={<PageSkeleton label="Đang tải Studio soạn bài giảng…" />}>
+                  <SlideDeckStudio
+                    slides={slides}
+                    activeSlideIndex={activeSlideIndex}
+                    onSelectSlideIndex={setActiveSlideIndex}
+                    onOpenWritingModal={(slide) => setWritingModalSlide(slide)}
+                    onToggleLearned={handleToggleLearnedSlide}
+                    onAddSlides={handleAddSlides}
+                    onUpdateSlide={handleUpdateSlide}
+                    onReplaceAllSlides={handleReplaceAllSlides}
+                    onResetDefaultSlides={handleResetDefaultSlides}
+                    roleMode="teacher"
+                    onSwitchToStudentHomework={() => {
+                      setUserProfile((prev) => ({ ...prev, role: 'student' }));
+                      setStudentTab('quiz-leaderboard');
+                      navigate('/bai-tap');
+                    }}
+                  />
+                </Suspense>
+              </LazyErrorBoundary>
             }
           />
 

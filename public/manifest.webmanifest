@@ -1,0 +1,38 @@
+{
+  "name": "HANU HSK — Học tiếng Trung chuẩn HSK 3.0",
+  "short_name": "Bin-Bin HSK",
+  "description": "Nền tảng học tiếng Trung HSK 1–9, luyện viết chữ Hán ô Mễ Tự Cách, ôn tập Flashcard SRS ngoại tuyến và quản lý lớp học.",
+  "theme_color": "#b83227",
+  "background_color": "#faf7f2",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/hoc",
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

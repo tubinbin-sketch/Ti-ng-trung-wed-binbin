@@ -125,6 +125,10 @@ if (typeof window !== 'undefined') {
     } catch {
       // Ignore if App Check is already initialized
     }
+  } else if (envConfig.PROD) {
+    console.warn(
+      '[Firebase App Check] VITE_RECAPTCHA_ENTERPRISE_SITE_KEY chưa được cấu hình lúc build production. Header X-Firebase-AppCheck sẽ rỗng; nếu server bật ENFORCE_APP_CHECK=true (mặc định trên production), các request /api/* sẽ trả về 401.'
+    );
   }
 }
 

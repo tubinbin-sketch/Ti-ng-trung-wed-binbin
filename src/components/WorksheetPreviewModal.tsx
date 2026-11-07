@@ -143,7 +143,12 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
                         key={`mzg-${idx}-${boxIdx}`}
                         className="relative w-12 h-12 shrink-0 bg-canvas border border-border-strong"
                       >
-                        <svg viewBox="0 0 100 100" className="w-full h-full">
+                        <svg
+                          viewBox="0 0 100 100"
+                          className="w-full h-full"
+                          role="img"
+                          aria-label={`Ô tập viết chữ ${charToRender || s.hanzi} (ô ${boxIdx + 1})`}
+                        >
                           <line x1="0" y1="50" x2="100" y2="50" stroke="#C5B358" strokeWidth="1" strokeDasharray="3 3" strokeOpacity="0.6" />
                           <line x1="50" y1="0" x2="50" y2="100" stroke="#C5B358" strokeWidth="1" strokeDasharray="3 3" strokeOpacity="0.6" />
                           <line x1="0" y1="0" x2="100" y2="100" stroke="#C5B358" strokeWidth="0.8" strokeDasharray="3 3" strokeOpacity="0.45" />

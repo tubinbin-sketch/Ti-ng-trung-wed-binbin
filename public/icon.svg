@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Biểu tượng ứng dụng Bin-Bin HSK 3.0">
+  <defs>
+    <linearGradient id="sealBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c93b2f" />
+      <stop offset="100%" stop-color="#9e241b" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#sealBg)" />
+  <rect x="36" y="36" width="440" height="440" rx="86" fill="none" stroke="#f3c969" stroke-width="10" stroke-opacity="0.85" />
+  <rect x="54" y="54" width="404" height="404" rx="72" fill="none" stroke="#faf7f2" stroke-width="3" stroke-opacity="0.35" />
+  <text
+    x="256"
+    y="295"
+    text-anchor="middle"
+    fill="#faf7f2"
+    font-family="'Noto Serif SC', 'Songti SC', serif"
+    font-weight="700"
+    font-size="250"
+  >汉</text>
+  <rect x="146" y="366" width="220" height="48" rx="24" fill="#faf7f2" fill-opacity="0.16" />
+  <text
+    x="256"
+    y="398"
+    text-anchor="middle"
+    fill="#f9dfa1"
+    font-family="'Be Vietnam Pro', sans-serif"
+    font-weight="700"
+    font-size="28"
+    letter-spacing="3"
+  >HSK 3.0</text>
+</svg>

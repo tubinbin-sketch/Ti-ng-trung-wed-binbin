@@ -197,6 +197,8 @@ export const ClassroomLuckyWheelModal: React.FC<ClassroomLuckyWheelModalProps> =
                 <div className="absolute -top-2 z-20 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[18px] border-t-accent drop-shadow" />
                 <svg
                   viewBox="0 0 200 200"
+                  role="img"
+                  aria-label="Vòng quay may mắn gọi tên học viên phát biểu trên lớp"
                   className="w-full h-full rounded-full border-4 border-border-strong shadow-md transition-transform duration-700 ease-out"
                   style={{ transform: `rotate(${wheelRotation}deg)` }}
                 >

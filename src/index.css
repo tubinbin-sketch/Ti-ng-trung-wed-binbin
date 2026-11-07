@@ -63,8 +63,8 @@
   --token-surface: #FFFFFF;
   --token-surface-2: #F1F3F5;
   --token-ink: #15181D;
-  --token-ink-muted: #545B68;
-  --token-ink-subtle: #868D99;
+  --token-ink-muted: #454C59;
+  --token-ink-subtle: #5D6573;
   --token-border: #E3E6EA;
   --token-border-strong: #CDD1D8;
 
@@ -133,8 +133,8 @@ html[data-theme="moon-night"] {
   --token-surface: #16191E;
   --token-surface-2: #1D2127;
   --token-ink: #ECEEF1;
-  --token-ink-muted: #A7AEBA;
-  --token-ink-subtle: #747C88;
+  --token-ink-muted: #B5BCC8;
+  --token-ink-subtle: #939BA8;
   --token-border: #272B33;
   --token-border-strong: #353A44;
 
@@ -219,9 +219,17 @@ h1, h2, h3, h4 {
 }
 
 /* Keyboard focus (WCAG 2.1 AA) */
-:focus-visible {
-  outline: 2px solid var(--token-focus);
+:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid var(--token-focus) !important;
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--token-focus) 20%, transparent);
 }
 
 /* Thin, quiet scrollbars */

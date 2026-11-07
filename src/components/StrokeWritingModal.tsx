@@ -340,6 +340,8 @@ export const StrokeWritingModal: React.FC<StrokeWritingModalProps> = ({
           <svg
             ref={svgBoxRef}
             viewBox="0 0 100 100"
+            role="img"
+            aria-label={`Ô Mễ Tự Cách luyện viết chữ Hán ${currentChar.char} (${totalStrokes} nét)`}
             className="w-full h-full cursor-crosshair"
             onMouseDown={handlePointerDown}
             onMouseMove={handlePointerMove}
