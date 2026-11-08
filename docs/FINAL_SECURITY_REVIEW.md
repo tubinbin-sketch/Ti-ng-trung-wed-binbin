@@ -51,7 +51,16 @@
    - Tệp `firestore.rules` trong repository cần được deploy lên Firebase Project bằng lệnh `firebase deploy --only firestore:rules` (hoặc qua CI/CD) để các quy tắc phân quyền có hiệu lực trên cơ sở dữ liệu đám mây.
 3. **Chế độ Luyện tập Demo Offline vs Chế độ Lớp học Firestore:**
    - Khi người dùng tự học ở chế độ Demo Offline (`getClassroomDataMode() === 'demo'`), dữ liệu câu hỏi mẫu (`SPEED_TEST_10_QUESTIONS`, `PRESET_ASSIGNMENT_BUOI_14`) nằm ở client để phục vụ việc tự luyện tập không cần mạng/lớp học. Trong chế độ Lớp học Firestore (`getClassroomDataMode() === 'firestore'`), toàn bộ điểm số và bảng xếp hạng của lớp đều do Server quyết định thông qua `POST /api/submissions` đối chiếu với `answerKeys` trên Firestore.
-4. **Giới hạn của Rate Limit qua Firestore Transaction:**
-   - `rateLimits/{bucketId}` trên Firestore phù hợp cho lưu lượng vừa và nhỏ của các route nhạy cảm (`/api/classes/join`, `/api/teachers/bootstrap`). Nếu hệ thống chịu tấn công DDoS tần suất lớn ở tầng mạng, cần kết hợp thêm Google Cloud Armor ở phía trước Cloud Run và cấu hình Firestore TTL Policy để tự động dọn dẹp các bản ghi `rateLimits` / `aiUsage` cũ.
-5. **Tuân thủ Pháp lý & Quyền riêng tư:**
-   - Ứng dụng đã cung cấp tính năng ẩn danh tính học viên trên bảng xếp hạng (`StudentLeaderboard.tsx`), lọc PII (email/SĐT) trước khi gửi tới Gemini AI (`sanitizeAiUserInput`), và trang quản lý dữ liệu cá nhân (`PrivacyPolicyPage.tsx`). Tuy nhiên, việc tuân thủ pháp lý đầy đủ (như Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân) còn phụ thuộc vào quy trình quản lý dữ liệu, hợp đồng xử lý dữ liệu và chính sách vận hành của đơn vị chủ quản.
+4. **Rate Limit Không Lưu IP Thô & Fail-Closed Bắt Buộc Trên Production (P0 & P2 Hardened):**
+   - Trên môi trường `NODE_ENV === 'production'`, cả `STRICT_FIRESTORE_AI_QUOTA` và `STRICT_SHARED_RATE_LIMIT` luôn bắt buộc bật (fail-closed `503` nếu Firestore lỗi, không thể bị tắt bởi biến môi trường `=false`).
+   - Toàn bộ khóa trong `rateLimits/{bucketId}` được băm HMAC-SHA256 (`RATE_LIMIT_HMAC_SECRET`), không lưu IP thô hay token, và đính kèm trường TTL `expiresAt` (`Date`, lưu giữ 24 giờ). Quản trị viên hạ tầng cần bật Firestore TTL Policy trên trường `expiresAt` cho 2 bộ sưu tập `rateLimits` và `aiUsage` trong Google Cloud Console, kết hợp Google Cloud Armor nếu cần chống DDoS tầng mạng.
+5. **Giao Dịch Nguyên Tử `reset-slot`, Ủy Quyền Bài Tập & Bảo Mật Gemini AI (P1 Hardened):**
+   - Tuyến `POST /api/classes/:classId/students/:studentCode/reset-slot` chạy trong giao dịch nguyên tử `resetStudentSlotTransaction`, bảo toàn 100% điểm số và lịch sử học tập của học viên khi đổi thiết bị.
+   - Tuyến `POST /api/assignments/start` và `POST /api/submissions` xác minh đầy đủ 7 điều kiện ủy quyền lớp học/bài tập/đáp án, từ chối `studentUid` và `answerKey` giả mạo từ client, đồng thời chặn nộp lặp qua `submissionNonce`.
+   - Tuyến `POST /api/binbin/chat` kiểm tra schema nghiêm ngặt (`validateAndSanitizeBinBinChatPayload`), lọc Prompt Injection đa ngôn ngữ (Việt / Trung / Anh), cô lập ngữ cảnh trong thẻ `<untrusted_*>`, ẩn danh hóa Email/SĐT/CCCD/JWT/API Key, và làm sạch đầu ra qua `sanitizeAiOutputObject()`.
+6. **Kết Quả Kiểm Thử Tự Động Mới Nhất:**
+   - `npx tsc --noEmit`: **PASS** (0 lỗi).
+   - `npm test`: **PASS** (40/40 kịch bản kiểm thử đơn vị và tích hợp: 15 kịch bản trong `serverSecurity.test.ts`, 20 kịch bản trong `firestore.rules.test.ts`, 5 kịch bản trong `assignmentParser.test.ts`).
+   - `npm run build` & `npm run build:server`: **PASS** (`sourcemap: false`, PWA `NetworkOnly` cho `/api/*` nhạy cảm).
+   - `npm audit`: **PASS** (`0 vulnerabilities`).
+

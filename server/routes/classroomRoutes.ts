@@ -8,10 +8,31 @@ import {
   RATE_LIMIT_SCOPES,
   resolveClientIp,
 } from '../middleware/authAndRateLimitMiddleware';
-import {
-  generateServerRandomCode,
-  getActiveServerStore,
-} from '../services/storeAndGradingService';
+import { getActiveServerStore } from '../services/storeAndGradingService';
+
+function sanitizeClientSubmittedAnswers(rawAnswers: Record<string, any>): Record<string, any> {
+  const cleaned: Record<string, any> = {};
+  const forbiddenKeys = new Set([
+    '__proto__',
+    'constructor',
+    'prototype',
+    'answerKey',
+    'vocabScore',
+    'writingScore',
+    'quizScore',
+    'totalPoints',
+    'attemptCount',
+    'maxAttempts',
+    'status',
+    'timeSeconds',
+    'teacherUid',
+  ]);
+  for (const [key, value] of Object.entries(rawAnswers)) {
+    if (forbiddenKeys.has(key)) continue;
+    cleaned[key] = value;
+  }
+  return cleaned;
+}
 
 export function registerClassroomRoutes(app: Express): void {
   /**
@@ -33,8 +54,10 @@ export function registerClassroomRoutes(app: Express): void {
       memoryCheck: () => checkJoinClassRateLimit(`bootstrap:${rateKey}`),
     });
     if (!bootstrapRate.allowed) {
-      res.status(429).json({
-        error: 'Bạn đã gửi quá nhiều yêu cầu xác thực Giảng viên. Vui lòng thử lại sau ít phút.',
+      res.status(bootstrapRate.httpStatus || 429).json({
+        error:
+          bootstrapRate.error ||
+          'Bạn đã gửi quá nhiều yêu cầu xác thực Giảng viên. Vui lòng thử lại sau ít phút.',
       });
       return;
     }
@@ -105,8 +128,10 @@ export function registerClassroomRoutes(app: Express): void {
       memoryCheck: () => checkJoinClassRateLimit(rateKey),
     });
     if (!joinRate.allowed) {
-      res.status(429).json({
-        error: 'Bạn đã thử nhập mã lớp quá nhiều lần. Vui lòng đợi 10 phút trước khi thử lại.',
+      res.status(joinRate.httpStatus || 429).json({
+        error:
+          joinRate.error ||
+          'Bạn đã thử nhập mã lớp quá nhiều lần. Vui lòng đợi 10 phút trước khi thử lại.',
       });
       return;
     }
@@ -163,10 +188,10 @@ export function registerClassroomRoutes(app: Express): void {
   });
 
   /**
-   * 4C. Teacher Reset / Re-issue Student Code Slot:
+   * 4C. Teacher Reset / Re-issue Student Code Slot (P1 Atomic Transaction):
    * POST /api/classes/:classId/students/:studentCode/reset-slot
-   * Allows the class teacher to unbind `studentUid` (and optionally regenerate a new random 6-char code)
-   * when a student changes devices.
+   * Atomically unbinds `studentUid`, enforces `studentCode` uniqueness, updates locks,
+   * and preserves all student submission/score/learning history.
    */
   app.post('/api/classes/:classId/students/:studentCode/reset-slot', async (req, res) => {
     const verifiedUser = await authenticateBearerRequest(req, res);
@@ -180,8 +205,10 @@ export function registerClassroomRoutes(app: Express): void {
       windowMs: RATE_LIMIT_SCOPES.reset_student_slot.windowMs,
     });
     if (!resetRate.allowed) {
-      res.status(429).json({
-        error: 'Bạn đã gửi quá nhiều yêu cầu cấp lại mã học viên. Vui lòng thử lại sau ít phút.',
+      res.status(resetRate.httpStatus || 429).json({
+        error:
+          resetRate.error ||
+          'Bạn đã gửi quá nhiều yêu cầu cấp lại mã học viên. Vui lòng thử lại sau ít phút.',
       });
       return;
     }
@@ -197,71 +224,51 @@ export function registerClassroomRoutes(app: Express): void {
     const classId = String(req.params.classId || '').trim();
     const targetCode = String(req.params.studentCode || '')
       .trim()
-      .toUpperCase();
+      .toUpperCase()
+      .replace(/[^A-Z0-9_-]/g, '');
     const regenerateCode = Boolean(req.body?.regenerateCode);
+    const requestedNewCode =
+      typeof req.body?.newStudentCode === 'string' ? req.body.newStudentCode.trim() : undefined;
 
-    if (!classId || !targetCode) {
-      res.status(400).json({ error: 'Thiếu classId hoặc studentCode.' });
+    if (
+      !classId ||
+      !/^[a-zA-Z0-9_-]{1,128}$/.test(classId) ||
+      !targetCode ||
+      targetCode.length > 32
+    ) {
+      res.status(400).json({ error: 'Thiếu hoặc sai định dạng classId / studentCode.' });
       return;
     }
 
     const activeServerStore = getActiveServerStore();
     try {
-      const classData = await activeServerStore.getDoc(`classes/${classId}`);
-      if (!classData || classData.teacherUid !== verifiedUser.uid) {
-        res.status(403).json({
-          error: 'Forbidden: Chỉ Giảng viên chủ nhiệm lớp mới có quyền cấp lại mã học viên.',
+      if (typeof activeServerStore.resetStudentSlotTransaction === 'function') {
+        const txResult = await activeServerStore.resetStudentSlotTransaction({
+          classId,
+          targetStudentCode: targetCode,
+          teacherUid: verifiedUser.uid,
+          regenerateCode,
+          requestedNewCode,
+          nowIso: new Date().toISOString(),
+        });
+
+        if (txResult.status === 'error') {
+          res.status(txResult.httpStatus).json({ error: txResult.error });
+          return;
+        }
+
+        res.status(200).json({
+          ok: true,
+          previousStudentCode: txResult.previousStudentCode,
+          studentCode: txResult.studentCode,
+          slotId: txResult.slotId,
+          preservedRecord: txResult.preservedRecord,
         });
         return;
       }
 
-      const allStudentDocs = await activeServerStore.listCollection(
-        `classes/${classId}/students`
-      );
-      const matchingDocs = allStudentDocs.filter(
-        (d) => String(d.data.studentCode || '').toUpperCase() === targetCode
-      );
-
-      if (matchingDocs.length === 0) {
-        res.status(404).json({ error: `Không tìm thấy mã học viên "${targetCode}" trong lớp.` });
-        return;
-      }
-
-      const nextStudentCode = regenerateCode ? generateServerRandomCode('HV', 6) : targetCode;
-      const nowIso = new Date().toISOString();
-      let baseRecord = matchingDocs[0].data;
-
-      for (const docItem of matchingDocs) {
-        const oldUid = String(docItem.data.studentUid || '').trim();
-        if (oldUid && docItem.id === oldUid) {
-          baseRecord = docItem.data;
-          await activeServerStore.deleteDoc(`classes/${classId}/students/${oldUid}`);
-        } else {
-          await activeServerStore.deleteDoc(`classes/${classId}/students/${docItem.id}`);
-        }
-      }
-
-      // Clear previous studentCode lock so the re-issued slot can be claimed cleanly
-      await activeServerStore.deleteDoc(`classes/${classId}/studentCodeLocks/${targetCode}`);
-      if (nextStudentCode !== targetCode) {
-        await activeServerStore.deleteDoc(`classes/${classId}/studentCodeLocks/${nextStudentCode}`);
-      }
-
-      const newSlotId = `slot-${nextStudentCode.toLowerCase().replace(/[^a-z0-9_-]/g, '')}`;
-      const updatedSlot = {
-        ...baseRecord,
-        studentUid: '',
-        studentCode: nextStudentCode,
-        updatedAt: nowIso,
-      };
-
-      await activeServerStore.setDoc(`classes/${classId}/students/${newSlotId}`, updatedSlot);
-
-      res.status(200).json({
-        ok: true,
-        previousStudentCode: targetCode,
-        studentCode: nextStudentCode,
-        slotId: newSlotId,
+      res.status(500).json({
+        error: 'Cơ chế giao dịch cấp lại mã học viên chưa sẵn sàng.',
       });
     } catch (err) {
       console.error('[server] reset-slot error', err);
@@ -272,11 +279,12 @@ export function registerClassroomRoutes(app: Express): void {
   });
 
   /**
-   * 4D-Start. Server-Side Assignment Timer Start Route: POST /api/assignments/start
+   * 4D-Start. Server-Side Assignment Timer Start Route (P1 Hardened):
+   * POST /api/assignments/start
    * Body: { classId, assignmentId }
-   * Records an authoritative server-side `startedAtMs` timestamp at
-   * `classes/{classId}/assignmentStarts/{assignmentId}_{uid}` so `/api/submissions`
-   * computes elapsed `timeSeconds` without trusting client-reported timers.
+   * Verifies student enrollment, assignment existence, teacher ownership, active status,
+   * and records an authoritative server-side `startedAtMs` timestamp at
+   * `classes/{classId}/assignmentStarts/{assignmentId}_{uid}`.
    */
   app.post('/api/assignments/start', async (req, res) => {
     const verifiedUser = await authenticateBearerRequest(req, res);
@@ -290,8 +298,21 @@ export function registerClassroomRoutes(app: Express): void {
       windowMs: RATE_LIMIT_SCOPES.assignment_start.windowMs,
     });
     if (!startRate.allowed) {
-      res.status(429).json({
-        error: 'Bạn đã gửi quá nhiều yêu cầu bắt đầu làm bài. Vui lòng đợi 1 phút trước khi thử lại.',
+      res.status(startRate.httpStatus || 429).json({
+        error:
+          startRate.error ||
+          'Bạn đã gửi quá nhiều yêu cầu bắt đầu làm bài. Vui lòng đợi 1 phút trước khi thử lại.',
+      });
+      return;
+    }
+
+    if (
+      req.body?.studentUid !== undefined &&
+      String(req.body.studentUid).trim() !== '' &&
+      String(req.body.studentUid).trim() !== verifiedUser.uid
+    ) {
+      res.status(403).json({
+        error: 'Forbidden: Không được phép giả mạo studentUid của học viên khác.',
       });
       return;
     }
@@ -310,52 +331,31 @@ export function registerClassroomRoutes(app: Express): void {
 
     const activeServerStore = getActiveServerStore();
     try {
-      const studentDoc = await activeServerStore.getDoc(
-        `classes/${classId}/students/${verifiedUser.uid}`
-      );
-      if (!studentDoc) {
-        res.status(403).json({
-          error: 'Forbidden: Bạn chưa tham gia lớp học này.',
-        });
-        return;
-      }
-
-      const startId = `${assignmentId}_${verifiedUser.uid}`;
-      const startPath = `classes/${classId}/assignmentStarts/${startId}`;
-      const existingStart = await activeServerStore.getDoc(startPath);
-      const existingSub = await activeServerStore.getDoc(
-        `classes/${classId}/submissions/${startId}`
-      );
-
-      const nowMs = Date.now();
-      const nowIso = new Date(nowMs).toISOString();
-
-      // Preserve initial start time if an active unsubmitted session already exists
-      if (existingStart && Number(existingStart.startedAtMs || 0) > 0 && !existingSub) {
-        res.status(200).json({
-          ok: true,
+      if (typeof activeServerStore.startAssignmentTransaction === 'function') {
+        const txResult = await activeServerStore.startAssignmentTransaction({
           classId,
           assignmentId,
-          startedAtMs: Number(existingStart.startedAtMs),
-          startedAt: String(existingStart.startedAt || nowIso),
+          uid: verifiedUser.uid,
+          nowMs: Date.now(),
+        });
+
+        if (txResult.status === 'error') {
+          res.status(txResult.httpStatus).json({ error: txResult.error });
+          return;
+        }
+
+        res.status(200).json({
+          ok: true,
+          classId: txResult.classId,
+          assignmentId: txResult.assignmentId,
+          startedAtMs: txResult.startedAtMs,
+          startedAt: txResult.startedAt,
         });
         return;
       }
 
-      await activeServerStore.setDoc(startPath, {
-        classId,
-        assignmentId,
-        studentUid: verifiedUser.uid,
-        startedAtMs: nowMs,
-        startedAt: nowIso,
-      });
-
-      res.status(200).json({
-        ok: true,
-        classId,
-        assignmentId,
-        startedAtMs: nowMs,
-        startedAt: nowIso,
+      res.status(500).json({
+        error: 'Cơ chế khởi tạo phiên làm bài chưa sẵn sàng.',
       });
     } catch (err) {
       console.error('[server] /api/assignments/start error', err);
@@ -366,21 +366,46 @@ export function registerClassroomRoutes(app: Express): void {
   });
 
   /**
-   * 4D. Server-Side Homework Grading Route: POST /api/submissions
-   * Body: { classId, assignmentId, answers }
+   * 4D. Server-Side Homework Grading Route (P1 Hardened): POST /api/submissions
+   * Body: { classId, assignmentId, answers, submissionNonce? }
    * Executes a single atomic transaction (`submitAssignmentTransaction`) that verifies
-   * student membership, checks `attemptCount < maxAttempts`, grades against
-   * `classes/{classId}/answerKeys/{assignmentId}`, computes server-authoritative `timeSeconds`,
-   * and writes `submissions`, `leaderboard`, and `students`.
+   * student membership, assignment/answerKey ownership & active status, checks `attemptCount < maxAttempts`,
+   * blocks replay nonces, grades against `classes/{classId}/answerKeys/{assignmentId}`,
+   * computes server-authoritative `timeSeconds`, and writes `submissions`, `leaderboard`, and `students`.
    */
   app.post('/api/submissions', async (req, res) => {
     const verifiedUser = await authenticateBearerRequest(req, res);
     if (!verifiedUser) return;
 
+    if (
+      req.body?.studentUid !== undefined &&
+      String(req.body.studentUid).trim() !== '' &&
+      String(req.body.studentUid).trim() !== verifiedUser.uid
+    ) {
+      res.status(403).json({
+        error: 'Forbidden: Không được phép nộp bài thay cho studentUid khác.',
+      });
+      return;
+    }
+
+    if (
+      req.body?.answerKey !== undefined ||
+      (req.body?.answers &&
+        typeof req.body.answers === 'object' &&
+        'answerKey' in req.body.answers)
+    ) {
+      res.status(400).json({
+        error: 'Bad Request: Không chấp nhận answerKey do client gửi lên.',
+      });
+      return;
+    }
+
     const classId = String(req.body?.classId || '').trim();
     const assignmentId = String(req.body?.assignmentId || 'default-assignment').trim();
-    const answers =
-      req.body?.answers && typeof req.body.answers === 'object'
+    const rawAnswers =
+      req.body?.answers &&
+      typeof req.body.answers === 'object' &&
+      !Array.isArray(req.body.answers)
         ? (req.body.answers as Record<string, any>)
         : null;
 
@@ -392,10 +417,19 @@ export function registerClassroomRoutes(app: Express): void {
       res.status(400).json({ error: 'assignmentId không hợp lệ.' });
       return;
     }
-    if (!answers) {
+    if (!rawAnswers) {
       res.status(400).json({ error: 'Thiếu dữ liệu bài làm (answers).' });
       return;
     }
+
+    const answers = sanitizeClientSubmittedAnswers(rawAnswers);
+    const rawNonce =
+      typeof req.body?.submissionNonce === 'string'
+        ? req.body.submissionNonce
+        : typeof req.headers['x-submission-nonce'] === 'string'
+        ? req.headers['x-submission-nonce']
+        : '';
+    const submissionNonce = rawNonce.trim().replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 128);
 
     const activeServerStore = getActiveServerStore();
     try {
@@ -409,6 +443,7 @@ export function registerClassroomRoutes(app: Express): void {
           answers,
           configuredMaxAttempts: configuredMax,
           nowMs: Date.now(),
+          submissionNonce: submissionNonce || undefined,
         });
 
         if (txResult.status === 'error') {
@@ -431,3 +466,4 @@ export function registerClassroomRoutes(app: Express): void {
     }
   });
 }
+

@@ -46,7 +46,10 @@ Theo quy định về bảo vệ dữ liệu cá nhân của trẻ em và ngư�
    - Vai trò: Hạ tầng xác thực và cơ sở dữ liệu đám mây bảo mật theo tiêu chuẩn ISO/IEC 27001, SOC 2.
 2. **Google Gemini API (`@google/genai`)**:
    - Vai trò: Hỗ trợ giải thích từ vựng và trợ giảng ngữ pháp.
-   - **Biện pháp kỹ thuật bảo vệ dữ liệu cá nhân**: Hàm `sanitizeAiUserInput` trong `server.ts` tự động lọc và thay thế mọi địa chỉ Email (`[EMAIL_ĐÃ_ẨN]`) và Số điện thoại (`[SĐT_ĐÃ_ẨN]`) nếu học viên vô tình gõ vào ô chat, đồng thời không bao giờ gửi danh sách học sinh hay điểm số cá nhân sang Gemini API.
+   - **Biện pháp kỹ thuật bảo vệ dữ liệu cá nhân (P1 Hardened)**: Hàm `sanitizeAiUserInput` và `validateAndSanitizeBinBinChatPayload` trong `server/services/geminiAiService.ts` tự động loại bỏ thẻ HTML/script, lọc Prompt Injection đa ngôn ngữ (Việt / Trung / Anh), cô lập ngữ cảnh trong thẻ `<untrusted_*>`, và che giấu mọi địa chỉ Email (`[EMAIL_ĐÃ_ẨN]`), Số điện thoại (`[SĐT_ĐÃ_ẨN]`), CCCD 12 số (`[CCCD_ĐÃ_ẨN]`), JWT/Bearer token (`[TOKEN_ĐÃ_ẨN]`) cùng khóa API (`[API_KEY_ĐÃ_ẨN]`). Hệ thống không bao giờ gửi danh sách học sinh hay điểm số cá nhân sang Gemini API.
+3. **Bảo vệ Quyền riêng tư trong Bộ đếm Rate Limit (`rateLimits/*` — P2 Hardened)**:
+   - Tuyệt đối không lưu địa chỉ IP thô, UID thô hoặc Firebase ID Token trong bộ sưu tập `/rateLimits/{bucketId}`.
+   - Mọi định danh rate limit được băm một chiều bằng **HMAC-SHA256** (`hashRateLimitIdentifier`), kèm trường thời gian tự hủy `expiresAt` (`Date` chuẩn Firestore TTL Policy, thời hạn lưu giữ 24 giờ).
 
 ---
 
@@ -55,4 +58,5 @@ Theo quy định về bảo vệ dữ liệu cá nhân của trẻ em và ngư�
 Tại trang `/chinh-sach-rieng-tu` (`src/components/PrivacyPolicyPage.tsx`), người dùng có thể thực hiện ngay lập tức:
 1. **Quyền được biết & Quyền truy cập / Xuất dữ liệu**: Bấm nút **"Xuất dữ liệu cá nhân (.json)"** để tải về toàn bộ dữ liệu học tập đang lưu trên thiết bị dưới định dạng chuẩn JSON.
 2. **Quyền xóa dữ liệu cục bộ (Bảo vệ trên máy tính dùng chung)**: Bấm nút **"Xóa dữ liệu cục bộ trên thiết bị này"** để xóa sạch toàn bộ khóa `hanu_*` trong `localStorage` và `sessionStorage` sau buổi học tại phòng máy.
-3. **Quyền yêu cầu xóa / chỉnh sửa hồ sơ lớp học trên Cloud**: Học viên hoặc Phụ huynh gửi yêu cầu tới Giảng viên chủ nhiệm lớp (giảng viên có nút Xóa / Cấp lại slot học viên trực tiếp trong `ClassroomManager`) hoặc liên hệ email quản trị `dondon.win10@gmail.com` để được xử lý trong vòng 72 giờ.
+3. **Quyền yêu cầu xóa / chỉnh sửa hồ sơ lớp học trên Cloud**: Học viên hoặc Phụ huynh gửi yêu cầu tới Giảng viên chủ nhiệm lớp (giảng viên có nút Xóa / Cấp lại slot học viên trực tiếp trong `ClassroomManager` thông qua giao dịch nguyên tử `resetStudentSlotTransaction` bảo toàn 100% lịch sử học tập) hoặc liên hệ kênh quản trị chính thức của lớp để được xử lý trong vòng 72 giờ.
+

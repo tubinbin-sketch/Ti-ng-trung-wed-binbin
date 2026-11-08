@@ -8,12 +8,17 @@ import {
   callGeminiModel,
   classifyErrorStatus,
   enrichCache,
+  getGeminiCallOverrideForTesting,
   getGeminiClient,
   parseModelJson,
+  sanitizeAiOutputObject,
   sanitizeAiUserInput,
   suggestCache,
+  validateAndSanitizeBinBinChatPayload,
 } from '../services/geminiAiService';
 import { protectAiRoute } from '../middleware/authAndRateLimitMiddleware';
+
+const SINGLE_HAN_CHAR_REGEX = /^\p{Script=Han}$/u;
 
 export function registerHanziStaticAndHealthRoutes(app: Express): void {
   // Liveness probe for Cloud Run / uptime monitors (no auth, no rate limit).
@@ -34,12 +39,16 @@ export function registerHanziStaticAndHealthRoutes(app: Express): void {
 
   app.get('/api/hanzi/char/:char', (req, res) => {
     const rawChar = String(req.params.char || '').trim();
-    if (!rawChar || Array.from(rawChar).length !== 1) {
+    if (
+      !rawChar ||
+      Array.from(rawChar).length !== 1 ||
+      !SINGLE_HAN_CHAR_REGEX.test(rawChar)
+    ) {
       res.status(400).json({ error: 'Invalid single Chinese character parameter.' });
       return;
     }
-    const charFile = path.join(HANZI_DATA_DIR, `${rawChar}.json`);
-    if (!fs.existsSync(charFile)) {
+    const charFile = path.resolve(HANZI_DATA_DIR, `${rawChar}.json`);
+    if (!charFile.startsWith(HANZI_DATA_DIR + path.sep) || !fs.existsSync(charFile)) {
       res.status(404).json({ error: 'Character stroke data not found in local package.' });
       return;
     }
@@ -67,13 +76,14 @@ export function registerAiRoutes(app: Express): void {
       }
 
       const ai = getGeminiClient();
-      if (!ai) {
+      const hasTestOverride = Boolean(getGeminiCallOverrideForTesting());
+      if (!ai && !hasTestOverride) {
         res.status(401).json({ fallback: true, error: 'Gemini API key is not configured.' });
         return;
       }
 
-      const { response, model } = await callGeminiModel(ai, 'fast', {
-        contents: `Hãy phân tích từ/chữ tiếng Trung "${hanzi}" dành cho học viên Việt Nam học HSK.
+      const { response, model } = await callGeminiModel(ai as any, 'fast', {
+        contents: `Hãy phân tích từ/chữ tiếng Trung <untrusted_user_query>${hanzi}</untrusted_user_query> dành cho học viên Việt Nam học HSK.
 Trả về JSON chính xác gồm:
 - pinyin: phiên âm Pinyin chuẩn có dấu thanh điệu, các âm tiết cách nhau 1 khoảng trắng (ví dụ: "温暖" -> "wēn nuǎn")
 - hanViet: âm Hán Việt chuẩn xác bằng chữ thường (ví dụ: "ôn noãn")
@@ -131,7 +141,9 @@ Trả về JSON chính xác gồm:
         },
       });
 
-      const parsed = parseModelJson<Record<string, unknown>>(response.text, {});
+      const parsed = sanitizeAiOutputObject(
+        parseModelJson<Record<string, unknown>>(response.text, {})
+      );
       if (!parsed.pinyin || !parsed.meaning) {
         res.status(502).json({ fallback: true, error: 'AI returned an incomplete word entry.' });
         return;
@@ -165,13 +177,14 @@ Trả về JSON chính xác gồm:
       }
 
       const ai = getGeminiClient();
-      if (!ai) {
+      const hasTestOverride = Boolean(getGeminiCallOverrideForTesting());
+      if (!ai && !hasTestOverride) {
         res.status(401).json({ fallback: true, error: 'Gemini API key is not configured.' });
         return;
       }
 
-      const { response, model } = await callGeminiModel(ai, 'fast', {
-        contents: `Giáo viên tiếng Trung đang tìm kiếm từ vựng với từ khóa/chủ đề: "${query}".
+      const { response, model } = await callGeminiModel(ai as any, 'fast', {
+        contents: `Giáo viên tiếng Trung đang tìm kiếm từ vựng với từ khóa/chủ đề: <untrusted_user_query>${query}</untrusted_user_query>.
 Hãy gợi ý ${limit} từ vựng tiếng Trung HSK sát nghĩa và hữu ích nhất để giáo viên chọn đưa vào bài giảng.
 Trả về JSON có thuộc tính "suggestions" là mảng các đối tượng, mỗi đối tượng gồm:
 - hanzi: chữ Hán giản thể chuẩn (ví dụ: "温暖", "咖啡", "家庭")
@@ -224,7 +237,9 @@ Trả về JSON có thuộc tính "suggestions" là mảng các đối tượng,
         },
       });
 
-      const parsed = parseModelJson<{ suggestions?: unknown[] }>(response.text, { suggestions: [] });
+      const parsed = sanitizeAiOutputObject(
+        parseModelJson<{ suggestions?: unknown[] }>(response.text, { suggestions: [] })
+      );
       const suggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, limit) : [];
       const payload = { suggestions };
       if (suggestions.length > 0) suggestCache.set(cacheKey, payload);
@@ -238,63 +253,27 @@ Trả về JSON có thuộc tính "suggestions" là mảng các đối tượng,
     }
   });
 
-  // Server-side Gemini API route for Bin Bin (彬彬) Practical Pedagogical Assistant
+  // Server-side Gemini API route for Bin Bin (彬彬) Practical Pedagogical Assistant (P1 Hardened)
   app.post('/api/binbin/chat', protectAiRoute, async (req, res) => {
     try {
-      const prompt = sanitizeAiUserInput(String(req.body?.prompt || ''), 1500);
-      const actionType = sanitizeAiUserInput(String(req.body?.actionType || 'chat'), 40) || 'chat';
-      const contextSlide = req.body?.contextSlide || null;
-      const contextQuiz = req.body?.contextQuiz || null;
-      // Last few turns so BinBin can follow up ("cho thêm ví dụ", "giải thích lại").
-      const rawHistory: unknown[] = Array.isArray(req.body?.history) ? req.body.history : [];
-      const history = rawHistory
-        .slice(-6)
-        .map((turn) => {
-          const t = turn as { role?: unknown; text?: unknown };
-          const role = t?.role === 'model' ? 'model' : t?.role === 'user' ? 'user' : null;
-          const text = typeof t?.text === 'string' ? sanitizeAiUserInput(t.text, 800) : '';
-          return role && text ? { role, parts: [{ text }] } : null;
-        })
-        .filter((t): t is { role: 'user' | 'model'; parts: { text: string }[] } => t !== null);
-
-      if (!prompt || prompt.length > 1500) {
-        res.status(400).json({ error: 'Invalid or missing prompt (max 1500 characters).' });
+      const validated = validateAndSanitizeBinBinChatPayload(req.body);
+      if (!validated.ok) {
+        res.status(validated.status).json({ error: validated.error });
         return;
       }
 
+      const { history, structuredTurnText } = validated.data;
+
       const ai = getGeminiClient();
-      if (!ai) {
+      const hasTestOverride = Boolean(getGeminiCallOverrideForTesting());
+      if (!ai && !hasTestOverride) {
         res.status(401).json({ fallback: true, error: 'Gemini API key is not configured.' });
         return;
       }
 
-      const contextSummary = [
-        contextSlide
-          ? `Từ vựng đang mở trên Slide: "${contextSlide.hanzi}" (${contextSlide.pinyin} - Hán Việt: ${contextSlide.hanViet} - Nghĩa: ${contextSlide.meaning}). Ví dụ: ${contextSlide.exampleHanzi} (${contextSlide.examplePinyin}).`
-          : '',
-        contextQuiz
-          ? `Câu hỏi Trò chơi hiện tại: ${contextQuiz.prompt || ''} | Gợi ý ngữ pháp: ${contextQuiz.grammarHint || ''} | Gợi ý Pinyin: ${contextQuiz.pinyinHint || ''}.`
-          : '',
-      ]
-        .filter(Boolean)
-        .join('\n');
-
-      const currentTurn = `${contextSummary ? `[Ngữ cảnh bài giảng hiện tại]\n${contextSummary}\n\n` : ''}[Chế độ: ${actionType}]\nYêu cầu của Giáo viên / Học viên: ${prompt}
-
-Hãy giải đáp trực diện, thực dụng theo chuẩn HSK 3.0 dưới dạng JSON:
-- replyText: Giải thích ngắn gọn, đi thẳng vào trọng tâm bằng gạch đầu dòng rõ ràng (tuyệt đối không chào hỏi dài dòng, không ghép từ máy móc kiểu "学习X" hay "常用X"). Nếu người dùng nhập câu sai, hãy chỉ rõ lỗi sai và cách sửa tự nhiên. Nếu giáo viên yêu cầu tạo bài tập/hội thoại, hãy trình bày rõ từng câu.
-- essenceAndContext: 1-2 câu tóm tắt bản chất từ loại và ngữ cảnh dùng thực tế của từ/cấu trúc.
-- collocations: mảng 3 cụm từ kết hợp chuẩn 100% người bản xứ (ví dụ với 初中: 上初中, 初中生, 初中毕业), mỗi phần tử gồm { hanzi, pinyin, meaning }.
-- synonymDistinction: so sánh nhanh với 1-2 từ dễ nhầm (ví dụ 初中 vs 高中, 温暖 vs 暖和), gồm { title, summary, items: [{ word, pinyin, nuance, example }] }.
-- examples: mảng 2 câu ví dụ thực tế tự nhiên, mỗi phần tử gồm { hanzi, pinyin, meaning }.
-- chinesePhrase: câu tiếng Trung tiêu biểu số 1.
-- pinyinPhrase: phiên âm Pinyin có dấu của chinesePhrase.
-- vietnamesePhrase: nghĩa tiếng Việt của chinesePhrase.
-- targetWord: thông tin từ vựng trọng tâm để có thể thêm ngay vào Slide bài giảng { hanzi, pinyin, hanViet, meaning, partOfSpeech, hskLevel }.`;
-
-      const { response, model } = await callGeminiModel(ai, 'chat', {
+      const { response, model } = await callGeminiModel(ai as any, 'chat', {
         // Earlier turns give the conversation memory; JSON instructions only on the latest turn.
-        contents: [...history, { role: 'user', parts: [{ text: currentTurn }] }],
+        contents: [...history, { role: 'user', parts: [{ text: structuredTurnText }] }],
         config: {
           systemInstruction: BINBIN_SYSTEM_INSTRUCTION,
           responseMimeType: 'application/json',
@@ -364,8 +343,10 @@ Hãy giải đáp trực diện, thực dụng theo chuẩn HSK 3.0 dưới dạ
         },
       });
 
-      const parsed = parseModelJson<Record<string, unknown>>(response.text, {});
-      if (!parsed.replyText) {
+      const parsed = sanitizeAiOutputObject(
+        parseModelJson<Record<string, unknown>>(response.text, {})
+      );
+      if (!parsed.replyText || typeof parsed.replyText !== 'string') {
         res.status(502).json({ fallback: true, error: 'AI returned an empty reply.' });
         return;
       }
@@ -374,8 +355,14 @@ Hãy giải đáp trực diện, thực dụng theo chuẩn HSK 3.0 dưới dạ
       const status = classifyErrorStatus(err);
       res.status(status).json({
         fallback: true,
-        error: 'Unable to process assistant request at this time.',
+        error:
+          status === 504
+            ? 'AI assistant timed out while processing the request.'
+            : status === 502
+            ? 'AI returned an invalid JSON response.'
+            : 'Unable to process assistant request at this time.',
       });
     }
   });
 }
+

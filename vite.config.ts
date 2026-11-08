@@ -65,6 +65,11 @@ export default defineConfig(() => {
           navigateFallbackDenylist: [/^\/api\//, /^\/hanzi-data\//],
           runtimeCaching: [
             {
+              // Never cache authenticated or private API endpoints in Service Worker CacheStorage
+              urlPattern: /^\/api\/(?!hanzi\/char\/).*/i,
+              handler: 'NetworkOnly',
+            },
+            {
               urlPattern: /^\/(hanzi-data\/.*\.json|api\/hanzi\/char\/.*)$/i,
               handler: 'CacheFirst',
               options: {
@@ -150,6 +155,7 @@ export default defineConfig(() => {
       ],
     },
     build: {
+      sourcemap: false,
       rolldownOptions: {
         output: {
           manualChunks(moduleId) {

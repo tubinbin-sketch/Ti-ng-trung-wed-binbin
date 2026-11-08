@@ -2,8 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { getAppCheck as getAdminAppCheck } from 'firebase-admin/app-check';
 import {
+  buildPrivacySafeRateLimitBucketId,
   firebaseAdminApp,
   getActiveServerStore,
+  MAX_IN_MEMORY_RATE_LIMIT_DOCS,
 } from '../services/storeAndGradingService';
 import { getAiDailyLimit } from '../services/geminiAiService';
 
@@ -51,6 +53,55 @@ const aiUidMinuteCounts = new Map<string, { count: number; resetAt: number }>();
 const aiUidDailyCounts = new Map<string, { count: number; resetAt: number }>();
 const joinClassAttemptCounts = new Map<string, { count: number; resetAt: number }>();
 
+function enforceMapMaxSize(map: Map<string, { count: number; resetAt: number }>, now = Date.now()): void {
+  if (map.size < MAX_IN_MEMORY_RATE_LIMIT_DOCS) return;
+  for (const [k, v] of map.entries()) {
+    if (now > v.resetAt) {
+      map.delete(k);
+    }
+  }
+  while (map.size >= MAX_IN_MEMORY_RATE_LIMIT_DOCS) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey === undefined) break;
+    map.delete(oldestKey);
+  }
+}
+
+export function checkBoundedInMemoryBucket(
+  bucketId: string,
+  maxRequests: number,
+  windowMs: number,
+  now = Date.now()
+): { allowed: boolean; count: number; remaining: number; resetAt: number } {
+  enforceMapMaxSize(clientRequestCounts, now);
+  const entry = clientRequestCounts.get(bucketId);
+  if (!entry || now > entry.resetAt) {
+    const resetAt = now + windowMs;
+    clientRequestCounts.set(bucketId, { count: 1, resetAt });
+    return {
+      allowed: true,
+      count: 1,
+      remaining: Math.max(0, maxRequests - 1),
+      resetAt,
+    };
+  }
+  if (entry.count >= maxRequests) {
+    return {
+      allowed: false,
+      count: entry.count,
+      remaining: 0,
+      resetAt: entry.resetAt,
+    };
+  }
+  entry.count += 1;
+  return {
+    allowed: true,
+    count: entry.count,
+    remaining: Math.max(0, maxRequests - entry.count),
+    resetAt: entry.resetAt,
+  };
+}
+
 /**
  * Dedicated brute-force rate limiter for /api/classes/join (max 15 attempts per 10 minutes per UID/IP).
  */
@@ -58,13 +109,14 @@ export function checkJoinClassRateLimit(
   key: string,
   now = Date.now()
 ): { allowed: boolean; remaining: number } {
-  const cleanKey = key.trim() || 'unknown';
-  const entry = joinClassAttemptCounts.get(cleanKey);
+  const hashedKey = buildPrivacySafeRateLimitBucketId('join_class', key.trim() || 'unknown');
+  enforceMapMaxSize(joinClassAttemptCounts, now);
+  const entry = joinClassAttemptCounts.get(hashedKey);
   if (entry && now <= entry.resetAt && entry.count >= JOIN_CLASS_MAX_ATTEMPTS) {
     return { allowed: false, remaining: 0 };
   }
   if (!entry || now > entry.resetAt) {
-    joinClassAttemptCounts.set(cleanKey, { count: 1, resetAt: now + JOIN_CLASS_WINDOW_MS });
+    joinClassAttemptCounts.set(hashedKey, { count: 1, resetAt: now + JOIN_CLASS_WINDOW_MS });
     return { allowed: true, remaining: JOIN_CLASS_MAX_ATTEMPTS - 1 };
   }
   entry.count += 1;
@@ -126,12 +178,22 @@ const rateLimitCleanupTimer = setInterval(() => {
 }, RATE_LIMIT_CLEANUP_INTERVAL_MS);
 rateLimitCleanupTimer.unref?.();
 
+/**
+ * Resolves the client IP solely through Express's trusted proxy resolution (`req.ip`)
+ * or the direct socket address (`req.socket.remoteAddress`).
+ * NEVER reads raw `req.headers['x-forwarded-for']` directly when `req.ip` is absent,
+ * preventing attackers from spoofing `X-Forwarded-For` headers to bypass IP rate limits.
+ */
 export function resolveClientIp(req: Request): string {
-  return String(
-    req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'local'
-  )
-    .split(',')[0]
-    .trim();
+  const expressIp = typeof req.ip === 'string' ? req.ip.trim() : '';
+  if (expressIp) {
+    return expressIp;
+  }
+  const socketIp =
+    req.socket && typeof req.socket.remoteAddress === 'string'
+      ? req.socket.remoteAddress.trim()
+      : '';
+  return socketIp || 'local';
 }
 
 export async function apiRateLimiter(req: Request, res: Response, next: NextFunction) {
@@ -144,8 +206,8 @@ export async function apiRateLimiter(req: Request, res: Response, next: NextFunc
   });
 
   if (!sharedRate.allowed) {
-    res.status(429).json({
-      error: 'Too many requests. Please try again in a minute.',
+    res.status(sharedRate.httpStatus || 429).json({
+      error: sharedRate.error || 'Too many requests. Please try again in a minute.',
       fallback: true,
     });
     return;
@@ -198,7 +260,7 @@ export async function verifyFirebaseIdToken(
   if (customTokenVerifierForTest) {
     return await customTokenVerifierForTest(idToken);
   }
-  // Check token revocation (`checkRevoked = true`) to reject revoked sessions immediately
+  // Check token revocation (`checkRevoked = true`) to reject revoked sessions or disabled users immediately
   const decoded = await getAdminAuth(firebaseAdminApp).verifyIdToken(idToken, true);
   return {
     uid: decoded.uid,
@@ -346,11 +408,38 @@ export async function isTeacherUserAuthorized(user: VerifiedFirebaseUser): Promi
   return false;
 }
 
+/**
+ * P0: Production ALWAYS enforces shared Firestore AI quota (fail-closed).
+ * Setting `STRICT_FIRESTORE_AI_QUOTA=false` is ignored in `NODE_ENV === 'production'`
+ * so an accidental env var can never re-enable silent in-memory fallback in production.
+ * In-memory fallback is permitted ONLY in development/test when `STRICT_FIRESTORE_AI_QUOTA !== 'true'`.
+ */
 export function isStrictFirestoreAiQuotaEnabled(): boolean {
   const raw = process.env.STRICT_FIRESTORE_AI_QUOTA?.trim().toLowerCase();
+  if (process.env.NODE_ENV === 'production') {
+    if (raw === 'false') {
+      console.warn(
+        '[SECURITY WARNING] STRICT_FIRESTORE_AI_QUOTA=false is ignored in NODE_ENV=production. Production always enforces shared Firestore AI quota (fail-closed).'
+      );
+    }
+    return true;
+  }
   if (raw === 'true') return true;
-  if (raw === 'false') return false;
-  return process.env.NODE_ENV === 'production';
+  return false;
+}
+
+export function isStrictSharedRateLimitEnabled(): boolean {
+  const raw = process.env.STRICT_SHARED_RATE_LIMIT?.trim().toLowerCase();
+  if (process.env.NODE_ENV === 'production') {
+    if (raw === 'false') {
+      console.warn(
+        '[SECURITY WARNING] STRICT_SHARED_RATE_LIMIT=false is ignored in NODE_ENV=production. Production always enforces shared Firestore rate limits (fail-closed).'
+      );
+    }
+    return true;
+  }
+  if (raw === 'true') return true;
+  return false;
 }
 
 export async function checkSharedRateLimit(params: {
@@ -360,14 +449,22 @@ export async function checkSharedRateLimit(params: {
   windowMs: number;
   nowMs?: number;
   memoryCheck?: () => { allowed: boolean };
-}): Promise<{ allowed: boolean; count: number; remaining: number; resetAt: number }> {
+}): Promise<{
+  allowed: boolean;
+  count: number;
+  remaining: number;
+  resetAt: number;
+  httpStatus?: number;
+  error?: string;
+  reason?: 'rate_limit_exceeded' | 'rate_store_unavailable';
+}> {
   const { scope, key, maxRequests, windowMs, nowMs = Date.now(), memoryCheck } = params;
-  const cleanKey = (key.trim() || 'unknown').replace(/\//g, '_');
+  const bucketId = buildPrivacySafeRateLimitBucketId(scope, key);
   const activeServerStore = getActiveServerStore();
+  const strictMode = isStrictSharedRateLimitEnabled();
 
   if (typeof activeServerStore.incrementRateLimitTransaction === 'function') {
     try {
-      const bucketId = `${scope}_${cleanKey}`;
       const sharedResult = await activeServerStore.incrementRateLimitTransaction(
         bucketId,
         maxRequests,
@@ -379,23 +476,37 @@ export async function checkSharedRateLimit(params: {
         count: sharedResult.count,
         remaining: Math.max(0, maxRequests - sharedResult.count),
         resetAt: sharedResult.resetAt,
+        httpStatus: sharedResult.allowed ? 200 : 429,
+        reason: sharedResult.allowed ? undefined : 'rate_limit_exceeded',
       };
     } catch (err) {
-      if (
-        process.env.NODE_ENV === 'production' ||
-        process.env.STRICT_SHARED_RATE_LIMIT === 'true'
-      ) {
+      if (strictMode) {
         console.error('[server] Shared rate limit transaction failed in strict mode:', err);
         return {
           allowed: false,
           count: maxRequests + 1,
           remaining: 0,
           resetAt: nowMs + windowMs,
+          httpStatus: 503,
+          reason: 'rate_store_unavailable',
+          error: 'Hệ thống kiểm soát lưu lượng tạm thời gián đoạn. Vui lòng thử lại sau.',
         };
       }
     }
+  } else if (strictMode) {
+    console.error('[server] Shared rate limit transaction unavailable in strict mode.');
+    return {
+      allowed: false,
+      count: maxRequests + 1,
+      remaining: 0,
+      resetAt: nowMs + windowMs,
+      httpStatus: 503,
+      reason: 'rate_store_unavailable',
+      error: 'Hệ thống kiểm soát lưu lượng tạm thời gián đoạn. Vui lòng thử lại sau.',
+    };
   }
 
+  // Development/test only fallback
   if (memoryCheck) {
     const localResult = memoryCheck();
     return {
@@ -403,34 +514,59 @@ export async function checkSharedRateLimit(params: {
       count: localResult.allowed ? 1 : maxRequests + 1,
       remaining: localResult.allowed ? Math.max(0, maxRequests - 1) : 0,
       resetAt: nowMs + windowMs,
+      httpStatus: localResult.allowed ? 200 : 429,
     };
   }
 
+  const memBucket = checkBoundedInMemoryBucket(bucketId, maxRequests, windowMs, nowMs);
   return {
-    allowed: true,
-    count: 1,
-    remaining: Math.max(0, maxRequests - 1),
-    resetAt: nowMs + windowMs,
+    ...memBucket,
+    httpStatus: memBucket.allowed ? 200 : 429,
   };
 }
 
 export function checkAndIncrementAiUidQuota(
   uid: string,
-  now = Date.now()
-): { allowed: boolean; reason?: 'minute_limit' | 'daily_limit'; dailyLimit: number } {
-  const cleanUid = uid.trim();
-  const dailyLimit = getAiDailyLimit();
+  now = Date.now(),
+  customDailyLimit?: number
+): {
+  allowed: boolean;
+  reason?: 'minute_limit' | 'daily_limit';
+  dailyLimit: number;
+  count: number;
+  remaining: number;
+} {
+  const cleanUid = uid.trim() || 'unknown';
+  const dailyLimit =
+    typeof customDailyLimit === 'number' && customDailyLimit > 0
+      ? Math.floor(customDailyLimit)
+      : getAiDailyLimit();
+
+  enforceMapMaxSize(aiUidMinuteCounts, now);
+  enforceMapMaxSize(aiUidDailyCounts, now);
 
   // 1. Per-minute burst check per UID
   const minuteEntry = aiUidMinuteCounts.get(cleanUid);
   if (minuteEntry && now <= minuteEntry.resetAt && minuteEntry.count >= AI_RATE_LIMIT_MAX_REQUESTS) {
-    return { allowed: false, reason: 'minute_limit', dailyLimit };
+    return {
+      allowed: false,
+      reason: 'minute_limit',
+      dailyLimit,
+      count: minuteEntry.count,
+      remaining: 0,
+    };
   }
 
   // 2. Per-day quota check per UID
   const dailyEntry = aiUidDailyCounts.get(cleanUid);
   if (dailyEntry && now <= dailyEntry.resetAt && dailyEntry.count >= dailyLimit) {
-    return { allowed: false, reason: 'daily_limit', dailyLimit };
+    return {
+      allowed: false,
+      reason: 'daily_limit',
+      dailyLimit,
+      count: dailyEntry.count,
+      remaining: 0,
+    };
   }
 
   if (!minuteEntry || now > minuteEntry.resetAt) {
@@ -439,45 +575,107 @@ export function checkAndIncrementAiUidQuota(
     minuteEntry.count += 1;
   }
 
+  let nextDailyCount = 1;
   if (!dailyEntry || now > dailyEntry.resetAt) {
     aiUidDailyCounts.set(cleanUid, { count: 1, resetAt: now + AI_DAILY_WINDOW_MS });
   } else {
     dailyEntry.count += 1;
+    nextDailyCount = dailyEntry.count;
   }
 
-  return { allowed: true, dailyLimit };
+  return {
+    allowed: true,
+    dailyLimit,
+    count: nextDailyCount,
+    remaining: Math.max(0, dailyLimit - nextDailyCount),
+  };
 }
 
 export async function checkAndIncrementAiFirestoreQuota(
   uid: string,
-  now = new Date()
+  nowOrCustomLimit: Date | number = new Date(),
+  explicitCustomLimit?: number
 ): Promise<{
   allowed: boolean;
   reason?: 'minute_limit' | 'daily_limit' | 'quota_store_unavailable';
   dailyLimit: number;
   count?: number;
+  remaining?: number;
+  httpStatus: number;
+  degradedToMemory: boolean;
 }> {
   const cleanUid = uid.trim();
-  const dailyLimit = getAiDailyLimit();
+  const now = nowOrCustomLimit instanceof Date ? nowOrCustomLimit : new Date();
+  const customLimit =
+    typeof nowOrCustomLimit === 'number' ? nowOrCustomLimit : explicitCustomLimit;
+  const dailyLimit =
+    typeof customLimit === 'number' && customLimit > 0
+      ? Math.floor(customLimit)
+      : getAiDailyLimit();
   const nowMs = now.getTime();
   const activeServerStore = getActiveServerStore();
+  const strictQuota = isStrictFirestoreAiQuotaEnabled();
 
-  // 1. Multi-instance per-minute burst check via Firestore `rateLimits/ai_minute_{uid}`
+  if (
+    typeof activeServerStore.incrementRateLimitTransaction !== 'function' ||
+    typeof activeServerStore.incrementAiUsageTransaction !== 'function'
+  ) {
+    if (strictQuota) {
+      return {
+        allowed: false,
+        reason: 'quota_store_unavailable',
+        dailyLimit,
+        remaining: 0,
+        httpStatus: 503,
+        degradedToMemory: false,
+      };
+    }
+    const fallback = checkAndIncrementAiUidQuota(cleanUid, nowMs, dailyLimit);
+    return {
+      ...fallback,
+      httpStatus: fallback.allowed ? 200 : 429,
+      degradedToMemory: true,
+    };
+  }
+
+  // 1. Multi-instance per-minute burst check via Firestore `rateLimits/ai_minute_{hmac(uid)}`
   try {
+    const minuteBucketId = buildPrivacySafeRateLimitBucketId('ai_minute', cleanUid);
     const minuteRate = await activeServerStore.incrementRateLimitTransaction(
-      `ai_minute_${cleanUid}`,
+      minuteBucketId,
       RATE_LIMIT_SCOPES.ai_minute.maxRequests,
       RATE_LIMIT_SCOPES.ai_minute.windowMs,
       nowMs
     );
     if (!minuteRate.allowed) {
-      return { allowed: false, reason: 'minute_limit', dailyLimit, count: minuteRate.count };
+      return {
+        allowed: false,
+        reason: 'minute_limit',
+        dailyLimit,
+        count: minuteRate.count,
+        remaining: 0,
+        httpStatus: 429,
+        degradedToMemory: false,
+      };
     }
   } catch (err) {
-    if (isStrictFirestoreAiQuotaEnabled()) {
+    if (strictQuota) {
       console.error('[server] Strict Firestore AI minute rate limit unavailable:', err);
-      return { allowed: false, reason: 'quota_store_unavailable', dailyLimit };
+      return {
+        allowed: false,
+        reason: 'quota_store_unavailable',
+        dailyLimit,
+        remaining: 0,
+        httpStatus: 503,
+        degradedToMemory: false,
+      };
     }
+    const fallback = checkAndIncrementAiUidQuota(cleanUid, nowMs, dailyLimit);
+    return {
+      ...fallback,
+      httpStatus: fallback.allowed ? 200 : 429,
+      degradedToMemory: true,
+    };
   }
 
   // 2. Daily quota check persisted in Firestore `aiUsage/{uid}_{YYYY-MM-DD}` via transaction
@@ -491,17 +689,43 @@ export async function checkAndIncrementAiFirestoreQuota(
       dailyLimit
     );
     if (!txRes.allowed) {
-      return { allowed: false, reason: 'daily_limit', dailyLimit, count: txRes.count };
+      return {
+        allowed: false,
+        reason: 'daily_limit',
+        dailyLimit,
+        count: txRes.count,
+        remaining: 0,
+        httpStatus: 429,
+        degradedToMemory: false,
+      };
     }
-    return { allowed: true, dailyLimit, count: txRes.count };
+    return {
+      allowed: true,
+      dailyLimit,
+      count: txRes.count,
+      remaining: Math.max(0, dailyLimit - txRes.count),
+      httpStatus: 200,
+      degradedToMemory: false,
+    };
   } catch (err) {
-    if (isStrictFirestoreAiQuotaEnabled()) {
+    if (strictQuota) {
       console.error('[server] Strict Firestore AI quota store unavailable:', err);
-      return { allowed: false, reason: 'quota_store_unavailable', dailyLimit };
+      return {
+        allowed: false,
+        reason: 'quota_store_unavailable',
+        dailyLimit,
+        remaining: 0,
+        httpStatus: 503,
+        degradedToMemory: false,
+      };
     }
-    // Fallback to in-memory daily counter only in local dev when ADC is unavailable
-    const fallback = checkAndIncrementAiUidQuota(cleanUid, nowMs);
-    return fallback;
+    // Fallback to in-memory daily counter ONLY in local development/test
+    const fallback = checkAndIncrementAiUidQuota(cleanUid, nowMs, dailyLimit);
+    return {
+      ...fallback,
+      httpStatus: fallback.allowed ? 200 : 429,
+      degradedToMemory: true,
+    };
   }
 }
 
@@ -666,6 +890,30 @@ export async function authenticateBearerRequest(
         error:
           'Unauthorized: Phiên đăng nhập Firebase đã bị thu hồi (auth/id-token-revoked). Vui lòng đăng nhập lại.',
         code: 'auth/id-token-revoked',
+        fallback: true,
+      });
+      return null;
+    }
+    if (
+      errCode === 'auth/user-disabled' ||
+      errMsg.includes('auth/user-disabled') ||
+      errMsg.includes('user-disabled')
+    ) {
+      res.status(403).json({
+        error: 'Forbidden: Tài khoản người dùng đã bị khóa (auth/user-disabled).',
+        code: 'auth/user-disabled',
+        fallback: true,
+      });
+      return null;
+    }
+    if (
+      errCode === 'auth/id-token-expired' ||
+      errMsg.includes('auth/id-token-expired') ||
+      errMsg.includes('id-token-expired')
+    ) {
+      res.status(401).json({
+        error: 'Unauthorized: Phiên đăng nhập đã hết hạn (auth/id-token-expired). Vui lòng làm mới phiên.',
+        code: 'auth/id-token-expired',
         fallback: true,
       });
       return null;

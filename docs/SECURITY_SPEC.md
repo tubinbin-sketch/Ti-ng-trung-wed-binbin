@@ -71,12 +71,32 @@
   2. Nếu `studentCodeLocks/{studentCode}` hoặc slot đã gắn với `studentUid` khác -> trả về `409 Conflict`.
   3. Ghi đồng thời `classes/{classId}/students/{uid}`, `classes/{classId}/studentCodeLocks/{studentCode}`, cập nhật slot gốc `slot-{studentCode}`, và cập nhật `users/{uid}.enrolledClassIds`.
 
-### 3.3. `POST /api/assignments/start` & `POST /api/submissions`
-- **`POST /api/assignments/start`:** Ghi nhận `startedAtMs = Date.now()` trên server tại `classes/{classId}/assignmentStarts/{assignmentId}_{uid}` (giữ nguyên mốc đầu tiên nếu học viên chưa nộp bài).
-- **`POST /api/submissions`:**
-  - Thực thi `submitAssignmentTransaction` nguyên tử:
-    1. Kiểm tra `classes/{classId}/students/{uid}` (nếu chưa thuộc lớp -> `403 Forbidden`).
-    2. Đọc `classes/{classId}/answerKeys/{assignmentId}` (hoặc preset fallback trên server) và `classes/{classId}/submissions/{assignmentId}_{uid}`.
-    3. Kiểm tra `prevAttempts < maxAttempts` (nếu vượt quá -> `409 Conflict`, chống race condition khi gửi nhiều request nộp bài đồng thời).
-    4. Tính `timeSeconds = computeServerAuthoritativeTimeSeconds({ startedAtMs, submittedAtMs, totalQuestions })` dựa trên `assignmentStarts/{assignmentId}_{uid}` (tối thiểu `max(5, totalQuestions * 2)` giây; nếu không có `startedAtMs` hợp lệ thì áp dụng mức phạt mặc định `300` giây, hoàn toàn bỏ qua `req.body.timeSeconds`).
-    5. Ghi đồng thời `submissions/{assignmentId}_{uid}`, `leaderboard/{uid}`, và `students/{uid}`.
+### 3.3. `POST /api/assignments/start` & `POST /api/submissions` (P1 Assignment Authorization Hardened)
+- **Kiểm tra Ủy quyền Bài tập (`validateAssignmentAndAnswerKeyAuthorization`):**
+  1. Xác thực Firebase ID Token (`verifyIdToken(token, true)`) + App Check; từ chối ngay (`403`) nếu `req.body.studentUid` khác `verifiedUser.uid`.
+  2. Kiểm tra học viên đã thuộc lớp `classes/{classId}/students/{uid}` (`403` nếu chưa thuộc lớp).
+  3. Kiểm tra bài tập thực sự tồn tại trong lớp (`classes/{classId}/assignments/{assignmentId}` hoặc `answerKeys/{assignmentId}`; trả về `404` nếu không tồn tại).
+  4. Kiểm tra bài tập và `answerKey` thuộc đúng giáo viên chủ nhiệm lớp (`teacherUid === classData.teacherUid` và `classId` khớp; trả về `403` nếu lệch lớp/giáo viên).
+  5. Kiểm tra bài tập đang ở trạng thái mở (`status` không phải `closed`/`archived`/`draft`/`disabled`/`locked`, `isClosed !== true`, `enabled !== false`, và chưa quá hạn `closedAt`).
+- **`POST /api/assignments/start` (`startAssignmentTransaction`):** Ghi nhận `startedAtMs = Date.now()` trên server tại `classes/{classId}/assignmentStarts/{assignmentId}_{uid}` (giữ nguyên mốc đầu tiên nếu học viên chưa nộp bài).
+- **`POST /api/submissions` (`submitAssignmentTransaction`):**
+  1. Từ chối (`400 Bad Request`) nếu client gửi kèm `answerKey` và tự động loại bỏ mọi trường điểm số giả mạo (`totalPoints`, `vocabScore`, `status`...) trong `answers`.
+  2. Chống nộp lặp (replay attack) qua `submissionNonce` (`409 Conflict` nếu trùng nonce đã nộp) và kiểm tra nguyên tử `prevAttempts < maxAttempts` (`409 Conflict` nếu vượt quá số lượt).
+  3. Tính `timeSeconds = computeServerAuthoritativeTimeSeconds({ startedAtMs, submittedAtMs, totalQuestions })` dựa trên `assignmentStarts/{assignmentId}_{uid}` (hoàn toàn bỏ qua `req.body.timeSeconds`).
+  4. Ghi đồng thời `submissions/{assignmentId}_{uid}`, `leaderboard/{uid}`, và `students/{uid}` trong cùng một giao dịch.
+
+### 3.4. `POST /api/classes/:classId/students/:studentCode/reset-slot` (P1 Atomic Transaction)
+- Thực thi trong một giao dịch Firestore nguyên tử (`resetStudentSlotTransaction`):
+  1. Xác minh quyền chủ sở hữu lớp của giáo viên (`classData.teacherUid === verifiedUser.uid`) và kiểm tra email giáo viên còn nằm trong `TEACHER_EMAIL_ALLOWLIST`.
+  2. Kiểm tra học viên có mã `studentCode` tồn tại trong lớp (`404` nếu không tồn tại) và kiểm tra mã mới không trùng với bất kỳ học viên hay `studentCodeLocks` nào khác trong lớp (`409 Conflict`).
+  3. Xóa hồ sơ gắn UID cũ và `studentCodeLocks/{oldCode}`, tạo/cập nhật `studentCodeLocks/{nextCode}` và ghi hồ sơ `slot-{nextCode}` trong khi **bảo toàn 100% lịch sử học tập & điểm số** (`vocabScore`, `writingScore`, `quizScore`, `totalPoints`, `status`, `feedback`, `reviewWords`, `timeSeconds`, `streak`, `lastSubmittedAt`, `submissions/*`).
+
+### 3.5. Bảo mật Gemini AI, Schema Validation & Chống Prompt Injection Đa Ngôn Ngữ (`POST /api/binbin/chat` — P1 Hardened)
+- **Strict Schema Validation (`validateAndSanitizeBinBinChatPayload`):** Không đọc trực tiếp object thô từ `req.body`. Chỉ chấp nhận các khóa cho phép (`prompt`, `actionType`, `contextSlide`, `contextQuiz`, `history`), kiểm tra `actionType` theo allowlist, giới hạn độ dài từng trường và giới hạn `history` tối đa 6 lượt (`role` chỉ nhận `'user' | 'model'`).
+- **Chống Prompt Injection (Việt / Trung / Anh) & XSS:** Hàm `sanitizeAiUserInput()` loại bỏ thẻ `<script>`, `<iframe>`, HTML, `javascript:`, lọc các mẫu Prompt Injection bằng tiếng Việt, tiếng Trung và tiếng Anh, đồng thời cô lập dữ liệu trong thẻ `<untrusted_slide_data>`, `<untrusted_quiz_data>`, `<untrusted_user_query>`.
+- **Ẩn danh hóa PII & Bí mật:** Tự động che giấu Email (`[EMAIL_ĐÃ_ẨN]`), SĐT (`[SĐT_ĐÃ_ẨN]`), CCCD (`[CCCD_ĐÃ_ẨN]`), JWT/Bearer token (`[TOKEN_ĐÃ_ẨN]`) và Google API Key (`[API_KEY_ĐÃ_ẨN]`). Giới hạn `maxOutputTokens: 2048` và làm sạch đầu ra qua `sanitizeAiOutputObject()`.
+
+### 3.6. Fail-Closed AI Quota (P0) & Bảo vệ Quyền riêng tư Rate Limit (P2)
+- **P0 (`STRICT_FIRESTORE_AI_QUOTA` & `STRICT_SHARED_RATE_LIMIT`):** Trên môi trường `NODE_ENV === 'production'`, `isStrictFirestoreAiQuotaEnabled()` và `isStrictSharedRateLimitEnabled()` **luôn trả về `true`** (không cho phép biến môi trường `STRICT_FIRESTORE_AI_QUOTA=false` vô hiệu hóa chế độ fail-closed trên production; trả về HTTP `503` khi Firestore gặp sự cố). Chỉ cho phép fallback RAM có giới hạn (`5000` bản ghi) ở môi trường `development`/`test`.
+- **P2 (`rateLimits/*` HMAC-SHA256 & TTL):** Mọi khóa định danh trong `rateLimits/{bucketId}` đều được băm một chiều bằng **HMAC-SHA256** (`hashRateLimitIdentifier` với `RATE_LIMIT_HMAC_SECRET`), tuyệt đối không lưu IP thô hay token, kèm trường TTL `expiresAt` (`Date`, lưu giữ 24 giờ). Hàm `resolveClientIp()` chỉ tin tưởng `req.ip` của Express (`trust proxy = 1`), không bao giờ đọc trực tiếp `req.headers['x-forwarded-for']`.
+
