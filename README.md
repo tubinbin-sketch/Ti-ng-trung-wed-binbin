@@ -103,22 +103,15 @@ npx firebase-tools emulators:exec --only firestore "npm test"
 
 ## 4. Triển khai lên Google Cloud Run
 
-> **Lưu ý quan trọng về App Check khi build & deploy Production**:
-> Vì Vite nhúng các biến `VITE_*` vào bundle tĩnh lúc chạy `vite build`, bạn cần khai báo `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY` trong `.env` (hoặc `--set-build-env-vars`) trước khi build. Nếu chưa có khóa reCAPTCHA Enterprise, bạn phải đặt tường minh `ENFORCE_APP_CHECK=false` trên Cloud Run, nếu không toàn bộ API `/api/*` sẽ trả về `401 Unauthorized` (do cơ chế fail-closed trên production).
+Netlify chỉ chạy giao diện; trợ giảng AI, vào lớp bằng mã và chấm bài cần máy chủ. Cách nhanh nhất là chạy script trong [Google Cloud Shell](https://shell.cloud.google.com):
 
 ```bash
-# 1. Kiểm tra bản build Production (đảm bảo đã điền VITE_RECAPTCHA_ENTERPRISE_SITE_KEY trong .env)
-VITE_RECAPTCHA_ENTERPRISE_SITE_KEY="6Lc..." npm run build
-
-# 2. Deploy lên Cloud Run (sử dụng Application Default Credentials cho firebase-admin)
-gcloud run deploy hanu-hsk3-classroom \
-  --source . \
-  --region asia-southeast1 \
-  --allow-unauthenticated \
-  --set-build-env-vars="VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=YOUR_RECAPTCHA_ENTERPRISE_SITE_KEY" \
-  --set-env-vars="NODE_ENV=production,FIREBASE_PROJECT_ID=YOUR_PROJECT_ID,ENFORCE_APP_CHECK=true,VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=YOUR_RECAPTCHA_ENTERPRISE_SITE_KEY,TEACHER_EMAIL_ALLOWLIST=teacher@example.edu.vn,AI_DAILY_LIMIT=60" \
-  --set-secrets="GEMINI_API_KEY=GEMINI_API_KEY:latest"
+git clone https://github.com/tubinbin-sketch/Ti-ng-trung-wed-binbin.git
+cd Ti-ng-trung-wed-binbin
+TEACHER_EMAIL_ALLOWLIST="giao.vien@gmail.com" bash scripts/deploy-cloud-run.sh
 ```
+
+Script bật các dịch vụ cần thiết, lưu Gemini API key vào Secret Manager, build image bằng Cloud Build (`Dockerfile`, `cloudbuild.yaml`) rồi deploy. App Check chỉ bật khi có `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY`. Hướng dẫn đầy đủ, deploy từ GitHub Actions và cách xử lý lỗi: [docs/DEPLOY_CLOUD_RUN.md](docs/DEPLOY_CLOUD_RUN.md).
 
 ---
 
