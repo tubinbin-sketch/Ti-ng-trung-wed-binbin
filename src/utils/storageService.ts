@@ -247,9 +247,9 @@ export function getClassroomDataMode(): ClassroomDataMode {
   if (typeof window === 'undefined') return 'new';
   try {
     const val = localStorage.getItem(STORAGE_KEYS.CLASSROOM_MODE);
-    return val === 'demo' ? 'demo' : 'new';
+    return val === 'new' ? 'new' : 'demo';
   } catch {
-    return 'new';
+    return 'demo';
   }
 }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, RefreshCw, Sparkles, Trash2, Users } from 'lucide-react';
+import { RefreshCw, Trash2, Users } from 'lucide-react';
 import { isStudentNeedsSupport } from '../../utils/chineseEngine';
 import { Dialog } from '../ui/Dialog';
 import { EmptyState } from '../ui/EmptyState';
@@ -34,19 +34,19 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
 }) => {
   return (
     <>
-      <div className="rounded-2xl border border-border bg-surface p-5 pb-16">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-border">
+      <section className="space-y-4 pb-12" aria-labelledby="grading-grid-heading">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border">
           <div>
-            <h4 className="text-sm font-bold text-ink">
+            <h3 id="grading-grid-heading" className="text-sm font-semibold text-ink">
               Kết quả tự động chấm bài tập về nhà (HSK 1–3) — Hiển thị: {filteredStudents.length}/{studentsList.length} học viên
-            </h4>
-            <p className="text-xs text-ink-muted mt-0.5">
-              Bấm &ldquo;Thêm học viên&rdquo; để cấp Mã học viên (HV-001...) hoặc &ldquo;Xuất Bảng Điểm CSV&rdquo; để tải về máy.
+            </h3>
+            <p className="text-xs text-ink-muted mt-0.5 max-w-[65ch]">
+              Bấm &ldquo;Thêm học viên&rdquo; để cấp Mã học viên (HV-001...) hoặc &ldquo;Xuất bảng điểm (CSV)&rdquo; để tải về máy.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-success font-bold bg-success/10 px-2.5 py-1 rounded-lg">
-              100% Đã chấm tự động
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-success font-semibold">
+              ● 100% Đã chấm tự động
             </span>
             {studentsList.length < DEFAULT_STUDENTS.length && (
               <button
@@ -89,33 +89,31 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
               return (
                 <div
                   key={st.id || st.name}
-                  className="rounded-xl bg-canvas border border-border hover:border-border-strong p-4 space-y-2 shadow-2xs relative group transition-all"
+                  className="rounded-2xl bg-surface border border-border hover:border-border-strong p-4 space-y-2.5 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-sm text-ink truncate">
-                          {st.name}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5 text-xs font-semibold text-ink-muted">
-                        <span className="px-1.5 py-0.5 rounded bg-primary/10 text-ink tabular-nums">
+                      <span className="font-semibold text-sm text-ink block leading-snug">
+                        {st.name}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1 text-xs font-medium text-ink-muted tabular-nums">
+                        <span className="text-primary font-semibold">
                           {st.studentCode || 'HV-001'}
                         </span>
-                        <span className="px-1.5 py-0.5 rounded bg-gold/15 text-ink">
+                        <span>·</span>
+                        <span className="text-gold font-semibold">
                           {st.hskLevel || 'HSK 2'}
                         </span>
-                        <span className="font-bold text-ink tabular-nums">
+                        <span>·</span>
+                        <span className="font-bold text-ink">
                           {st.totalPoints}đ
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <span
-                        className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                          needsSupport
-                            ? 'text-warning bg-warning/15 border border-warning/30'
-                            : 'text-success bg-success/10'
+                        className={`text-xs font-semibold ${
+                          needsSupport ? 'text-warning' : 'text-success'
                         }`}
                       >
                         {needsSupport ? 'Cần kèm thêm' : 'Đã hoàn thành'}
@@ -126,7 +124,7 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
                           data-testid={`reissue-code-btn-${st.id}`}
                           onClick={() => onReissueStudentCode(st)}
                           title="Gỡ liên kết thiết bị cũ và cấp lại mã học viên"
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-primary hover:bg-primary/10 border border-primary/30 text-xs font-medium transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 min-h-8 px-2 py-0.5 rounded-lg text-primary hover:bg-primary-soft border border-border text-xs font-medium transition-colors cursor-pointer"
                         >
                           <RefreshCw className="w-3 h-3" />
                           <span>Cấp lại mã</span>
@@ -136,7 +134,7 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
                         type="button"
                         onClick={(e) => onDeleteStudentClick(st, e)}
                         aria-label={`Xóa học viên ${st.name}`}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-danger hover:bg-danger/10 border border-danger/20 text-xs font-medium transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 min-h-8 px-2 py-0.5 rounded-lg text-danger hover:bg-danger/10 border border-border text-xs font-medium transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-3 h-3" />
                         <span>Xóa</span>
@@ -144,7 +142,7 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
                     </div>
                   </div>
 
-                  <div className="text-xs text-ink-muted space-y-1 tabular-nums pt-1">
+                  <div className="text-xs text-ink-muted space-y-1 tabular-nums pt-2 border-t border-border">
                     <div>
                       Từ vựng: <strong className="text-ink">{st.vocabScore}</strong>
                     </div>
@@ -161,7 +159,7 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
                           <span
                             key={word}
                             lang="zh-CN"
-                            className="px-1.5 py-0.5 rounded bg-warning/15 text-warning border border-warning/30 text-xs font-bold font-['Noto_Serif_SC']"
+                            className="text-warning text-xs font-bold font-hanzi"
                           >
                             {word}
                           </span>
@@ -174,8 +172,8 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-border flex items-center justify-between gap-2">
-                    <p className="text-xs text-ink-muted line-clamp-2 flex-1">
+                  <div className="pt-2.5 border-t border-border flex items-center justify-between gap-2">
+                    <p className="text-xs text-ink-muted line-clamp-2 flex-1 leading-snug">
                       Nhận xét tự động: {st.feedback}
                     </p>
                     <button
@@ -188,7 +186,7 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
                           'Phát biểu xây dựng bài trên lớp'
                         )
                       }
-                      className="px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary text-ink hover:text-on-primary border border-border-strong text-xs font-bold transition-all shrink-0 cursor-pointer"
+                      className="min-h-8 px-2.5 py-1 rounded-lg bg-surface-2 hover:bg-primary text-ink hover:text-on-primary border border-border text-xs font-semibold transition-colors shrink-0 cursor-pointer"
                     >
                       +5đ thưởng
                     </button>
@@ -198,7 +196,7 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
             })}
           </div>
         )}
-      </div>
+      </section>
 
       {/* Accessible Dialog: Confirm Student Deletion */}
       <Dialog
@@ -208,29 +206,27 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
         maxWidthClass="max-w-md"
       >
         {studentToDelete && (
-          <div className="p-5 sm:p-6 flex flex-col space-y-4 bg-canvas text-ink">
+          <div className="p-5 sm:p-6 flex flex-col space-y-4 bg-surface text-ink rounded-3xl border border-border">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-danger/10 flex items-center justify-center text-danger shrink-0">
-                <Trash2 className="w-5 h-5" />
-              </div>
+              <Trash2 className="w-5 h-5 text-danger shrink-0" />
               <div>
-                <h2 className="text-base font-bold text-ink">
+                <h3 className="text-base font-bold text-ink">
                   Xác nhận xóa học viên
-                </h2>
+                </h3>
                 <p className="text-xs text-ink-muted">
                   Lớp HSK 1–3 · Thao tác quản lý lớp
                 </p>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-surface border border-border space-y-1">
+            <div className="py-3 border-y border-border space-y-1">
               <p className="text-xs text-ink-muted">
                 Bạn có chắc chắn muốn xóa học viên khỏi danh sách lớp?
               </p>
               <p className="text-base font-bold text-danger">
                 {studentToDelete.name}
               </p>
-              <div className="text-xs text-ink-muted pt-1.5 border-t border-border flex items-center justify-between">
+              <div className="text-xs text-ink-muted pt-1.5 flex items-center justify-between tabular-nums">
                 <span>
                   Điểm tổng kết: <strong className="text-ink">{studentToDelete.totalPoints || 95}đ</strong>
                 </span>
@@ -240,7 +236,7 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
               </div>
             </div>
 
-            <p className="text-xs text-ink-muted bg-danger/5 p-2.5 rounded-xl border border-danger/20 leading-relaxed">
+            <p className="text-xs text-ink-muted leading-relaxed">
               ⚠️ Học viên này sẽ bị xóa khỏi danh sách lớp và sĩ số sẽ tự động giảm tương ứng.
             </p>
 
@@ -248,14 +244,14 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
               <button
                 type="button"
                 onClick={onCloseDeleteModal}
-                className="px-4 py-2 rounded-xl bg-surface hover:bg-primary/10 border border-border text-xs font-semibold text-ink transition-all cursor-pointer"
+                className="min-h-10 px-4 py-2 rounded-xl bg-transparent hover:bg-surface-2 border border-border text-xs font-semibold text-ink transition-colors cursor-pointer"
               >
                 Hủy bỏ
               </button>
               <button
                 type="button"
                 onClick={onConfirmDeleteStudent}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-danger hover:bg-danger/90 text-white text-xs font-bold transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 min-h-10 px-4 py-2 rounded-xl bg-danger hover:bg-danger/90 text-white text-xs font-bold transition-colors cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Xác nhận xóa</span>

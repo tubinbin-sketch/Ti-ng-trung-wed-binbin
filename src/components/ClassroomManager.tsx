@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Award,
   Calendar,
@@ -33,6 +34,7 @@ import { ClassroomAddStudentModal } from './ClassroomAddStudentModal';
 import { ClassroomLuckyWheelModal } from './ClassroomLuckyWheelModal';
 import { WorksheetPreviewModal } from './WorksheetPreviewModal';
 import {
+  ActiveClassroomSession,
   ClassroomDataMode,
   getClassroomDataMode,
   loadActiveClassroomSession,
@@ -72,6 +74,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   onStudentCountChange,
   slides,
 }) => {
+  const { classId: routeClassId } = useParams<{ classId?: string }>();
   const [studentsList, setStudentsList] = useState<ClassStudent[]>(() => getStoredStudentRoster());
   const [classroomMode, setClassroomModeState] = useState<ClassroomDataMode>(() => getClassroomDataMode());
   const studentCount = studentsList.length;
@@ -95,8 +98,28 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   });
 
   const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState(false);
-  const [activeClassMeta, setActiveClassMeta] = useState(() => loadActiveClassroomSession());
+  const [activeClassMeta, setActiveClassMeta] = useState<ActiveClassroomSession | null>(() =>
+    loadActiveClassroomSession()
+  );
   const legacyBackupInputRef = useRef<HTMLInputElement>(null);
+
+  const resolvedClassMeta = useMemo<ActiveClassroomSession>(() => {
+    if (activeClassMeta) return activeClassMeta;
+    const isDemoHsk3 = routeClassId === 'demo-hsk3-class';
+    return {
+      classId: routeClassId || 'demo-hsk3-class',
+      className: isDemoHsk3
+        ? 'Lớp HSK 3.0 Bản Demo (Offline)'
+        : 'HSK 1–3 — Lớp Tối 246 (19:30–21:00)',
+      joinCode: isDemoHsk3 ? 'DEMO-HSK3' : '722229',
+      hskLevel: 'HSK 3',
+      role: 'teacher',
+      uid: 'demo-teacher-uid',
+      displayName: 'GV Nguyễn Văn Thụ',
+      teacherName: 'GV Nguyễn Văn Thụ',
+      isDemo: true,
+    };
+  }, [activeClassMeta, routeClassId]);
 
   const storeRevisions = useAppStoreSelector((s) => ({
     students: s.studentsRosterVersion,
@@ -268,8 +291,8 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       const nextSession = {
         role: 'teacher' as const,
         uid: created.teacherUid,
-        displayName: activeClassMeta?.displayName || 'Giáo viên HSK',
-        email: activeClassMeta?.email,
+        displayName: resolvedClassMeta.displayName || 'GV Nguyễn Văn Thụ',
+        email: resolvedClassMeta.email,
         classId: created.id,
         className: created.name,
         joinCode: created.joinCode,
@@ -292,15 +315,15 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
       setActionBanner('⏳ Đang di chuyển dữ liệu JSON cũ lên Cloud Firestore...');
       const result = await importLegacyBackupToFirestore(
         parsedJson,
-        activeClassMeta?.className || 'HSK 1–3 — Lớp Di Chuyển Từ JSON'
+        resolvedClassMeta.className || 'HSK 1–3 — Lớp Di Chuyển Từ JSON'
       );
       setClassroomDataMode('new');
       setClassroomModeState('new');
       const nextSession = {
         role: 'teacher' as const,
-        uid: activeClassMeta?.uid || 'teacher',
-        displayName: activeClassMeta?.displayName || 'Giáo viên HSK',
-        email: activeClassMeta?.email,
+        uid: resolvedClassMeta.uid || 'teacher',
+        displayName: resolvedClassMeta.displayName || 'GV Nguyễn Văn Thụ',
+        email: resolvedClassMeta.email,
         classId: result.classDoc.id,
         className: result.classDoc.name,
         joinCode: result.classDoc.joinCode,
@@ -333,9 +356,9 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const handleConfirmDelete = () => {
     if (!studentToDelete) return;
     const updated = studentsList.filter((s) => s.id !== studentToDelete.id);
-    if (classroomMode !== 'demo' && activeClassMeta?.classId) {
+    if (classroomMode !== 'demo' && resolvedClassMeta.classId) {
       void deleteTeacherStudentSlotFromFirestore(
-        activeClassMeta.classId,
+        resolvedClassMeta.classId,
         studentToDelete.id,
         studentToDelete.studentCode
       ).catch(() => {});
@@ -360,10 +383,10 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     const fallbackNewCode = generateRandomStudentCode('HV');
     let issuedCode = fallbackNewCode;
 
-    if (classroomMode !== 'demo' && activeClassMeta?.classId) {
+    if (classroomMode !== 'demo' && resolvedClassMeta.classId) {
       try {
         const res = await resetTeacherStudentSlotInFirestore(
-          activeClassMeta.classId,
+          resolvedClassMeta.classId,
           student.studentCode,
           true
         );
@@ -384,213 +407,198 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     );
   };
 
+  const cleanTeacherName = (resolvedClassMeta.displayName || 'GV Nguyễn Văn Thụ')
+    .replace(/\s*\(Demo\)\s*/i, '')
+    .trim();
+
   return (
-    <div className="space-y-6">
-      <div className="rounded-3xl bg-surface/90 backdrop-blur-md border border-border text-ink p-5 md:p-7 shadow-xs space-y-6">
-        {/* Top Class Header */}
-        <div className="flex flex-col 2xl:flex-row 2xl:items-center justify-between gap-4 pb-5 border-b border-border">
-          <div className="min-w-0 2xl:max-w-[50%]">
+    <div className="space-y-6 pb-20 lg:pb-12">
+      {/* Top Class Header — Full width title + metadata, separated action bar so title never wraps narrowly */}
+      <div className="space-y-4 pb-5 border-b border-border">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="min-w-0 flex-1 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-ink-muted">
               <span>Bảng điều khiển giáo viên</span>
+              <span aria-hidden="true">·</span>
               <span
                 data-testid="active-class-join-code-badge"
-                className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold"
+                className="text-primary font-semibold tabular-nums"
               >
-                Mã lớp: {activeClassMeta?.joinCode || '722229'}
+                Mã lớp: {resolvedClassMeta.joinCode || 'DEMO-HSK3'}
               </span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-ink mt-1">
-              {activeClassMeta?.className || 'HSK 1–3 — Lớp Tối 246 (19:30–21:00)'}
+            <h2 className="text-xl sm:text-2xl font-bold text-ink leading-snug">
+              {resolvedClassMeta.className}
             </h2>
-            <p className="text-xs text-ink-muted mt-1">
-              Lịch học: Thứ 2, 4, 6 · Tiến độ:{' '}
-              <strong className="text-ink tabular-nums">{completedCount}/{totalCourseSessions} buổi</strong> · Giảng viên: {activeClassMeta?.displayName || 'GV Nguyễn Văn Thụ (阮文受)'}
-            </p>
+            {/* Structured inline metadata capped within comfortable reading measure */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted max-w-[60ch]">
+              <span>Lịch học: Thứ 2, 4, 6</span>
+              <span aria-hidden="true">·</span>
+              <span>
+                Tiến độ: <strong className="text-ink tabular-nums">{completedCount}/{totalCourseSessions} buổi</strong>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>Giảng viên: {cleanTeacherName}</span>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              ref={legacyBackupInputRef}
-              type="file"
-              accept=".json,application/json"
-              onChange={handleLegacyJsonBackupImport}
-              className="hidden"
-              data-testid="legacy-json-backup-file-input"
-            />
-            <button
-              type="button"
-              onClick={() => legacyBackupInputRef.current?.click()}
-              data-testid="import-legacy-json-backup-btn"
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border text-sm font-medium transition-colors cursor-pointer"
-            >
-              <UploadCloud className="w-4 h-4 text-ink-muted" />
-              <span>Nhập dữ liệu cũ (.json)</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleActivateDemoClassroom}
-              data-testid="activate-demo-classroom-btn"
-              aria-pressed={classroomMode === 'demo' && studentsList.length > 0}
-              className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
-                classroomMode === 'demo' && studentsList.length > 0
-                  ? 'bg-primary-soft text-primary border-primary/30'
-                  : 'bg-surface hover:bg-surface-2 text-ink border-border'
-              }`}
-            >
-              <span>Dữ liệu mẫu</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleCreateNewClassroom}
-              data-testid="create-new-classroom-btn"
-              className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border text-sm font-medium transition-colors cursor-pointer ${
-                classroomMode === 'new' && studentsList.length === 0
-                  ? 'bg-primary-soft text-primary border-primary/30'
-                  : 'bg-surface hover:bg-surface-2 text-ink border-border'
-              }`}
-            >
-              <Plus className="w-4 h-4" />
-              <span>Tạo lớp học mới</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              data-testid="header-export-csv-report-btn"
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border text-sm font-medium transition-colors cursor-pointer"
-            >
-              <Download className="w-4 h-4 text-ink-muted" />
-              <span>Xuất bảng điểm (CSV)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                playGentleChime(783.99, 0.24);
-                setSessions((prev) => prev.map((s) => autoGradeClassSession(s)));
-                setActionBanner('Hoàn tất tự động: Đã giao bài và chấm điểm toàn bộ 19/19 buổi học!');
-              }}
-              data-testid="batch-autograde-btn"
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors cursor-pointer"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Giao &amp; chấm toàn khóa</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              playGentleChime(783.99, 0.24);
+              setSessions((prev) => prev.map((s) => autoGradeClassSession(s)));
+              setActionBanner('Hoàn tất tự động: Đã giao bài và chấm điểm toàn bộ 19/19 buổi học!');
+            }}
+            data-testid="batch-autograde-btn"
+            className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-xs sm:text-sm font-semibold transition-colors cursor-pointer shrink-0 self-start"
+          >
+            <Sparkles className="w-4 h-4 shrink-0" />
+            <span>Giao &amp; chấm toàn khóa</span>
+          </button>
         </div>
 
-        {/* 4 Synchronized KPI Stat Boxes */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="rounded-2xl bg-surface-2 p-4 flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
-              <span>Tổng số buổi</span>
-              <Calendar className="w-3.5 h-3.5 text-gold" />
-            </div>
-            <div className="text-xl sm:text-2xl font-bold text-ink mt-1 tabular-nums">{totalCourseSessions}</div>
-            <div className="text-xs text-ink-muted mt-0.5 truncate">Khóa chuẩn HSK 1–3</div>
-          </div>
-          <div className="rounded-2xl bg-surface-2 p-4 flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
-              <span>Đã giao bài</span>
-              <Send className="w-3.5 h-3.5 text-ink-muted" />
-            </div>
-            <div className="text-xl sm:text-2xl font-bold text-ink mt-1 tabular-nums" data-testid="assigned-sessions-count">
-              {assignedCount}/{totalCourseSessions}
-            </div>
-            <div className="text-xs text-primary font-semibold mt-0.5 truncate">Kèm Slide &amp; Đề chuẩn</div>
-          </div>
-          <div className="rounded-2xl bg-surface-2 p-4 flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
-              <span>Đã tự chấm điểm</span>
-              <Sparkles className="w-3.5 h-3.5 text-ink-muted" />
-            </div>
-            <div className="text-xl sm:text-2xl font-bold text-gold mt-1 tabular-nums" data-testid="graded-sessions-count">
-              {gradedCount}/{totalCourseSessions}
-            </div>
-            <div className="text-xs text-gold font-semibold mt-0.5 truncate">100% học viên đã chấm</div>
-          </div>
-          <div className="rounded-2xl bg-surface-2 p-4 flex flex-col justify-between">
-            <div className="flex items-center justify-between text-xs font-semibold text-ink-muted">
-              <span>Sĩ số học viên</span>
-              <Award className="w-3.5 h-3.5 text-primary" />
-            </div>
-            <div className="text-xl sm:text-2xl font-bold text-ink mt-1 tabular-nums">{studentCount}</div>
-            <div className="text-xs text-ink-muted mt-0.5 truncate">Đầy đủ tài khoản</div>
-          </div>
+        {/* Secondary Action Toolbar */}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={legacyBackupInputRef}
+            type="file"
+            accept=".json,application/json"
+            onChange={handleLegacyJsonBackupImport}
+            className="hidden"
+            data-testid="legacy-json-backup-file-input"
+          />
+          <button
+            type="button"
+            onClick={() => legacyBackupInputRef.current?.click()}
+            data-testid="import-legacy-json-backup-btn"
+            className="inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl bg-transparent hover:bg-surface-2 text-ink-muted hover:text-ink border border-border text-xs font-medium transition-colors cursor-pointer"
+          >
+            <UploadCloud className="w-3.5 h-3.5 shrink-0" />
+            <span>Nhập dữ liệu cũ (.json)</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleActivateDemoClassroom}
+            data-testid="activate-demo-classroom-btn"
+            aria-pressed={classroomMode === 'demo' && studentsList.length > 0}
+            className={`inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl border text-xs font-medium transition-colors cursor-pointer ${
+              classroomMode === 'demo' && studentsList.length > 0
+                ? 'bg-surface-2 text-ink border-border-strong font-semibold'
+                : 'bg-transparent hover:bg-surface-2 text-ink-muted hover:text-ink border-border'
+            }`}
+          >
+            <span>Dữ liệu mẫu</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleCreateNewClassroom}
+            data-testid="create-new-classroom-btn"
+            className={`inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl border text-xs font-medium transition-colors cursor-pointer ${
+              classroomMode === 'new' && studentsList.length === 0
+                ? 'bg-surface-2 text-ink border-border-strong font-semibold'
+                : 'bg-transparent hover:bg-surface-2 text-ink-muted hover:text-ink border-border'
+            }`}
+          >
+            <Plus className="w-3.5 h-3.5 shrink-0" />
+            <span>Tạo lớp học mới</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            data-testid="header-export-csv-report-btn"
+            className="inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl bg-transparent hover:bg-surface-2 text-ink-muted hover:text-ink border border-border text-xs font-medium transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 shrink-0" />
+            <span>Xuất bảng điểm (CSV)</span>
+          </button>
         </div>
+      </div>
 
-        {/* Dedicated Teacher Control Overview (Class List, Assigned Homework, Unsubmitted Students) */}
-        <TeacherControlOverview
-          activeClassMeta={activeClassMeta}
-          studentsList={studentsList}
-          activePackage={activePackage}
-          selectedSessionNumber={selectedSessionNumber}
-          onSelectSessionNumber={setSelectedSessionNumber}
-          selectedFile={selectedFile}
-          onSelectFile={setSelectedFile}
-          customPastedText={customPastedText}
-          onChangeCustomPastedText={setCustomPastedText}
-          isExtracting={isExtracting}
-          onAssignUploadedFile={handleAssignUploadedFile}
-          onLoadDemoPackage={handleLoadDemoPackage}
-          successBanner={successBanner}
-          onSwitchToStudentView={onSwitchToStudentView}
-          onCreateNewClassroom={handleCreateNewClassroom}
-          onFilterUnsubmitted={() => {
-            setStudentStatusFilter('needs_support');
-            setActiveTab('grading');
-          }}
-          onOpenAddStudentModal={() => setIsAddStudentModalOpen(true)}
-        />
+      {/* 4 Synchronized KPI Stat Strip — Single surface with hairline dividers */}
+      <dl className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border rounded-2xl bg-surface border border-border">
+        <div className="p-4 sm:p-5 flex flex-col justify-between">
+          <dt className="flex items-center justify-between text-xs font-medium text-ink-muted">
+            <span>Tổng số buổi</span>
+            <Calendar className="w-3.5 h-3.5 text-gold shrink-0" />
+          </dt>
+          <dd className="text-xl sm:text-2xl font-bold text-ink mt-1.5 tabular-nums">{totalCourseSessions}</dd>
+          <dd className="text-xs text-ink-muted mt-0.5">Khóa chuẩn HSK 1–3</dd>
+        </div>
+        <div className="p-4 sm:p-5 flex flex-col justify-between">
+          <dt className="flex items-center justify-between text-xs font-medium text-ink-muted">
+            <span>Đã giao bài</span>
+            <Send className="w-3.5 h-3.5 text-ink-muted shrink-0" />
+          </dt>
+          <dd className="text-xl sm:text-2xl font-bold text-ink mt-1.5 tabular-nums" data-testid="assigned-sessions-count">
+            {assignedCount}/{totalCourseSessions}
+          </dd>
+          <dd className="text-xs text-primary font-semibold mt-0.5">Kèm Slide &amp; Đề chuẩn</dd>
+        </div>
+        <div className="p-4 sm:p-5 flex flex-col justify-between">
+          <dt className="flex items-center justify-between text-xs font-medium text-ink-muted">
+            <span>Đã tự chấm điểm</span>
+            <Sparkles className="w-3.5 h-3.5 text-ink-muted shrink-0" />
+          </dt>
+          <dd className="text-xl sm:text-2xl font-bold text-gold mt-1.5 tabular-nums" data-testid="graded-sessions-count">
+            {gradedCount}/{totalCourseSessions}
+          </dd>
+          <dd className="text-xs text-gold font-semibold mt-0.5">100% học viên đã chấm</dd>
+        </div>
+        <div className="p-4 sm:p-5 flex flex-col justify-between">
+          <dt className="flex items-center justify-between text-xs font-medium text-ink-muted">
+            <span>Sĩ số học viên</span>
+            <Award className="w-3.5 h-3.5 text-primary shrink-0" />
+          </dt>
+          <dd className="text-xl sm:text-2xl font-bold text-ink mt-1.5 tabular-nums">{studentCount}</dd>
+          <dd className="text-xs text-ink-muted mt-0.5">Đầy đủ tài khoản</dd>
+        </div>
+      </dl>
 
-        {/* Class actions + section tabs */}
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              data-testid="open-lucky-wheel-btn"
-              onClick={() => setIsLuckyWheelOpen(true)}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border text-sm font-medium transition-colors cursor-pointer"
-            >
-              <Dices className="w-4 h-4 text-ink-muted" />
-              <span>Vòng quay gọi tên &amp; ghép thẻ</span>
-            </button>
-            <button
-              type="button"
-              data-testid="classroom-print-worksheet-btn"
-              onClick={() => setIsWorksheetModalOpen(true)}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-surface hover:bg-surface-2 text-ink border border-border text-sm font-medium transition-colors cursor-pointer"
-            >
-              <Printer className="w-4 h-4 text-ink-muted" />
-              <span>In phiếu viết A4</span>
-            </button>
-            <button
-              type="button"
-              data-testid="open-add-student-modal-btn"
-              onClick={() => setIsAddStudentModalOpen(true)}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Thêm học viên</span>
-            </button>
-          </div>
+      {/* Dedicated Teacher Control Overview (Class List, Assigned Homework, Unsubmitted Students) */}
+      <TeacherControlOverview
+        activeClassMeta={resolvedClassMeta}
+        studentsList={studentsList}
+        activePackage={activePackage}
+        selectedSessionNumber={selectedSessionNumber}
+        onSelectSessionNumber={setSelectedSessionNumber}
+        selectedFile={selectedFile}
+        onSelectFile={setSelectedFile}
+        customPastedText={customPastedText}
+        onChangeCustomPastedText={setCustomPastedText}
+        isExtracting={isExtracting}
+        onAssignUploadedFile={handleAssignUploadedFile}
+        onLoadDemoPackage={handleLoadDemoPackage}
+        successBanner={successBanner}
+        onSwitchToStudentView={onSwitchToStudentView}
+        onCreateNewClassroom={handleCreateNewClassroom}
+        onFilterUnsubmitted={() => {
+          setStudentStatusFilter('needs_support');
+          setActiveTab('grading');
+        }}
+        onOpenAddStudentModal={() => setIsAddStudentModalOpen(true)}
+      />
 
+      {/* Section tabs + utilities + search/filter bar */}
+      <div className="space-y-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 py-2.5 border-b border-border">
           <div
             role="tablist"
             aria-label="Các mục quản lý lớp"
-            className="flex items-end gap-1 border-b border-border overflow-x-auto no-scrollbar"
+            className="flex items-center gap-1.5 overflow-x-auto no-scrollbar"
           >
             <button
               type="button"
               role="tab"
               aria-selected={activeTab === 'schedule'}
               onClick={() => setActiveTab('schedule')}
-              className={`inline-flex items-center gap-2 h-11 px-3 sm:px-4 -mb-px border-b-2 text-sm whitespace-nowrap transition-colors cursor-pointer ${
-                  activeTab === 'schedule'
-                    ? 'border-primary text-primary font-semibold'
-                    : 'border-transparent text-ink-muted hover:text-ink font-medium'
-                }`}
+              className={`inline-flex items-center gap-2 min-h-10 px-3.5 rounded-xl text-sm whitespace-nowrap transition-colors cursor-pointer ${
+                activeTab === 'schedule'
+                  ? 'bg-primary-soft text-primary font-semibold'
+                  : 'text-ink-muted hover:text-ink hover:bg-surface-2 font-medium'
+              }`}
             >
-              <Calendar className="w-4 h-4" />
-              Chương trình &amp; tiến độ
+              <Calendar className="w-4 h-4 shrink-0" />
+              <span>Chương trình &amp; tiến độ</span>
             </button>
             <button
               type="button"
@@ -598,15 +606,15 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               aria-selected={activeTab === 'grading'}
               data-testid="tab-student-grading"
               onClick={() => setActiveTab('grading')}
-              className={`inline-flex items-center gap-2 h-11 px-3 sm:px-4 -mb-px border-b-2 text-sm whitespace-nowrap transition-colors cursor-pointer ${
-                  activeTab === 'grading'
-                    ? 'border-primary text-primary font-semibold'
-                    : 'border-transparent text-ink-muted hover:text-ink font-medium'
-                }`}
+              className={`inline-flex items-center gap-2 min-h-10 px-3.5 rounded-xl text-sm whitespace-nowrap transition-colors cursor-pointer ${
+                activeTab === 'grading'
+                  ? 'bg-primary-soft text-primary font-semibold'
+                  : 'text-ink-muted hover:text-ink hover:bg-surface-2 font-medium'
+              }`}
             >
-              <Award className="w-4 h-4" />
-              Bảng điểm
-              <span className="px-1.5 py-0.5 rounded-md bg-surface-2 text-ink-muted text-xs tabular-nums">{studentCount}</span>
+              <Award className="w-4 h-4 shrink-0" />
+              <span>Bảng điểm</span>
+              <span className="text-xs tabular-nums opacity-80">({studentCount})</span>
             </button>
             <button
               type="button"
@@ -614,125 +622,159 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               aria-selected={activeTab === 'analytics'}
               data-testid="tab-reading-writing-analytics"
               onClick={() => setActiveTab('analytics')}
-              className={`inline-flex items-center gap-2 h-11 px-3 sm:px-4 -mb-px border-b-2 text-sm whitespace-nowrap transition-colors cursor-pointer ${
-                  activeTab === 'analytics'
-                    ? 'border-primary text-primary font-semibold'
-                    : 'border-transparent text-ink-muted hover:text-ink font-medium'
-                }`}
+              className={`inline-flex items-center gap-2 min-h-10 px-3.5 rounded-xl text-sm whitespace-nowrap transition-colors cursor-pointer ${
+                activeTab === 'analytics'
+                  ? 'bg-primary-soft text-primary font-semibold'
+                  : 'text-ink-muted hover:text-ink hover:bg-surface-2 font-medium'
+              }`}
             >
-              <Mic className="w-4 h-4" />
-              Luyện đọc &amp; viết
-              <span className="px-1.5 py-0.5 rounded-md bg-surface-2 text-ink-muted text-xs tabular-nums">
-                {readingHistory.length + handwritingHistory.length}
+              <Mic className="w-4 h-4 shrink-0" />
+              <span>Luyện đọc &amp; viết</span>
+              <span className="text-xs tabular-nums opacity-80">
+                ({readingHistory.length + handwritingHistory.length})
               </span>
             </button>
           </div>
 
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 p-2.5 rounded-2xl bg-canvas border border-border">
-            <div className="relative flex-1 min-w-0">
-              <Search className="w-3.5 h-3.5 text-ink-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                data-testid="student-search-input"
-                aria-label="Tìm kiếm học viên theo tên hoặc mã học viên"
-                value={studentSearchQuery}
-                onChange={(e) => {
-                  setStudentSearchQuery(e.target.value);
-                  if (activeTab !== 'grading') setActiveTab('grading');
-                }}
-                placeholder="Tìm kiếm học viên theo tên, mã HV hoặc cấp độ HSK..."
-                className="w-full pl-8 pr-8 py-1.5 rounded-xl bg-surface border border-border text-sm text-ink placeholder:text-ink-muted"
-              />
-              {studentSearchQuery && (
-                <button
-                  type="button"
-                  aria-label="Xóa từ khóa tìm kiếm"
-                  onClick={() => setStudentSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink text-xs cursor-pointer"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5 shrink-0" role="group" aria-label="Bộ lọc trạng thái học viên">
-              {(
-                [
-                  { id: 'all', label: `Tất cả (${studentCount})` },
-                  { id: 'completed', label: `Đã hoàn thành (${completedStudentsCount})` },
-                  { id: 'needs_support', label: `Cần kèm thêm (${needsSupportStudentsCount})` },
-                ] as { id: StudentStatusFilter; label: string }[]
-              ).map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  data-testid={`student-filter-${f.id}`}
-                  onClick={() => {
-                    setStudentStatusFilter(f.id);
-                    if (activeTab !== 'grading') setActiveTab('grading');
-                  }}
-                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    studentStatusFilter === f.id
-                      ? 'bg-primary text-on-primary'
-                      : 'bg-surface text-ink-muted border border-border hover:text-ink'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              data-testid="open-lucky-wheel-btn"
+              onClick={() => setIsLuckyWheelOpen(true)}
+              className="inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl bg-transparent hover:bg-surface-2 text-ink-muted hover:text-ink border border-border text-xs font-medium transition-colors cursor-pointer"
+            >
+              <Dices className="w-3.5 h-3.5 shrink-0" />
+              <span>Vòng quay gọi tên</span>
+            </button>
+            <button
+              type="button"
+              data-testid="classroom-print-worksheet-btn"
+              onClick={() => setIsWorksheetModalOpen(true)}
+              className="inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl bg-transparent hover:bg-surface-2 text-ink-muted hover:text-ink border border-border text-xs font-medium transition-colors cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5 shrink-0" />
+              <span>In phiếu viết A4</span>
+            </button>
+            <button
+              type="button"
+              data-testid="open-add-student-modal-btn"
+              onClick={() => setIsAddStudentModalOpen(true)}
+              className="inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl bg-surface-2 hover:bg-primary-soft text-ink hover:text-primary border border-border text-xs font-semibold transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 shrink-0" />
+              <span>Thêm học viên</span>
+            </button>
           </div>
         </div>
 
-        <div className="px-3.5 py-2 rounded-xl bg-canvas border border-border-strong text-xs font-medium text-ink flex items-center gap-2" data-testid="classroom-status-banner">
-          <CheckCircle2 className="w-4 h-4 text-gold shrink-0" />
-          <span className="truncate">{actionBanner}</span>
-        </div>
+        {/* Flat search & status filter bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="relative flex-1 min-w-0">
+            <Search className="w-4 h-4 text-ink-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              data-testid="student-search-input"
+              aria-label="Tìm kiếm học viên theo tên hoặc mã học viên"
+              value={studentSearchQuery}
+              onChange={(e) => {
+                setStudentSearchQuery(e.target.value);
+                if (activeTab !== 'grading') setActiveTab('grading');
+              }}
+              placeholder="Tìm kiếm học viên theo tên, mã HV hoặc cấp độ HSK..."
+              className="w-full min-h-10 pl-9 pr-8 py-2 rounded-xl bg-surface border border-border text-sm text-ink placeholder:text-ink-muted"
+            />
+            {studentSearchQuery && (
+              <button
+                type="button"
+                aria-label="Xóa từ khóa tìm kiếm"
+                onClick={() => setStudentSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
-        {activeTab === 'schedule' ? (
-          <ClassroomScheduleTable
-            sessions={sessions}
-            studentsList={studentsList}
-            selectedReportSession={selectedReportSession}
-            onSelectReportSession={setSelectedReportSession}
-            onRegradeSession={(session) => {
-              playGentleChime(659.25, 0.2);
-              setSessions((prev) => prev.map((s) => (s.id === session.id ? autoGradeClassSession(s) : s)));
-              setActionBanner(`Đã chấm điểm tự động cho Buổi #${session.sessionNumber}: "${session.lessonTitle}".`);
-            }}
-            onDeleteStudentClick={(st, e) => {
-              e?.stopPropagation();
-              setStudentToDelete(st);
-            }}
-          />
-        ) : activeTab === 'grading' ? (
-          <ClassroomGradingGrid
-            studentsList={studentsList}
-            filteredStudents={filteredStudents}
-            onRestoreDefaultStudents={handleActivateDemoClassroom}
-            onResetFilters={() => {
-              setStudentSearchQuery('');
-              setStudentStatusFilter('all');
-            }}
-            onOpenAddStudentModal={() => setIsAddStudentModalOpen(true)}
-            onDeleteStudentClick={(st, e) => {
-              e?.stopPropagation();
-              setStudentToDelete(st);
-            }}
-            onReissueStudentCode={handleReissueStudentCode}
-            onAwardBonusPoints={handleAwardBonusPoints}
-            studentToDelete={studentToDelete}
-            onCloseDeleteModal={() => setStudentToDelete(null)}
-            onConfirmDeleteStudent={handleConfirmDelete}
-          />
-        ) : (
-          <ClassroomAnalyticsPanel
-            readingHistory={readingHistory}
-            handwritingHistory={handwritingHistory}
-            onOpenWorksheetModal={() => setIsWorksheetModalOpen(true)}
-          />
-        )}
+          <div className="flex flex-wrap items-center gap-1.5 shrink-0" role="group" aria-label="Bộ lọc trạng thái học viên">
+            {(
+              [
+                { id: 'all', label: `Tất cả (${studentCount})` },
+                { id: 'completed', label: `Đã hoàn thành (${completedStudentsCount})` },
+                { id: 'needs_support', label: `Cần kèm thêm (${needsSupportStudentsCount})` },
+              ] as { id: StudentStatusFilter; label: string }[]
+            ).map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                data-testid={`student-filter-${f.id}`}
+                onClick={() => {
+                  setStudentStatusFilter(f.id);
+                  if (activeTab !== 'grading') setActiveTab('grading');
+                }}
+                className={`min-h-10 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                  studentStatusFilter === f.id
+                    ? 'bg-primary-soft text-primary border border-primary/40'
+                    : 'bg-surface text-ink-muted border border-border hover:text-ink hover:bg-surface-2'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
+
+      <div
+        className="flex items-center gap-2 text-xs font-medium text-ink-muted py-0.5"
+        data-testid="classroom-status-banner"
+      >
+        <CheckCircle2 className="w-4 h-4 text-gold shrink-0" />
+        <span className="leading-snug">{actionBanner}</span>
+      </div>
+
+      {activeTab === 'schedule' ? (
+        <ClassroomScheduleTable
+          sessions={sessions}
+          studentsList={studentsList}
+          selectedReportSession={selectedReportSession}
+          onSelectReportSession={setSelectedReportSession}
+          onRegradeSession={(session) => {
+            playGentleChime(659.25, 0.2);
+            setSessions((prev) => prev.map((s) => (s.id === session.id ? autoGradeClassSession(s) : s)));
+            setActionBanner(`Đã chấm điểm tự động cho Buổi #${session.sessionNumber}: "${session.lessonTitle}".`);
+          }}
+          onDeleteStudentClick={(st, e) => {
+            e?.stopPropagation();
+            setStudentToDelete(st);
+          }}
+        />
+      ) : activeTab === 'grading' ? (
+        <ClassroomGradingGrid
+          studentsList={studentsList}
+          filteredStudents={filteredStudents}
+          onRestoreDefaultStudents={handleActivateDemoClassroom}
+          onResetFilters={() => {
+            setStudentSearchQuery('');
+            setStudentStatusFilter('all');
+          }}
+          onOpenAddStudentModal={() => setIsAddStudentModalOpen(true)}
+          onDeleteStudentClick={(st, e) => {
+            e?.stopPropagation();
+            setStudentToDelete(st);
+          }}
+          onReissueStudentCode={handleReissueStudentCode}
+          onAwardBonusPoints={handleAwardBonusPoints}
+          studentToDelete={studentToDelete}
+          onCloseDeleteModal={() => setStudentToDelete(null)}
+          onConfirmDeleteStudent={handleConfirmDelete}
+        />
+      ) : (
+        <ClassroomAnalyticsPanel
+          readingHistory={readingHistory}
+          handwritingHistory={handwritingHistory}
+          onOpenWorksheetModal={() => setIsWorksheetModalOpen(true)}
+        />
+      )}
 
       <ClassroomAddStudentModal
         isOpen={isAddStudentModalOpen}

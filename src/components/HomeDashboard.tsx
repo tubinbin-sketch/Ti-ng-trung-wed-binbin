@@ -88,47 +88,6 @@ function MiZiGeBackdrop() {
   );
 }
 
-/** Visual circular progress ring for learned vocabulary ratio. */
-function VocabProgressRing({ percent }: { percent: number }) {
-  const radius = 26;
-  const circumference = 2 * Math.PI * radius;
-  const clamped = Math.max(0, Math.min(100, percent));
-  const strokeDashoffset = circumference - (clamped / 100) * circumference;
-
-  return (
-    <div
-      className="relative w-16 h-16 shrink-0 grid place-items-center"
-      data-testid="vocab-progress-ring"
-      aria-hidden="true"
-    >
-      <svg viewBox="0 0 64 64" className="w-16 h-16 -rotate-90">
-        <circle
-          cx="32"
-          cy="32"
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="6"
-          className="text-surface-2"
-        />
-        <circle
-          cx="32"
-          cy="32"
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="6"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          className="text-primary transition-[stroke-dashoffset] duration-700 ease-out"
-        />
-      </svg>
-      <span className="absolute text-xs font-semibold tabular-nums text-ink">{clamped}%</span>
-    </div>
-  );
-}
-
 export function HomeDashboard({
   userProfile,
   slides,
@@ -226,8 +185,8 @@ export function HomeDashboard({
 
   return (
     <div className="space-y-6 pb-24 sm:pb-16 lg:pb-10" data-testid="home-dashboard">
-      {/* Greeting + Daily Streak & Daily Goal Header Bar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 animate-rise-in">
+      {/* Greeting + Consolidated Daily Rhythm Strip (Streak & Daily Goal) */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-4 border-b border-border animate-rise-in">
         <div>
           <p className="text-sm text-ink-muted">{greetingForNow()},</p>
           <h2 className="text-2xl sm:text-[28px] font-semibold text-ink mt-0.5">
@@ -235,23 +194,23 @@ export function HomeDashboard({
           </h2>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Daily Streak Badge */}
+        <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+          {/* Daily Streak Readout */}
           <div
             data-testid="home-daily-streak-badge"
-            className="inline-flex items-center gap-2 h-11 px-3.5 rounded-2xl bg-surface border border-border shadow-2xs"
+            className="inline-flex items-center gap-2.5 min-h-11"
             title="Chuỗi ngày học liên tiếp"
           >
-            <span className="w-7 h-7 rounded-xl bg-highlight/20 text-gold grid place-items-center shrink-0">
-              <Flame className="w-4 h-4 fill-current" />
-            </span>
+            <Flame className="w-5 h-5 text-gold fill-current shrink-0" aria-hidden="true" />
             <div className="leading-tight">
               <span className="block text-xs text-ink-muted">Chuỗi ngày học</span>
               <span className="block text-sm font-semibold text-ink tabular-nums">
-                🔥 {dailyProgress.streakDays} ngày liên tiếp
+                {dailyProgress.streakDays} ngày liên tiếp
               </span>
             </div>
           </div>
+
+          <span className="hidden sm:block h-7 w-px bg-border" aria-hidden="true" />
 
           {/* Daily Goal Progress & Switcher (5 / 10 / 20 words) */}
           <div
@@ -266,19 +225,17 @@ export function HomeDashboard({
               }
             }}
             title="Bấm để đổi mục tiêu ôn tập trong ngày (5 / 10 / 20 từ)"
-            className="flex items-center gap-3 min-h-11 px-3.5 py-2 rounded-2xl bg-surface border border-border hover:border-border-strong shadow-2xs transition-colors cursor-pointer"
+            className="flex items-center gap-3 min-h-11 cursor-pointer"
           >
-            <span className="w-7 h-7 rounded-xl bg-primary-soft text-primary grid place-items-center shrink-0">
-              <Target className="w-4 h-4" />
-            </span>
-            <div className="min-w-[140px]">
+            <Target className="w-5 h-5 text-primary shrink-0" aria-hidden="true" />
+            <div className="min-w-[148px]">
               <div className="flex items-center justify-between gap-2 text-xs">
                 <span className="font-medium text-ink tabular-nums" data-testid="home-daily-goal-text">
-                  Đã ôn {dailyProgress.reviewedCountToday}/{dailyProgress.dailyGoal} từ hôm nay
+                  Mục tiêu hôm nay: {dailyProgress.reviewedCountToday}/{dailyProgress.dailyGoal} từ
                 </span>
               </div>
               <div
-                className="mt-1.5 h-1.5 w-full rounded-full bg-surface-2 overflow-hidden"
+                className="mt-1.5 h-1.5 w-full bg-surface-2 overflow-hidden"
                 role="progressbar"
                 aria-valuemin={0}
                 aria-valuemax={dailyProgress.dailyGoal}
@@ -286,13 +243,13 @@ export function HomeDashboard({
                 aria-label="Tiến độ mục tiêu từ vựng hôm nay"
               >
                 <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
-                  style={{ width: `${dailyGoalPercent}%` }}
+                  className="h-full w-full bg-primary origin-left transition-transform duration-200 ease-out"
+                  style={{ transform: `scaleX(${dailyGoalPercent / 100})` }}
                 />
               </div>
             </div>
             <div
-              className="flex items-center gap-1 pl-1 border-l border-border"
+              className="flex items-center gap-1 pl-2 border-l border-border"
               aria-label="Chọn mục tiêu số từ mỗi ngày"
             >
               {([5, 10, 20] as const).map((goalOption) => {
@@ -304,7 +261,7 @@ export function HomeDashboard({
                     data-testid={`daily-goal-btn-${goalOption}`}
                     onClick={(e) => handleSelectDailyGoal(goalOption, e)}
                     aria-pressed={isSelected}
-                    className={`h-6 px-2 rounded-lg text-xs font-semibold tabular-nums transition-colors cursor-pointer ${
+                    className={`min-h-8 min-w-8 px-2 rounded-lg text-xs font-semibold tabular-nums transition-colors cursor-pointer ${
                       isSelected
                         ? 'bg-primary text-on-primary'
                         : 'bg-surface-2 text-ink-muted hover:text-ink'
@@ -320,15 +277,15 @@ export function HomeDashboard({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* Continue lesson — compact side-by-side layout on wider screens */}
+        {/* Continue lesson — single card surface, no nested card wrappers */}
         {current && (
           <section
-            className="lg:col-span-2 rounded-3xl bg-surface border border-border shadow-xs p-5 sm:p-6 flex flex-col justify-between gap-4 animate-rise-in"
+            className="lg:col-span-2 rounded-2xl bg-surface border border-border p-5 sm:p-6 flex flex-col justify-between gap-5 animate-rise-in"
             style={{ '--stagger': 1 } as React.CSSProperties}
             aria-labelledby="continue-heading"
           >
             <div className="flex items-center justify-between gap-2">
-              <h3 id="continue-heading" className="text-sm font-medium text-ink-muted">
+              <h3 id="continue-heading" className="text-sm font-semibold text-ink-muted">
                 Tiếp tục bài học
               </h3>
               <span className="text-xs text-ink-subtle tabular-nums">
@@ -338,35 +295,37 @@ export function HomeDashboard({
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
-              {/* Compact Hanzi MiZiGe box placed right beside Pinyin/Meaning */}
-              <div
+              {/* Compact Hanzi MiZiGe character grid directly inside section */}
+              <button
+                type="button"
                 onClick={() => speakChinese(current.hanzi)}
                 title={`Chạm để nghe phát âm ${current.hanzi}`}
-                className="shrink-0 self-start sm:self-center rounded-2xl bg-surface-2 p-3 flex items-center justify-center gap-1.5 cursor-pointer hover:bg-primary-soft/40 transition-colors"
+                aria-label={`Nghe phát âm ${current.hanzi}`}
+                className="shrink-0 self-start sm:self-center flex items-center gap-2 cursor-pointer group"
               >
                 {Array.from(current.hanzi)
                   .slice(0, 4)
                   .map((ch, i, arr) => {
                     const size = arr.length === 1 ? 92 : arr.length === 2 ? 78 : 58;
                     return (
-                      <div
+                      <span
                         key={`${ch}-${i}`}
-                        className="relative shrink-0 bg-surface/70 rounded-lg"
+                        className="relative inline-block shrink-0"
                         style={{ width: size, height: size }}
                       >
                         <MiZiGeBackdrop />
                         <span
-                          className="absolute inset-0 grid place-items-center font-hanzi leading-none text-ink"
+                          className="absolute inset-0 grid place-items-center font-hanzi leading-none text-ink group-hover:text-primary transition-colors"
                           style={{ fontSize: Math.round(size * 0.68) }}
                         >
                           {ch}
                         </span>
-                      </div>
+                      </span>
                     );
                   })}
-              </div>
+              </button>
 
-              {/* Pinyin, Han-Viet, Meaning & Example right next to the character */}
+              {/* Pinyin, Han-Viet, Meaning & Example */}
               <div className="min-w-0 flex-1 space-y-1.5">
                 <div className="flex items-baseline gap-2.5 flex-wrap">
                   <span className="text-xl sm:text-2xl font-semibold text-primary">
@@ -379,7 +338,7 @@ export function HomeDashboard({
                 <p className="text-base sm:text-lg font-medium text-ink">{current.meaning}</p>
                 {current.exampleHanzi && (
                   <div className="flex items-start gap-2 pt-0.5">
-                    <p className="text-sm text-ink-muted line-clamp-2 flex-1">
+                    <p className="text-sm text-ink-muted leading-relaxed flex-1">
                       <span className="font-hanzi text-ink">{current.exampleHanzi}</span>
                       {current.exampleMeaning && <span> — {current.exampleMeaning}</span>}
                     </p>
@@ -389,21 +348,21 @@ export function HomeDashboard({
                       onClick={() => speakChinese(current.exampleHanzi)}
                       aria-label={`Nghe câu ví dụ: ${current.exampleHanzi}`}
                       title={`Nghe phát âm câu ví dụ: ${current.exampleHanzi}`}
-                      className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-lg bg-surface-2 text-ink-muted hover:text-primary hover:bg-primary-soft/60 transition-colors cursor-pointer"
+                      className="shrink-0 inline-flex items-center justify-center min-w-9 min-h-9 rounded-lg text-ink-muted hover:text-primary hover:bg-surface-2 transition-colors cursor-pointer"
                     >
-                      <Volume2 className="w-3.5 h-3.5" />
+                      <Volume2 className="w-4 h-4" />
                     </button>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="pt-3 border-t border-border/70 flex flex-wrap items-center gap-2">
+            <div className="pt-3.5 border-t border-border flex flex-wrap items-center gap-2.5">
               <button
                 type="button"
                 data-testid="home-continue-btn"
                 onClick={onContinueLesson}
-                className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors cursor-pointer"
+                className="inline-flex items-center gap-2 min-h-11 px-4 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors cursor-pointer"
               >
                 <BookOpen className="w-4 h-4" />
                 Học tiếp
@@ -411,7 +370,7 @@ export function HomeDashboard({
               <button
                 type="button"
                 onClick={() => onPracticeWriting(current)}
-                className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-border-strong bg-surface hover:bg-surface-2 text-ink text-sm font-medium transition-colors cursor-pointer"
+                className="inline-flex items-center gap-2 min-h-11 px-4 rounded-xl border border-border-strong bg-surface hover:bg-surface-2 text-ink text-sm font-medium transition-colors cursor-pointer"
               >
                 <PenLine className="w-4 h-4" />
                 Luyện viết
@@ -420,7 +379,7 @@ export function HomeDashboard({
                 type="button"
                 onClick={() => speakChinese(current.hanzi)}
                 aria-label={`Nghe phát âm ${current.hanzi}`}
-                className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl text-ink-muted hover:bg-surface-2 hover:text-ink text-sm font-medium transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 min-h-11 px-3.5 rounded-xl text-ink-muted hover:bg-surface-2 hover:text-ink text-sm font-medium transition-colors cursor-pointer"
               >
                 <Volume2 className="w-4 h-4" />
                 <span>Phát âm</span>
@@ -429,16 +388,16 @@ export function HomeDashboard({
           </section>
         )}
 
-        {/* Progress with visual circular ring + linear progress bar */}
+        {/* Vocabulary Deck Progress — single card layer, no duplicate 12%, separated progress bar */}
         <section
-          className="rounded-3xl bg-surface border border-border shadow-xs p-5 sm:p-6 flex flex-col justify-between animate-rise-in"
+          className="rounded-2xl bg-surface border border-border p-5 sm:p-6 flex flex-col justify-between gap-4 animate-rise-in"
           style={{ '--stagger': 2 } as React.CSSProperties}
           aria-labelledby="progress-heading"
           data-testid="home-progress-card"
         >
-          <div>
+          <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <h3 id="progress-heading" className="text-sm font-medium text-ink-muted">
+              <h3 id="progress-heading" className="text-sm font-semibold text-ink-muted">
                 Tiến độ bộ từ
               </h3>
               <span className="text-xs text-ink-subtle tabular-nums">
@@ -446,27 +405,31 @@ export function HomeDashboard({
               </span>
             </div>
 
-            <div className="mt-3 flex items-center justify-between gap-4">
-              <div>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-3xl sm:text-4xl font-semibold tabular-nums text-ink">
-                    {learnedCount}
-                  </span>
-                  <span className="text-sm sm:text-base text-ink-muted">
-                    / {slides.length} từ đã thuộc
-                  </span>
-                </div>
-                <p className="text-xs text-ink-subtle mt-1">
-                  {learnedCount === slides.length
-                    ? 'Tuyệt vời! Bạn đã hoàn thành toàn bộ bộ từ.'
-                    : `Đã hoàn thành ${percent}% mục tiêu từ vựng bài học`}
-                </p>
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl sm:text-4xl font-semibold tabular-nums text-ink">
+                  {learnedCount}
+                </span>
+                <span className="text-sm sm:text-base text-ink-muted tabular-nums">
+                  / {slides.length} từ đã thuộc
+                </span>
               </div>
-              <VocabProgressRing percent={percent} />
+              <span
+                data-testid="vocab-progress-ring"
+                className="text-lg font-semibold tabular-nums text-primary"
+              >
+                {percent}%
+              </span>
             </div>
 
+            <p className="text-xs text-ink-muted leading-normal">
+              {learnedCount === slides.length
+                ? 'Tuyệt vời! Bạn đã hoàn thành toàn bộ bộ từ.'
+                : 'Tiến độ tích lũy bộ từ vựng bài học hiện tại'}
+            </p>
+
             <div
-              className="mt-4 h-2.5 rounded-full bg-surface-2 overflow-hidden"
+              className="h-2 w-full bg-surface-2 overflow-hidden"
               role="progressbar"
               aria-valuemin={0}
               aria-valuemax={100}
@@ -474,20 +437,20 @@ export function HomeDashboard({
               aria-label="Tỷ lệ từ đã thuộc"
             >
               <div
-                className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
-                style={{ width: `${percent}%` }}
+                className="h-full w-full bg-primary origin-left transition-transform duration-200 ease-out"
+                style={{ transform: `scaleX(${percent / 100})` }}
               />
             </div>
           </div>
 
-          <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl bg-surface-2 px-3 py-2.5">
+          <dl className="pt-4 border-t border-border grid grid-cols-2 divide-x divide-border text-sm">
+            <div className="pr-3">
               <dt className="text-ink-muted text-xs">Kho từ HSK</dt>
-              <dd className="font-semibold text-ink tabular-nums">{totalVocabBankCount}</dd>
+              <dd className="font-semibold text-ink tabular-nums mt-0.5">{totalVocabBankCount}</dd>
             </div>
-            <div className="rounded-xl bg-surface-2 px-3 py-2.5">
+            <div className="pl-3">
               <dt className="text-ink-muted text-xs">Lớp {userProfile.classCode || '—'}</dt>
-              <dd className="font-semibold text-ink tabular-nums">{classroomStudentCount} học viên</dd>
+              <dd className="font-semibold text-ink tabular-nums mt-0.5">{classroomStudentCount} học viên</dd>
             </div>
           </dl>
         </section>
@@ -531,26 +494,26 @@ export function HomeDashboard({
               type="button"
               data-testid={testId}
               onClick={onClick}
-              className="group text-left flex items-center gap-3 rounded-2xl bg-surface border border-border hover:border-border-strong p-4 transition-colors cursor-pointer"
+              className="group text-left flex items-center gap-3.5 rounded-2xl bg-surface border border-border hover:border-border-strong p-4 transition-colors cursor-pointer"
             >
               <span className="w-10 h-10 shrink-0 rounded-xl bg-primary-soft text-primary grid place-items-center">
                 <Icon className="w-5 h-5" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold text-ink">{title}</span>
-                <span className="block text-xs text-ink-muted truncate">{body}</span>
+                <span className="block text-xs text-ink-muted leading-snug mt-0.5">{body}</span>
               </span>
-              <ChevronRight className="w-4 h-4 text-ink-subtle group-hover:text-ink transition-colors" />
+              <ChevronRight className="w-4 h-4 text-ink-subtle group-hover:text-ink transition-colors shrink-0" />
             </button>
           ))}
         </div>
       </section>
 
-      {/* Words to review — with smart filter chips, quick search, direct speaker button & detail popup */}
+      {/* Words to review — uniform cards with Hanzi focal point, Pinyin + Vietnamese secondary */}
       {remainingCount > 0 && (
         <section
           aria-labelledby="review-heading"
-          className="animate-rise-in space-y-3"
+          className="animate-rise-in space-y-3.5"
           style={{ '--stagger': 4 } as React.CSSProperties}
         >
           <div className="flex items-baseline justify-between gap-2">
@@ -568,16 +531,16 @@ export function HomeDashboard({
             <button
               type="button"
               onClick={onOpenFlashcard}
-              className="text-sm font-medium text-primary hover:underline cursor-pointer shrink-0"
+              className="min-h-9 px-2 text-sm font-medium text-primary hover:underline cursor-pointer shrink-0"
             >
               Ôn tất cả
             </button>
           </div>
 
-          {/* Smart Filter & Quick Search Toolbar */}
+          {/* Flat Filter & Quick Search Toolbar (no nested card wrapper) */}
           <div
             data-testid="home-unlearned-toolbar"
-            className="flex flex-col sm:flex-row sm:items-center gap-2.5 rounded-2xl bg-surface border border-border p-2.5"
+            className="flex flex-col sm:flex-row sm:items-center gap-2.5"
           >
             <div className="relative sm:w-64 shrink-0">
               <Search className="w-4 h-4 text-ink-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -588,14 +551,14 @@ export function HomeDashboard({
                 onChange={(e) => setUnlearnedSearchQuery(e.target.value)}
                 placeholder="Tìm chữ Hán, Pinyin, nghĩa..."
                 aria-label="Tìm nhanh trong danh sách từ chưa thuộc"
-                className="w-full h-9 pl-9 pr-8 rounded-xl bg-surface-2 border border-transparent focus:border-primary focus:bg-surface focus:outline-none text-sm text-ink placeholder:text-ink-subtle"
+                className="w-full h-10 pl-9 pr-8 rounded-xl bg-surface border border-border focus:border-primary focus:outline-none text-sm text-ink placeholder:text-ink-subtle"
               />
               {unlearnedSearchQuery && (
                 <button
                   type="button"
                   onClick={() => setUnlearnedSearchQuery('')}
                   aria-label="Xóa từ khóa tìm kiếm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full grid place-items-center text-ink-subtle hover:text-ink cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full grid place-items-center text-ink-subtle hover:text-ink cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -625,10 +588,10 @@ export function HomeDashboard({
                     data-testid={chip.testId}
                     onClick={() => setUnlearnedFilter(chip.id)}
                     aria-pressed={active}
-                    className={`h-8 px-3 rounded-xl text-xs font-medium whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
+                    className={`h-9 px-3 rounded-xl text-xs font-medium whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
                       active
                         ? 'bg-primary-soft text-primary border-primary/40 font-semibold'
-                        : 'bg-surface-2/70 text-ink-muted border-transparent hover:text-ink hover:bg-surface-2'
+                        : 'bg-surface text-ink-muted border-border hover:text-ink hover:bg-surface-2'
                     }`}
                   >
                     {chip.label}
@@ -652,17 +615,17 @@ export function HomeDashboard({
                   setUnlearnedSearchQuery('');
                   setUnlearnedFilter('all');
                 }}
-                className="inline-flex items-center h-8 px-3 rounded-xl bg-surface-2 hover:bg-primary-soft text-xs font-medium text-primary transition-colors cursor-pointer"
+                className="inline-flex items-center h-9 px-3.5 rounded-xl bg-surface-2 hover:bg-primary-soft text-xs font-medium text-primary transition-colors cursor-pointer"
               >
                 Đặt lại bộ lọc
               </button>
             </div>
           ) : (
-            <ul className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
+            <ul className="grid gap-3 grid-cols-2 sm:grid-cols-4">
               {displayedUnlearned.map(({ s, i, isHard }) => (
                 <li
                   key={s.id}
-                  className="group relative rounded-2xl bg-surface border border-border hover:border-primary/40 transition-colors"
+                  className="group relative rounded-2xl bg-surface border border-border hover:border-primary/50 transition-colors"
                 >
                   <button
                     type="button"
@@ -671,22 +634,31 @@ export function HomeDashboard({
                       setPreviewWord({ slide: s, index: i });
                       speakChinese(s.hanzi);
                     }}
+                    title={`${s.hanzi} (${s.pinyin}) — ${s.meaning}`}
                     aria-label={`Xem chi tiết từ ${s.hanzi} (${s.pinyin} - ${s.meaning})`}
-                    className="w-full text-left px-4 py-3 pr-10 cursor-pointer"
+                    className="w-full min-h-[112px] flex flex-col justify-between text-left p-4 pr-11 cursor-pointer"
                   >
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-hanzi text-2xl text-ink leading-tight group-hover:text-primary transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span
+                        lang="zh-CN"
+                        className="font-hanzi text-2xl sm:text-[28px] font-semibold text-ink leading-none group-hover:text-primary transition-colors"
+                      >
                         {s.hanzi}
                       </span>
                       {isHard && (
-                        <span className="px-1.5 py-0.5 rounded bg-accent-soft text-accent text-[10px] font-medium">
+                        <span className="px-1.5 py-0.5 rounded bg-accent-soft text-accent text-[11px] font-medium">
                           Khó
                         </span>
                       )}
                     </div>
-                    <span className="block text-xs text-ink-muted mt-1 truncate">
-                      {s.pinyin} · {s.meaning}
-                    </span>
+                    <div className="mt-2.5 space-y-0.5">
+                      <span className="block text-xs font-semibold text-primary leading-snug">
+                        {s.pinyin}
+                      </span>
+                      <span className="block text-xs text-ink-muted leading-snug line-clamp-2">
+                        {s.meaning}
+                      </span>
+                    </div>
                   </button>
                   <button
                     type="button"
@@ -697,9 +669,9 @@ export function HomeDashboard({
                     }}
                     aria-label={`Nghe phát âm ${s.hanzi}`}
                     title={`Nghe phát âm ${s.hanzi}`}
-                    className="absolute top-2.5 right-2.5 w-7 h-7 rounded-lg grid place-items-center text-ink-subtle hover:text-primary hover:bg-primary-soft/60 transition-colors cursor-pointer"
+                    className="absolute top-1.5 right-1.5 min-w-10 min-h-10 rounded-xl grid place-items-center text-ink-subtle hover:text-primary hover:bg-primary-soft/60 transition-colors cursor-pointer"
                   >
-                    <Volume2 className="w-3.5 h-3.5" />
+                    <Volume2 className="w-4 h-4" />
                   </button>
                 </li>
               ))}
@@ -721,27 +693,27 @@ export function HomeDashboard({
             <button
               type="button"
               onClick={onOpenLessonBuilder}
-              className="text-left flex items-center gap-3 rounded-2xl bg-surface border border-border hover:border-border-strong p-4 transition-colors cursor-pointer"
+              className="text-left flex items-center gap-3.5 rounded-2xl bg-surface border border-border hover:border-border-strong p-4 transition-colors cursor-pointer"
             >
               <span className="w-10 h-10 shrink-0 rounded-xl bg-surface-2 text-ink grid place-items-center">
                 <Presentation className="w-5 h-5" />
               </span>
               <span>
                 <span className="block text-sm font-semibold text-ink">Soạn bài giảng</span>
-                <span className="block text-xs text-ink-muted">Thêm từ, sắp xếp slide, trình chiếu</span>
+                <span className="block text-xs text-ink-muted mt-0.5">Thêm từ, sắp xếp slide, trình chiếu</span>
               </span>
             </button>
             <button
               type="button"
               onClick={onOpenClassroom}
-              className="text-left flex items-center gap-3 rounded-2xl bg-surface border border-border hover:border-border-strong p-4 transition-colors cursor-pointer"
+              className="text-left flex items-center gap-3.5 rounded-2xl bg-surface border border-border hover:border-border-strong p-4 transition-colors cursor-pointer"
             >
               <span className="w-10 h-10 shrink-0 rounded-xl bg-surface-2 text-ink grid place-items-center">
                 <GraduationCap className="w-5 h-5" />
               </span>
               <span>
                 <span className="block text-sm font-semibold text-ink">Quản lý lớp</span>
-                <span className="block text-xs text-ink-muted">
+                <span className="block text-xs text-ink-muted mt-0.5">
                   {classroomStudentCount} học viên · giao bài, chấm điểm
                 </span>
               </span>
@@ -769,25 +741,26 @@ export function HomeDashboard({
                 type="button"
                 onClick={() => setPreviewWord(null)}
                 aria-label="Đóng cửa sổ chi tiết từ"
-                className="w-8 h-8 rounded-full grid place-items-center text-ink-muted hover:bg-surface-2 hover:text-ink transition-colors cursor-pointer"
+                className="w-9 h-9 rounded-full grid place-items-center text-ink-muted hover:bg-surface-2 hover:text-ink transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-              <div
+              <button
+                type="button"
                 onClick={() => speakChinese(activePreviewSlide.hanzi)}
-                className="shrink-0 self-start rounded-2xl bg-surface-2 p-3 flex items-center justify-center gap-1.5 cursor-pointer"
+                className="shrink-0 self-start flex items-center gap-1.5 cursor-pointer"
               >
                 {Array.from(activePreviewSlide.hanzi)
                   .slice(0, 4)
                   .map((ch, idx, arr) => {
                     const size = arr.length === 1 ? 84 : arr.length === 2 ? 72 : 56;
                     return (
-                      <div
+                      <span
                         key={`${ch}-${idx}`}
-                        className="relative shrink-0 bg-surface/80 rounded-lg"
+                        className="relative inline-block shrink-0"
                         style={{ width: size, height: size }}
                       >
                         <MiZiGeBackdrop />
@@ -797,10 +770,10 @@ export function HomeDashboard({
                         >
                           {ch}
                         </span>
-                      </div>
+                      </span>
                     );
                   })}
-              </div>
+              </button>
 
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex items-baseline gap-2.5 flex-wrap">
@@ -831,7 +804,7 @@ export function HomeDashboard({
             </div>
 
             {activePreviewSlide.exampleHanzi && (
-              <div className="rounded-2xl bg-surface-2 p-3.5 space-y-1">
+              <div className="pt-3 border-t border-border space-y-1">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-ink-subtle">Câu ví dụ</span>
                   <button
@@ -864,7 +837,7 @@ export function HomeDashboard({
               testId="popup-pronunciation-result"
             />
 
-            <div className="pt-2 border-t border-border flex flex-wrap items-center justify-between gap-2">
+            <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"

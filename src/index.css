@@ -8,8 +8,8 @@
    ============================================================================ */
 
 @theme {
-  --font-sans: 'Be Vietnam Pro', 'Noto Sans SC', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-hanzi: 'Noto Serif SC', 'Songti SC', 'STSong', serif;
+  --font-sans: 'Be Vietnam Pro', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-hanzi: 'Noto Serif SC', 'Noto Sans SC', 'PingFang SC', 'Songti SC', 'STSong', 'Microsoft YaHei', serif;
 
   /* Slightly larger small sizes: the app leans heavily on text-xs */
   --text-xs: 0.8125rem;
@@ -63,8 +63,8 @@
   --token-surface: #FFFFFF;
   --token-surface-2: #F1F3F5;
   --token-ink: #15181D;
-  --token-ink-muted: #454C59;
-  --token-ink-subtle: #5D6573;
+  --token-ink-muted: #414854;
+  --token-ink-subtle: #505866;
   --token-border: #E3E6EA;
   --token-border-strong: #CDD1D8;
 
@@ -132,11 +132,11 @@ html[data-theme="moon-night"] {
   --token-canvas: #0E1013;
   --token-surface: #16191E;
   --token-surface-2: #1D2127;
-  --token-ink: #ECEEF1;
-  --token-ink-muted: #B5BCC8;
-  --token-ink-subtle: #939BA8;
-  --token-border: #272B33;
-  --token-border-strong: #353A44;
+  --token-ink: #F1F3F6;
+  --token-ink-muted: #C4CBD6;
+  --token-ink-subtle: #A3ACBA;
+  --token-border: #282D36;
+  --token-border-strong: #383E4A;
 
   --token-primary: #34BC8C;
   --token-primary-hover: #4DCB9D;
@@ -259,12 +259,13 @@ textarea:focus-visible,
   align-items: center;
   gap: 0.75rem;
   width: 100%;
+  min-height: 44px;
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-xl);
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--token-ink-muted);
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .app-nav-link:hover {
@@ -394,11 +395,11 @@ textarea:focus-visible,
    consistent: quick for feedback, a little longer for things that appear.
    ============================================================================ */
 :root {
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --dur-fast: 120ms;
+  --dur-fast: 150ms;
   --dur-base: 200ms;
-  --dur-slow: 320ms;
+  --dur-slow: 250ms;
 }
 
 /* Menus, popovers, chat bubbles: grow from their anchor */
@@ -484,22 +485,32 @@ textarea:focus-visible,
 .typing-dots span:nth-child(2) { animation-delay: 0.15s; }
 .typing-dots span:nth-child(3) { animation-delay: 0.3s; }
 
-/* Buttons and nav items: quick, consistent feedback */
+/* Buttons and nav items: quick, consistent feedback with exponential ease-out */
 .app-nav-link,
 .app-tabbar-link {
-  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, transform var(--dur-fast) ease;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
 }
 .app-tabbar-link:active,
 .app-nav-link:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
-.app-tabbar-link[aria-current="page"] svg {
-  animation: tabBounce var(--dur-slow) var(--ease-out);
+.app-tabbar-link svg {
+  transition: transform var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
-@keyframes tabBounce {
-  0% { transform: translateY(0) scale(1); }
-  40% { transform: translateY(-2px) scale(1.08); }
-  100% { transform: none; }
+
+/* Suppress injected hosting badges (e.g. "Powered by Netlify") and organic clip-path contours */
+[id*="netlify" i]:not(#root *),
+[class*="netlify" i]:not(#root *),
+iframe[src*="netlify" i],
+a[href*="netlify.com" i] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+div[style*="clip-path: path("],
+div[style*="clip-path:path("] {
+  clip-path: none !important;
 }
 
 /* Smooth colour change while switching theme (class added for ~300 ms) */

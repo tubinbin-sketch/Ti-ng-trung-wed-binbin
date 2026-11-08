@@ -224,13 +224,10 @@ export default function App() {
       const stored = localStorage.getItem(STORAGE_KEY_UI_THEME);
       const match = TEACHER_THEME_PRESETS.find((t) => t.id === stored);
       if (match) return match;
-      if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
-        return TEACHER_THEME_PRESETS.find((t) => t.id === 'moon-night') || TEACHER_THEME_PRESETS[0];
-      }
     } catch {
-      // storage unavailable: fall back to default theme
+      // storage unavailable: fall back to default dark theme
     }
-    return TEACHER_THEME_PRESETS[0];
+    return TEACHER_THEME_PRESETS.find((t) => t.id === 'moon-night') || TEACHER_THEME_PRESETS[0];
   });
   const [classroomStudentCount, setClassroomStudentCount] = useState<number>(
     () => getStoredStudentRoster().length
@@ -260,13 +257,26 @@ export default function App() {
       setStudentTab('quiz-leaderboard');
     } else if (path === '/giao-vien/soan-bai') {
       if (userProfile.role !== 'teacher') {
-        setUserProfile((prev) => ({ ...prev, role: 'teacher' }));
+        setUserProfile((prev) => ({
+          ...prev,
+          role: 'teacher',
+          name: prev.role === 'teacher' ? prev.name : 'GV Nguyễn Văn Thụ',
+        }));
       }
       setTeacherTab('lesson-builder');
     } else if (path.startsWith('/giao-vien/lop/')) {
-      if (userProfile.role !== 'teacher') {
-        setUserProfile((prev) => ({ ...prev, role: 'teacher' }));
-      }
+      const routeClassId = path.split('/giao-vien/lop/')[1]?.split('/')[0] || '';
+      const isDemoHsk3Route = routeClassId === 'demo-hsk3-class';
+      setUserProfile((prev) => ({
+        ...prev,
+        role: 'teacher',
+        name:
+          prev.role === 'teacher' && !/^học viên/i.test(prev.name)
+            ? prev.name
+            : 'GV Nguyễn Văn Thụ',
+        classId: routeClassId || prev.classId || 'demo-hsk3-class',
+        classCode: isDemoHsk3Route ? 'DEMO-HSK3' : prev.classCode || '722229',
+      }));
       setTeacherTab('class-manager');
     }
   }, [location.pathname]);
@@ -473,10 +483,10 @@ export default function App() {
     if (!el || prefersReducedMotion() || typeof el.animate !== 'function') return;
     el.animate(
       [
-        { opacity: 0, transform: 'translateY(6px)' },
+        { opacity: 0, transform: 'translateY(4px)' },
         { opacity: 1, transform: 'none' },
       ],
-      { duration: 220, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
+      { duration: 200, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
     );
   }, [location.pathname]);
 
@@ -936,13 +946,13 @@ export default function App() {
             type="button"
             data-testid="header-auth-btn"
             onClick={() => setAuthModalOpen(true)}
-            className="w-full flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-surface-2 transition-colors text-left cursor-pointer"
-            title="Tài khoản & đăng nhập"
+            className="w-full flex items-center gap-2.5 rounded-xl px-2 py-2 min-h-11 hover:bg-surface-2 transition-colors text-left cursor-pointer"
+            title={`${displayName} — ${roleLabel}${userProfile.classCode ? ` · Lớp ${userProfile.classCode}` : ''}`}
           >
-            <Avatar name={userProfile.name} size={36} />
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-ink truncate">{displayName}</span>
-              <span className="block text-xs text-ink-muted truncate">
+            <Avatar name={userProfile.name} size={32} />
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="block text-sm font-semibold text-ink">{displayName}</span>
+              <span className="block text-[11px] text-ink-muted mt-0.5 whitespace-nowrap">
                 {roleLabel}
                 {userProfile.classCode ? ` · Lớp ${userProfile.classCode}` : ''}
               </span>
@@ -963,18 +973,18 @@ export default function App() {
               <button
                 type="button"
                 onClick={navHome.onSelect}
-                className="app-seal cursor-pointer"
+                className="min-w-11 min-h-11 inline-grid place-items-center rounded-xl cursor-pointer"
                 aria-label="HANU HSK — về trang tổng quan"
               >
-                汉
+                <span className="app-seal">汉</span>
               </button>
             </div>
-            <h1 className="flex-1 min-w-0 text-base lg:text-lg font-semibold text-ink truncate">
+            <h1 className="flex-1 min-w-0 text-base lg:text-lg font-semibold text-ink">
               {pageTitle}
             </h1>
 
             {isDemoMode && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg bg-highlight/15 text-gold text-xs font-medium">
+              <span className="hidden sm:inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-highlight/15 text-gold text-xs font-medium shrink-0">
                 <FlaskConical className="w-3.5 h-3.5" aria-hidden="true" />
                 Bản demo
               </span>
@@ -986,7 +996,7 @@ export default function App() {
               type="button"
               onClick={() => appStore.openBinBinAssistant()}
               data-testid="navbar-open-binbin-btn"
-              className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border border-border bg-surface hover:bg-surface-2 text-sm font-medium text-ink transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center gap-2 min-h-11 min-w-11 px-3 rounded-xl border border-border bg-surface hover:bg-surface-2 text-sm font-medium text-ink transition-colors cursor-pointer shrink-0"
               title="Hỏi trợ giảng 彬彬"
             >
               <span aria-hidden="true">🐼</span>
@@ -995,7 +1005,7 @@ export default function App() {
             </button>
 
             {/* Account menu */}
-            <div className="relative" ref={settingsMenuRef}>
+            <div className="relative shrink-0" ref={settingsMenuRef}>
               <button
                 type="button"
                 data-testid="navbar-settings-menu-btn"
@@ -1003,9 +1013,9 @@ export default function App() {
                 aria-haspopup="menu"
                 aria-label="Tài khoản, giao diện và tiện ích"
                 onClick={() => setSettingsMenuOpen((v) => !v)}
-                className="relative inline-flex items-center rounded-full cursor-pointer ring-offset-2 ring-offset-surface hover:ring-2 hover:ring-border-strong transition-shadow"
+                className="relative inline-flex items-center justify-center min-w-11 min-h-11 rounded-full cursor-pointer ring-offset-2 ring-offset-surface hover:ring-2 hover:ring-border-strong transition-shadow"
               >
-                <Avatar name={userProfile.name} size={34} />
+                <Avatar name={userProfile.name} size={36} />
                 <span
                   aria-hidden="true"
                   className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface ${
@@ -1170,7 +1180,7 @@ export default function App() {
         <main
           ref={studioSectionRef}
           id="studio"
-          className={`relative flex-1 w-full max-w-[1320px] mx-auto px-4 sm:px-6 pt-5 sm:pt-6 pb-32 lg:pb-14 transition-[padding] duration-300 ${
+          className={`relative flex-1 w-full max-w-[1320px] mx-auto px-4 sm:px-6 pt-5 sm:pt-6 pb-32 lg:pb-16 ${
             isBinBinDockedOpen ? 'lg:pr-[384px]' : ''
           }`}
         >

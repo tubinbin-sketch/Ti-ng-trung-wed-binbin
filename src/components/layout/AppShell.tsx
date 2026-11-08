@@ -27,7 +27,7 @@ export function BrandMark({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-2.5 rounded-xl cursor-pointer"
+      className="inline-flex items-center gap-2.5 min-h-11 rounded-xl cursor-pointer"
       aria-label="HANU HSK — về trang tổng quan"
     >
       <span className="app-seal" aria-hidden="true">
@@ -105,7 +105,7 @@ export function AppSidebar({
                       className="app-nav-link cursor-pointer"
                     >
                       <Icon aria-hidden="true" />
-                      <span className="flex-1 text-left truncate">{item.label}</span>
+                      <span className="flex-1 text-left leading-snug">{item.label}</span>
                       {item.locked && (
                         <Lock className="!w-3.5 !h-3.5 text-ink-subtle" aria-label="Cần đăng nhập giáo viên" />
                       )}
@@ -151,7 +151,7 @@ export function AppTabBar({ items, activeId }: { items: NavItem[]; activeId: str
                 className="app-tabbar-link w-full cursor-pointer"
               >
                 <Icon aria-hidden="true" />
-                <span className="truncate max-w-full px-1">{item.shortLabel || item.label}</span>
+                <span className="max-w-full px-1 leading-tight text-center">{item.shortLabel || item.label}</span>
               </button>
             </li>
           );
