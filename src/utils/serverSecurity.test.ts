@@ -384,7 +384,8 @@ test('Server Security & Classroom API Suite (Bootstrap, Atomic Join, Atomic Grad
 
   await t.test('5. POST /api/submissions executes atomically, prevents concurrent double-submissions, and ignores forged client timeSeconds', async () => {
     const answerKey = extractAssignmentAnswerKey(
-          'teacher-uid-1',
+      SAMPLE_ASSIGNMENT,
+      'teacher-uid-1',
       1
     );
     await store.setDoc('classes/class-hsk3/answerKeys/assign-b14', answerKey);
