@@ -1,0 +1,11 @@
+# Netlify (static hosting). The Node server (server.ts) is not running here.
+
+# Stroke data: proxy to the same npm package the server serves locally.
+/hanzi-data/*   https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/:splat   200
+
+# API routes need the Node server. Answer with a JSON 404 instead of the app's
+# HTML so the client falls back cleanly (offline dictionary, local demo data).
+/api/*          /api-unavailable.json   404
+
+# Single-page app: every other path (e.g. /hoc, /flashcard) loads the app.
+/*              /index.html             200

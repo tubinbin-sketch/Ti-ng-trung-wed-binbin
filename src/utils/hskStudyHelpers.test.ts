@@ -462,13 +462,55 @@ test('filterUnlearnedSlides and extractUnlearnedPosCategories filter by search, 
 
 test('DailyStudyProgress initializes, records reviewed words, and switches daily goals (5 / 10 / 20)', () => {
   const progress = getDailyStudyProgress(INITIAL_VOCAB_SLIDES);
-  assert.ok(progress.streakDays >= 1);
+  // A brand-new learner has no streak and nothing reviewed yet (no invented numbers).
+  assert.equal(progress.streakDays, 0);
+  assert.equal(progress.reviewedCountToday, 0);
   assert.equal(progress.dailyGoal, 10);
 
   const afterReview = recordDailyWordReview('slide-3', INITIAL_VOCAB_SLIDES);
   assert.ok(afterReview.reviewedWordIdsToday.includes('slide-3'));
+  assert.equal(afterReview.streakDays, 1);
 
   const afterGoal20 = setDailyStudyGoal(20, INITIAL_VOCAB_SLIDES);
   assert.equal(afterGoal20.dailyGoal, 20);
 });
 
+
+test('Daily streak counts only days with real reviews (opening the app is not enough)', () => {
+  const g = globalThis as unknown as { window?: unknown; localStorage?: Storage };
+  const prevWindow = g.window;
+  const prevStorage = g.localStorage;
+  const mem = new Map<string, string>();
+  g.localStorage = {
+    getItem: (k: string) => (mem.has(k) ? (mem.get(k) as string) : null),
+    setItem: (k: string, v: string) => void mem.set(k, String(v)),
+    removeItem: (k: string) => void mem.delete(k),
+    clear: () => mem.clear(),
+    key: () => null,
+    length: 0,
+  } as Storage;
+  g.window = globalThis;
+  try {
+    const day = (d: number) => new Date(2026, 10, d, 9, 0, 0);
+
+    // Day 1 and day 2: review → streak 1, then 2
+    assert.equal(recordDailyWordReview('w1', [], day(1)).streakDays, 1);
+    assert.equal(recordDailyWordReview('w2', [], day(2)).streakDays, 2);
+
+    // Day 3: open the app only (no review). Streak still alive for today.
+    assert.equal(getDailyStudyProgress([], day(3)).streakDays, 2);
+
+    // Day 4: day 3 had no review, so the streak is broken…
+    assert.equal(getDailyStudyProgress([], day(4)).streakDays, 0);
+    // …and the first review today starts a new streak.
+    const restarted = recordDailyWordReview('w3', [], day(4));
+    assert.equal(restarted.streakDays, 1);
+    assert.equal(restarted.reviewedCountToday, 1);
+
+    // Same word twice on the same day counts once
+    assert.equal(recordDailyWordReview('w3', [], day(4)).reviewedCountToday, 1);
+  } finally {
+    g.window = prevWindow;
+    g.localStorage = prevStorage;
+  }
+});

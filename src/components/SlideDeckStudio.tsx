@@ -46,7 +46,7 @@ import {
   getStoredHsk3FilterState,
   saveStoredHsk3FilterState,
 } from '../utils/storageService';
-import { auth, saveStudentSrsWordToFirestore } from '../firebase';
+import { currentFirebaseUid, loadFirebase } from '../firebaseClient';
 import { appStore } from '../context/AppStoreContext';
 import { LazyErrorBoundary } from './LazyErrorBoundary';
 
@@ -430,12 +430,16 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
       appStore.notifySrsUpdated();
       recordDailyWordReview(currentSlide.id, slides);
 
-      if (auth.currentUser?.uid && nextRecords[currentSlide.id]) {
+      const signedInUid = currentFirebaseUid();
+      if (signedInUid && nextRecords[currentSlide.id]) {
         const isLearnedRating = rating === 'good' || rating === 'mastered';
-        void saveStudentSrsWordToFirestore(auth.currentUser.uid, currentSlide.id, {
-          ...nextRecords[currentSlide.id],
-          learned: isLearnedRating,
-        }).catch(() => {});
+        const wordId = currentSlide.id;
+        const record = { ...nextRecords[wordId], learned: isLearnedRating };
+        void loadFirebase()
+          .then(({ saveStudentSrsWordToFirestore }) =>
+            saveStudentSrsWordToFirestore(signedInUid, wordId, record)
+          )
+          .catch(() => {});
       }
 
       playGentleChime(
@@ -1589,7 +1593,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                   >
                     <Search className="w-3.5 h-3.5 text-ink-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
-                      type="text"
+                      type="search"
+                      aria-label="Tìm hoặc thêm nhanh từ vựng"
                       value={vocabSearchQuery}
                       onChange={(e) => {
                         setVocabSearchQuery(e.target.value);
@@ -1957,12 +1962,37 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
             <div
               ref={pillStripRef}
               data-testid="horizontal-vocab-pill-strip"
-              className="min-w-0 flex-1 flex items-center justify-start gap-1.5 overflow-x-auto no-scrollbar py-0.5"
+              role="toolbar"
+              aria-label="Danh sách từ vựng — dùng phím mũi tên để chuyển từ"
+              onKeyDown={(e) => {
+                // Roving focus: the strip is one Tab stop; arrows/Home/End move within it.
+                const buttons = Array.from(
+                  e.currentTarget.querySelectorAll<HTMLButtonElement>('button[data-vocab-pill]')
+                );
+                const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+                if (current === -1) return;
+                let next = current;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = current + 1;
+                else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = current - 1;
+                else if (e.key === 'Home') next = 0;
+                else if (e.key === 'End') next = buttons.length - 1;
+                else return;
+                e.preventDefault();
+                e.stopPropagation();
+                const target = buttons[Math.max(0, Math.min(buttons.length - 1, next))];
+                target?.focus();
+                target?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+              }}
+              className="min-w-0 flex-1 flex items-center justify-start gap-1.5 overflow-x-auto no-scrollbar py-0.5 px-0.5"
             >
-              {(filteredSlides.length > 0 ? filteredSlides : slides).map((s) => {
+              {(filteredSlides.length > 0 ? filteredSlides : slides).map((s, listPos, list) => {
                 const originalIdx = slides.findIndex((item) => item.id === s.id);
                 const idx = originalIdx !== -1 ? originalIdx : 0;
                 const isActive = idx === activeSlideIndex;
+                // Keep exactly one Tab stop even when the active word is filtered out.
+                const isTabStop =
+                  isActive ||
+                  (listPos === 0 && !list.some((item) => item.id === slides[activeSlideIndex]?.id));
                 return (
                   <button
                     key={s.id}
@@ -1971,6 +2001,8 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       else chipRefs.current.delete(idx);
                     }}
                     type="button"
+                    data-vocab-pill
+                    tabIndex={isTabStop ? 0 : -1}
                     onClick={() => {
                       handleSelectSlide(idx);
                       speakChinese(s.hanzi);
@@ -2000,7 +2032,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       <span
                         data-testid={`learned-green-dot-${s.hanzi}`}
                         title="Đã thuộc"
-                        className="inline-grid place-items-center w-4 h-4 rounded-full bg-success text-white shrink-0"
+                        className="inline-grid place-items-center w-4 h-4 rounded-full bg-success text-surface shrink-0"
                       >
                         <Check className="w-2.5 h-2.5" strokeWidth={3} />
                         <span className="sr-only">Đã thuộc</span>
@@ -2022,120 +2054,121 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
             >
               {/* Flashcard */}
               <section className="xl:col-span-8 space-y-4" aria-label="Thẻ ôn tập">
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={isCardFlipped}
-                  aria-label={
-                    isCardFlipped
-                      ? `Thẻ từ ${currentSlide.hanzi} (${currentSlide.pinyin}: ${currentSlide.meaning}) — đang xem mặt sau. Nhấn Space hoặc Enter để lật thẻ, mũi tên Trái/Phải để chuyển từ, phím 1 đến 4 để đánh giá mức độ thuộc.`
-                      : `Thẻ từ ${currentSlide.hanzi} — đang xem mặt trước. Nhấn Space hoặc Enter để lật thẻ xem đáp án, mũi tên Trái/Phải để chuyển từ.`
-                  }
-                  data-testid="flashcard-flip-toggle-btn"
-                  onClick={() => setIsCardFlipped((f) => !f)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setIsCardFlipped((f) => !f);
-                      speakChinese(currentSlide.hanzi, speechRate);
-                    } else if (e.key === 'ArrowLeft') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handlePrev();
-                    } else if (e.key === 'ArrowRight') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleNext();
+                {/* Card + its speak button are siblings: no button nested inside role="button" */}
+                <div className="relative">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isCardFlipped}
+                    aria-label={
+                      isCardFlipped
+                        ? `Thẻ từ ${currentSlide.hanzi} (${currentSlide.pinyin}: ${currentSlide.meaning}) — đang xem mặt sau. Nhấn Space hoặc Enter để lật thẻ, mũi tên Trái/Phải để chuyển từ, phím 1 đến 4 để đánh giá mức độ thuộc.`
+                        : `Thẻ từ ${currentSlide.hanzi} — đang xem mặt trước. Nhấn Space hoặc Enter để lật thẻ xem đáp án, mũi tên Trái/Phải để chuyển từ.`
                     }
-                  }}
-                  className="flip-scene relative rounded-3xl bg-surface border border-border shadow-sm hover:shadow-md transition-shadow cursor-pointer min-h-[340px] sm:min-h-[380px] flex flex-col items-center justify-center px-6 py-10 text-center select-none"
-                >
-                  <span className="absolute top-4 left-4 text-xs font-medium px-2 py-1 rounded-md bg-primary-soft text-primary">
-                    {currentHsk3Meta.hskLevelNormalized}
-                  </span>
+                    data-testid="flashcard-flip-toggle-btn"
+                    onClick={() => setIsCardFlipped((f) => !f)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsCardFlipped((f) => !f);
+                        speakChinese(currentSlide.hanzi, speechRate);
+                      } else if (e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handlePrev();
+                      } else if (e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleNext();
+                      }
+                    }}
+                    className="flip-scene relative rounded-3xl bg-surface border border-border shadow-sm hover:shadow-md transition-shadow cursor-pointer min-h-[340px] sm:min-h-[380px] flex flex-col items-center justify-center px-6 py-10 text-center select-none"
+                  >
+                    <span className="absolute top-4 left-4 text-xs font-medium px-2 py-1 rounded-md bg-primary-soft text-primary">
+                      {currentHsk3Meta.hskLevelNormalized}
+                    </span>
+
+                    <div
+                      key={`${currentSlide.id}-${isCardFlipped ? 'back' : 'front'}`}
+                      className="animate-flip-in w-full flex flex-col items-center"
+                    >
+                      <div className="font-hanzi text-7xl sm:text-8xl text-ink leading-none">
+                        {currentSlide.hanzi}
+                      </div>
+
+                      {isCardFlipped ? (
+                        <div className="mt-6 w-full max-w-md space-y-2 animate-fade-in">
+                          <div className="text-2xl font-semibold text-primary">{currentSlide.pinyin}</div>
+                          {currentSlide.hanViet && (
+                            <div className="text-sm text-ink-subtle">Hán Việt: {currentSlide.hanViet}</div>
+                          )}
+                          <div className="text-lg text-ink">{currentSlide.meaning}</div>
+                          {currentToneSandhi.spokenPinyin &&
+                            currentToneSandhi.spokenPinyin !== currentSlide.pinyin && (
+                              <div className="text-xs text-ink-muted">
+                                {currentToneSandhi.ruleTitle}: <strong className="text-ink">{currentToneSandhi.spokenPinyin}</strong>
+                              </div>
+                            )}
+                          {currentSlide.exampleHanzi && (
+                            <div className="mt-3 pt-3 border-t border-border text-sm text-ink-muted">
+                              <span className="font-hanzi text-base text-ink">{currentSlide.exampleHanzi}</span>
+                              {currentSlide.exampleMeaning && <div className="mt-0.5">{currentSlide.exampleMeaning}</div>}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="mt-6 text-sm text-ink-subtle">Nhẩm phiên âm và nghĩa, rồi bấm vào thẻ để lật</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Flashcard Audio & SpeechRecognition Pronunciation Practice Bar */}
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      data-testid="flashcard-pronounce-word-btn"
+                      onClick={() => speakChinese(currentSlide.hanzi, speechRate)}
+                      className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors cursor-pointer"
+                    >
+                      <Volume2 className="w-4 h-4" />
+                      <span>Phát âm</span>
+                    </button>
+                    <PronunciationPracticeButton
+                      isRecording={wordPronunciation.isRecording}
+                      onClick={() => wordPronunciation.startOrStopPractice()}
+                      testId="flashcard-pronounce-practice-btn"
+                    />
+                    {currentSlide.exampleHanzi && (
+                      <button
+                        type="button"
+                        onClick={() => speakChinese(currentSlide.exampleHanzi, speechRate)}
+                        className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl border border-border bg-surface hover:bg-surface-2 text-ink text-sm font-medium transition-colors cursor-pointer"
+                      >
+                        <Volume2 className="w-4 h-4 text-primary" />
+                        <span>Nghe câu ví dụ</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <PronunciationResultBanner
+                    result={wordPronunciation.result}
+                    error={wordPronunciation.error}
+                    targetHanzi={currentSlide.hanzi}
+                    onRetry={wordPronunciation.startOrStopPractice}
+                    onClose={wordPronunciation.clearResult}
+                    testId="flashcard-pronunciation-result"
+                  />
+
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      speakChinese(currentSlide.hanzi, speechRate);
-                    }}
+                    onClick={() => speakChinese(currentSlide.hanzi, speechRate)}
                     aria-label={`Nghe phát âm ${currentSlide.hanzi}`}
                     className="absolute top-4 right-4 w-10 h-10 grid place-items-center rounded-full text-ink-muted hover:text-primary hover:bg-primary-soft transition-colors cursor-pointer"
                   >
                     <Volume2 className="w-5 h-5" />
                   </button>
-
-                  <div
-                    key={`${currentSlide.id}-${isCardFlipped ? 'back' : 'front'}`}
-                    className="animate-flip-in w-full flex flex-col items-center"
-                  >
-                    <div className="font-hanzi text-7xl sm:text-8xl text-ink leading-none">
-                      {currentSlide.hanzi}
-                    </div>
-
-                    {isCardFlipped ? (
-                      <div className="mt-6 w-full max-w-md space-y-2 animate-fade-in">
-                        <div className="text-2xl font-semibold text-primary">{currentSlide.pinyin}</div>
-                        {currentSlide.hanViet && (
-                          <div className="text-sm text-ink-subtle">Hán Việt: {currentSlide.hanViet}</div>
-                        )}
-                        <div className="text-lg text-ink">{currentSlide.meaning}</div>
-                        {currentToneSandhi.spokenPinyin &&
-                          currentToneSandhi.spokenPinyin !== currentSlide.pinyin && (
-                            <div className="text-xs text-ink-muted">
-                              {currentToneSandhi.ruleTitle}: <strong className="text-ink">{currentToneSandhi.spokenPinyin}</strong>
-                            </div>
-                          )}
-                        {currentSlide.exampleHanzi && (
-                          <div className="mt-3 pt-3 border-t border-border text-sm text-ink-muted">
-                            <span className="font-hanzi text-base text-ink">{currentSlide.exampleHanzi}</span>
-                            {currentSlide.exampleMeaning && <div className="mt-0.5">{currentSlide.exampleMeaning}</div>}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="mt-6 text-sm text-ink-subtle">Nhẩm phiên âm và nghĩa, rồi bấm vào thẻ để lật</p>
-                    )}
-                  </div>
                 </div>
-
-                {/* Flashcard Audio & SpeechRecognition Pronunciation Practice Bar */}
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    data-testid="flashcard-pronounce-word-btn"
-                    onClick={() => speakChinese(currentSlide.hanzi, speechRate)}
-                    className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-sm font-semibold transition-colors cursor-pointer"
-                  >
-                    <Volume2 className="w-4 h-4" />
-                    <span>Phát âm</span>
-                  </button>
-                  <PronunciationPracticeButton
-                    isRecording={wordPronunciation.isRecording}
-                    onClick={() => wordPronunciation.startOrStopPractice()}
-                    testId="flashcard-pronounce-practice-btn"
-                  />
-                  {currentSlide.exampleHanzi && (
-                    <button
-                      type="button"
-                      onClick={() => speakChinese(currentSlide.exampleHanzi, speechRate)}
-                      className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl border border-border bg-surface hover:bg-surface-2 text-ink text-sm font-medium transition-colors cursor-pointer"
-                    >
-                      <Volume2 className="w-4 h-4 text-primary" />
-                      <span>Nghe câu ví dụ</span>
-                    </button>
-                  )}
-                </div>
-
-                <PronunciationResultBanner
-                  result={wordPronunciation.result}
-                  targetHanzi={currentSlide.hanzi}
-                  onRetry={wordPronunciation.startOrStopPractice}
-                  onClose={wordPronunciation.clearResult}
-                  testId="flashcard-pronunciation-result"
-                />
-
                 <div>
                   <div className="text-xs text-ink-muted text-center mb-2">
                     {isCardFlipped
@@ -2204,9 +2237,9 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h3 id="mistake-notebook-title" className="text-base font-semibold text-ink">
+                    <h2 id="mistake-notebook-title" className="text-base font-semibold text-ink">
                       Sổ từ hay quên <span className="font-hanzi text-ink-subtle font-normal">错题本</span>
-                    </h3>
+                    </h2>
                     <p className="text-xs text-ink-muted mt-0.5">
                       Từ bạn chấm “Quên” hoặc “Khó” sẽ nằm ở đây.
                     </p>
@@ -2464,6 +2497,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
 
                 <PronunciationResultBanner
                   result={wordPronunciation.result}
+                  error={wordPronunciation.error}
                   targetHanzi={currentSlide.hanzi}
                   onRetry={wordPronunciation.startOrStopPractice}
                   onClose={wordPronunciation.clearResult}
@@ -2677,9 +2711,9 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
               {/* Top Meta Header */}
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-base font-semibold text-ink">
+                  <h2 className="text-base font-semibold text-ink">
                     Luyện viết <span className="font-hanzi text-ink-subtle font-normal">米字格</span>
-                  </h3>
+                  </h2>
                   <div
                     className="text-sm text-ink-muted"
                     data-testid="inline-stroke-meta"
@@ -3705,7 +3739,7 @@ export const SlideDeckStudio: React.FC<SlideDeckStudioProps> = ({
                       value={editCustomImagePrompt}
                       onChange={(e) => setEditCustomImagePrompt(e.target.value)}
                       placeholder="VD: sunrise over the Great Wall of China, calendar flipping..."
-                      className="flex-1 px-3 py-1.5 rounded-xl bg-surface-2 border border-primary/20 text-xs text-ink focus:outline-none"
+                      className="flex-1 px-3 py-1.5 rounded-xl bg-surface-2 border border-primary/20 text-xs text-ink focus:outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-focus/40"
                     />
                     <button
                       type="button"

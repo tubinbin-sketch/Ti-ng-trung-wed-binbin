@@ -1422,7 +1422,7 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
               placeholder="Dán link ảnh (https://...) hoặc để trống để tự động..."
               aria-label={`Đường dẫn ảnh minh họa tùy chỉnh cho từ ${hanzi}`}
               data-testid="custom-vocab-image-input"
-              className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface/95 text-ink text-sm border border-highlight/50 focus:outline-none"
+              className="flex-1 px-2.5 py-1.5 rounded-lg bg-surface/95 text-ink text-sm border border-highlight/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             />
             <button
               type="submit"

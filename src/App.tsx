@@ -46,7 +46,7 @@ import {
   getStoredStudentRoster,
   STORAGE_KEY_STUDENTS,
 } from './components/classroom/classroomRosterData';
-import { AuthModal, UserProfile, UserRole } from './components/AuthModal';
+import type { UserProfile, UserRole } from './components/AuthModal';
 import { LazyErrorBoundary } from './components/LazyErrorBoundary';
 import { HomeDashboard } from './components/HomeDashboard';
 import { PWAInstallButton } from './components/PWAInstallButton';
@@ -61,6 +61,10 @@ import {
   ThemePicker,
 } from './components/layout/AppShell';
 
+// The login dialog pulls in Firebase; load it only when it's opened.
+const AuthModal = React.lazy(() =>
+  import('./components/AuthModal').then((m) => ({ default: m.AuthModal }))
+);
 const StrokeWritingModal = React.lazy(() =>
   import('./components/StrokeWritingModal').then((m) => ({ default: m.StrokeWritingModal }))
 );
@@ -104,14 +108,7 @@ import {
   recordDailyWordReview,
 } from './utils/hskStudyHelpers';
 import { saveStoredAssignment } from './utils/assignmentParser';
-import {
-  auth,
-  onAuthStateChanged,
-  saveStudentSrsWordToFirestore,
-  saveTeacherDeckToFirestore,
-  subscribeToClassroom,
-  subscribeToStudentSrs,
-} from './firebase';
+import { currentFirebaseUid, loadFirebase } from './firebaseClient';
 
 const STORAGE_KEY_UI_THEME = 'hanu_ui_theme';
 
@@ -281,9 +278,19 @@ export default function App() {
     }
   }, [location.pathname]);
 
+  // Firebase loads in the background after the first screen (see firebaseClient.ts).
+  // firebaseUid is the reactive "signed in" signal for the effects below.
+  const [firebaseUid, setFirebaseUid] = useState<string | null>(null);
+
   // Listen to Firebase Auth state changes and active classroom Firestore subscriptions
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
+    let cancelled = false;
+    let unsubAuth: (() => void) | undefined;
+    loadFirebase()
+      .then(({ auth, onAuthStateChanged }) => {
+        if (cancelled) return;
+        unsubAuth = onAuthStateChanged(auth, (user) => {
+      setFirebaseUid(user?.uid ?? null);
       if (!user) return;
       const session = loadActiveClassroomSession();
       if (session && !session.isDemo) {
@@ -293,19 +300,31 @@ export default function App() {
           email: user.email || prev.email,
         }));
       }
-    });
-    return () => unsubAuth();
+        });
+      })
+      .catch(() => {
+        // Offline or blocked: the app keeps working with local data.
+      });
+    return () => {
+      cancelled = true;
+      unsubAuth?.();
+    };
   }, []);
 
   // Real-time Firestore listener for active class (slides, assignment, roster/leaderboard)
   useEffect(() => {
     if (isDemoMode) return;
-    if (!auth.currentUser?.uid) return;
+    // Wait for the restored Firebase session (it arrives asynchronously after load).
+    if (!firebaseUid) return;
     const activeSession = loadActiveClassroomSession();
     const classId = userProfile.classId || activeSession?.classId;
     if (!classId || classId.startsWith('demo-')) return;
 
-    const unsubClassroom = subscribeToClassroom(
+    let cancelled = false;
+    let unsubClassroom: (() => void) | undefined;
+    void loadFirebase().then(({ subscribeToClassroom }) => {
+      if (cancelled) return;
+      unsubClassroom = subscribeToClassroom(
       classId,
       userProfile.role,
       {
@@ -363,17 +382,25 @@ export default function App() {
         },
       }
     );
+    });
 
-    return () => unsubClassroom();
-  }, [userProfile.classId, userProfile.role, isDemoMode]);
+    return () => {
+      cancelled = true;
+      unsubClassroom?.();
+    };
+  }, [userProfile.classId, userProfile.role, isDemoMode, firebaseUid]);
 
   // Real-time Firestore listener for personal Student SRS ("users/{uid}/srs/{wordId}")
   useEffect(() => {
     if (isDemoMode || userProfile.role !== 'student') return;
-    const uid = auth.currentUser?.uid || userProfile.uid;
+    const uid = firebaseUid || userProfile.uid;
     if (!uid || uid.startsWith('demo-')) return;
 
-    const unsubSrs = subscribeToStudentSrs(uid, (srsMap) => {
+    let cancelled = false;
+    let unsubSrs: (() => void) | undefined;
+    void loadFirebase().then(({ subscribeToStudentSrs }) => {
+      if (cancelled) return;
+      unsubSrs = subscribeToStudentSrs(uid, (srsMap) => {
       if (Object.keys(srsMap).length === 0) return;
       const learnedIds = new Set<string>();
       Object.entries(srsMap).forEach(([wordId, data]) => {
@@ -389,8 +416,19 @@ export default function App() {
       });
       appStore.notifySrsUpdated();
     });
-    return () => unsubSrs();
-  }, [userProfile.uid, userProfile.role, userProfile.studentCode, selectedStudentName, isDemoMode]);
+    });
+    return () => {
+      cancelled = true;
+      unsubSrs?.();
+    };
+  }, [
+    firebaseUid,
+    userProfile.uid,
+    userProfile.role,
+    userProfile.studentCode,
+    selectedStudentName,
+    isDemoMode,
+  ]);
 
   const totalVocabBankCount = React.useMemo(() => {
     const dictKeys = Object.keys(SMART_HANZI_DICTIONARY);
@@ -614,7 +652,7 @@ export default function App() {
 
   const handleQuickSwitchRole = (targetRole: UserRole, desiredTeacherTab?: TeacherTab) => {
     if (targetRole === 'teacher' && userProfile.role !== 'teacher') {
-      if (isTeacherSessionUnlocked() || auth.currentUser || isDemoMode) {
+      if (isTeacherSessionUnlocked() || firebaseUid || isDemoMode) {
         applyRoleSwitch('teacher', desiredTeacherTab);
         return;
       }
@@ -659,7 +697,10 @@ export default function App() {
         userProfile.classId &&
         !userProfile.classId.startsWith('demo-')
       ) {
-        void saveTeacherDeckToFirestore(userProfile.classId, allSlides).catch(() => {});
+        const classId = userProfile.classId;
+        void loadFirebase()
+          .then(({ saveTeacherDeckToFirestore }) => saveTeacherDeckToFirestore(classId, allSlides))
+          .catch(() => {});
       }
     } catch {
       // ignore storage quota errors
@@ -686,14 +727,20 @@ export default function App() {
       }
       saveStudentLearnedSlideIds(learnedIds, studentKey);
       persistCustomSlides(updated);
-      if (!isDemoMode && auth.currentUser?.uid && targetSlide) {
-        void saveStudentSrsWordToFirestore(auth.currentUser.uid, slideId, {
+      const signedInUid = currentFirebaseUid();
+      if (!isDemoMode && signedInUid && targetSlide) {
+        const record = {
           slideId,
           hanzi: targetSlide.hanzi,
           pinyin: targetSlide.pinyin,
           meaning: targetSlide.meaning,
           learned: Boolean(targetSlide.learned),
-        }).catch(() => {});
+        };
+        void loadFirebase()
+          .then(({ saveStudentSrsWordToFirestore }) =>
+            saveStudentSrsWordToFirestore(signedInUid, slideId, record)
+          )
+          .catch(() => {});
       }
       return updated;
     });
@@ -796,7 +843,7 @@ export default function App() {
   const teacherLocked =
     userProfile.role !== 'teacher' &&
     !isTeacherSessionUnlocked() &&
-    !auth.currentUser &&
+    !firebaseUid &&
     !isDemoMode;
 
   const goStudent = (path: string) => {
@@ -937,6 +984,16 @@ export default function App() {
       className="min-h-dvh w-full bg-canvas text-ink lg:pl-64"
       data-theme-dark={isDarkTheme ? 'true' : undefined}
     >
+      <a
+        href="#studio"
+        onClick={(e) => {
+          e.preventDefault();
+          studioSectionRef.current?.focus();
+        }}
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:px-4 focus:py-2 focus:rounded-xl focus:bg-primary focus:text-on-primary focus:text-sm focus:font-semibold focus:shadow-lg"
+      >
+        Bỏ qua tới nội dung chính
+      </a>
       <AppSidebar
         sections={navSections}
         activeId={activeNavId}
@@ -1180,7 +1237,8 @@ export default function App() {
         <main
           ref={studioSectionRef}
           id="studio"
-          className={`relative flex-1 w-full max-w-[1320px] mx-auto px-4 sm:px-6 pt-5 sm:pt-6 pb-32 lg:pb-16 ${
+          tabIndex={-1}
+          className={`relative flex-1 w-full max-w-[1320px] mx-auto px-4 sm:px-6 pt-5 sm:pt-6 pb-32 lg:pb-16 focus:outline-none ${
             isBinBinDockedOpen ? 'lg:pr-[384px]' : ''
           }`}
         >
@@ -1378,26 +1436,28 @@ export default function App() {
           <Route
             path="/dang-nhap"
             element={
-              <AuthModal
-                isOpen={true}
-                standalonePage={true}
-                currentUser={userProfile}
-                onSelectRoleAndLogin={(nextProfile) => {
-                  if (nextProfile.role === 'student' && nextProfile.name) {
-                    setSelectedStudentName(nextProfile.name);
-                  }
-                  setUserProfile(nextProfile);
-                  setIsDemoMode(Boolean(nextProfile.isDemo));
-                  if (nextProfile.role === 'teacher') {
-                    setTeacherTab('class-manager');
-                    navigate(`/giao-vien/lop/${nextProfile.classId || 'demo-class-722229'}`);
-                  } else {
-                    setStudentTab('today-lesson');
-                    navigate('/hoc');
-                  }
-                }}
-                onClose={() => navigate('/')}
-              />
+              <Suspense fallback={<PageSkeleton label="Đang mở trang đăng nhập…" />}>
+                <AuthModal
+                  isOpen={true}
+                  standalonePage={true}
+                  currentUser={userProfile}
+                  onSelectRoleAndLogin={(nextProfile) => {
+                    if (nextProfile.role === 'student' && nextProfile.name) {
+                      setSelectedStudentName(nextProfile.name);
+                    }
+                    setUserProfile(nextProfile);
+                    setIsDemoMode(Boolean(nextProfile.isDemo));
+                    if (nextProfile.role === 'teacher') {
+                      setTeacherTab('class-manager');
+                      navigate(`/giao-vien/lop/${nextProfile.classId || 'demo-class-722229'}`);
+                    } else {
+                      setStudentTab('today-lesson');
+                      navigate('/hoc');
+                    }
+                  }}
+                  onClose={() => navigate('/')}
+                />
+              </Suspense>
             }
           />
 
@@ -1466,28 +1526,32 @@ export default function App() {
         </Suspense>
       </LazyErrorBoundary>
 
-      {/* Login & Role Selection Portal Modal */}
-      <AuthModal
-        isOpen={authModalOpen}
-        currentUser={userProfile}
-        onSelectRoleAndLogin={(nextProfile) => {
-          if (nextProfile.role === 'student' && nextProfile.name) {
-            setSelectedStudentName(nextProfile.name);
-          }
-          setUserProfile(nextProfile);
-          setIsDemoMode(Boolean(nextProfile.isDemo));
-          setAuthModalOpen(false);
-          if (nextProfile.role === 'teacher') {
-            setTeacherTab('class-manager');
-            navigate(`/giao-vien/lop/${nextProfile.classId || 'demo-class-722229'}`);
-          } else {
-            setStudentTab('today-lesson');
-            navigate('/hoc');
-          }
-          scrollToStudio();
-        }}
-        onClose={() => setAuthModalOpen(false)}
-      />
+      {/* Login & Role Selection Portal Modal (loaded on first open) */}
+      {authModalOpen && (
+        <Suspense fallback={null}>
+          <AuthModal
+            isOpen={authModalOpen}
+            currentUser={userProfile}
+            onSelectRoleAndLogin={(nextProfile) => {
+              if (nextProfile.role === 'student' && nextProfile.name) {
+                setSelectedStudentName(nextProfile.name);
+              }
+              setUserProfile(nextProfile);
+              setIsDemoMode(Boolean(nextProfile.isDemo));
+              setAuthModalOpen(false);
+              if (nextProfile.role === 'teacher') {
+                setTeacherTab('class-manager');
+                navigate(`/giao-vien/lop/${nextProfile.classId || 'demo-class-722229'}`);
+              } else {
+                setStudentTab('today-lesson');
+                navigate('/hoc');
+              }
+              scrollToStudio();
+            }}
+            onClose={() => setAuthModalOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* Optional Full-Screen Hanzi Stroke Order Modal */}
       {writingModalSlide && (
