@@ -1350,7 +1350,7 @@ export const INITIAL_VOCAB_SLIDES: VocabSlide[] = [
     exampleMeaning: 'Chúng ta cùng đi xem phim đi.',
     illustrationKey: 'zanmen',
     imageUrl: '/illustrations/friends_community.svg',
-    learned: true,
+    learned: false,
     characters: [STROKE_LIBRARY['咱'], STROKE_LIBRARY['们']],
   },
   {
@@ -1368,7 +1368,7 @@ export const INITIAL_VOCAB_SLIDES: VocabSlide[] = [
     exampleMeaning: 'Tôi muốn đổi 200 Nhân dân tệ.',
     illustrationKey: 'huan',
     imageUrl: '/illustrations/action_exchange.svg',
-    learned: true,
+    learned: false,
     characters: [STROKE_LIBRARY['换']],
   },
   {
@@ -1602,7 +1602,7 @@ export const INITIAL_VOCAB_SLIDES: VocabSlide[] = [
     exampleMeaning: 'Giao thông của thành phố này vô cùng thuận tiện.',
     illustrationKey: 'daily',
     imageUrl: '/illustrations/transport_city.svg',
-    learned: true,
+    learned: false,
     characters: [STROKE_LIBRARY['交'], STROKE_LIBRARY['通']],
   },
   {

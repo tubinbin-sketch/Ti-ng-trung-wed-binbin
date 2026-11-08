@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useRef, useSyncExternalStore } from 'react';
 import type { BinBinSlidePayload } from '../utils/chineseEngine';
 import type { UploadedAssignmentPackage } from '../utils/assignmentParser';
-import type { ActiveClassroomSession, ClassroomDataMode, SyncStatus } from '../utils/storageService';
+import type { ActiveClassroomSession, SyncStatus } from '../utils/storageService';
 
 export interface BinBinAskQuestionPayload {
   questionPrompt: string;
@@ -18,7 +18,6 @@ export interface AppBusState {
   handwritingHistoryVersion: number;
   projectorFullscreenTick: number;
   syncStatus: SyncStatus;
-  classroomMode: ClassroomDataMode;
   classroomSession: ActiveClassroomSession | null;
   latestAssignment: UploadedAssignmentPackage | null;
   binbinOpenTick: number;
@@ -38,7 +37,6 @@ let currentState: AppBusState = {
   handwritingHistoryVersion: 0,
   projectorFullscreenTick: 0,
   syncStatus: 'synced',
-  classroomMode: 'new',
   classroomSession: null,
   latestAssignment: null,
   binbinOpenTick: 0,
@@ -136,11 +134,6 @@ export const appStore = {
   setSyncStatus(syncStatus: SyncStatus) {
     if (currentState.syncStatus === syncStatus) return;
     currentState = { ...currentState, syncStatus };
-    emitChange();
-  },
-  setClassroomMode(classroomMode: ClassroomDataMode) {
-    if (currentState.classroomMode === classroomMode) return;
-    currentState = { ...currentState, classroomMode };
     emitChange();
   },
   setClassroomSession(classroomSession: ActiveClassroomSession | null) {

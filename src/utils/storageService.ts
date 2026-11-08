@@ -96,7 +96,6 @@ export function saveStoredHsk3FilterState(
   }
 }
 
-export type ClassroomDataMode = 'demo' | 'new';
 export type SyncStatus = 'synced' | 'syncing' | 'offline';
 
 let currentSyncStatus: SyncStatus = 'synced';
@@ -243,24 +242,28 @@ export function getLocalStateUpdatedAt(): string | null {
   }
 }
 
-export function getClassroomDataMode(): ClassroomDataMode {
-  if (typeof window === 'undefined') return 'new';
-  try {
-    const val = localStorage.getItem(STORAGE_KEYS.CLASSROOM_MODE);
-    return val === 'new' ? 'new' : 'demo';
-  } catch {
-    return 'demo';
-  }
-}
-
-export function setClassroomDataMode(mode: ClassroomDataMode): void {
+/**
+ * Older versions opened in a "demo" class with sample students, a sample
+ * assignment and a fake teacher session. Remove those once so every visitor
+ * starts empty. Real data (mode "new", set on sign-in) is left untouched.
+ */
+export function purgeLegacyDemoData(): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(STORAGE_KEYS.CLASSROOM_MODE, mode);
-    markLocalStateUpdated();
-    appStore.setClassroomMode(mode);
+    const mode = localStorage.getItem(STORAGE_KEYS.CLASSROOM_MODE);
+    if (mode === 'new') return;
+    localStorage.removeItem(STORAGE_KEYS.STUDENTS_ROSTER);
+    localStorage.removeItem('hanu_active_assignment_v2');
+    const rawSession = localStorage.getItem(STORAGE_KEYS.ACTIVE_CLASSROOM_SESSION);
+    if (rawSession) {
+      const session = JSON.parse(rawSession) as ActiveClassroomSession | null;
+      if (!session || session.isDemo || String(session.classId || '').startsWith('demo-')) {
+        localStorage.removeItem(STORAGE_KEYS.ACTIVE_CLASSROOM_SESSION);
+      }
+    }
+    localStorage.setItem(STORAGE_KEYS.CLASSROOM_MODE, 'new');
   } catch {
-    // ignore storage errors
+    // storage unavailable: nothing to purge
   }
 }
 

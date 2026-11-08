@@ -4070,7 +4070,9 @@ export function applyStudentSubmissionToRoster(
     return {
       ...st,
       vocabScore: `${submission.learnedVocabCount}/${submission.totalVocabCount} từ`,
-      writingScore: `${clampedWriting}% độ chuẩn nét`,
+      // Only overwrite handwriting accuracy when this submission actually measured it.
+      writingScore:
+        submission.writingAccuracy > 0 ? `${clampedWriting}% độ chuẩn nét` : st.writingScore,
       quizScore: `${submission.quizCorrectCount}/${submission.quizTotalCount} câu đúng`,
       totalPoints: clampedTotal,
       status,
@@ -4094,7 +4096,7 @@ export function applyStudentSubmissionToRoster(
       {
         ...created,
         vocabScore: `${submission.learnedVocabCount}/${submission.totalVocabCount} từ`,
-        writingScore: `${clampedWriting}% độ chuẩn nét`,
+        writingScore: submission.writingAccuracy > 0 ? `${clampedWriting}% độ chuẩn nét` : '',
         quizScore: `${submission.quizCorrectCount}/${submission.quizTotalCount} câu đúng`,
         reviewWords: cleanReview,
         lastSubmittedAt: nowLabel,

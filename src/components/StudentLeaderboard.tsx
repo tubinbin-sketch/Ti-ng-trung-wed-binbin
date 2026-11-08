@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { LeaderboardEntry } from '../data/chineseData';
 import { getStoredStudentRoster, ClassStudent } from './ClassroomManager';
+import { EmptyState } from './ui/EmptyState';
 
 function maskStudentCodeForPrivacy(code?: string, isMe?: boolean): string {
   if (!code) return '';
@@ -108,8 +109,14 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
   }, []);
 
   const allEntries: ClassLeaderboardItem[] = useMemo(() => {
-    const mapped: ClassLeaderboardItem[] = roster.map((st, idx) => {
-      const isMe = st.name.trim().toLowerCase() === currentStudentName.trim().toLowerCase();
+    const isMeName = (name: string) =>
+      name.trim().toLowerCase() === currentStudentName.trim().toLowerCase();
+    // Only students who actually submitted are ranked.
+    const ranked = roster.filter(
+      (st) => st.status !== 'Chưa nộp' || (isMeName(st.name) && hasSubmitted)
+    );
+    const mapped: ClassLeaderboardItem[] = ranked.map((st, idx) => {
+      const isMe = isMeName(st.name);
       const score =
         isMe && hasSubmitted && currentStudentScore > 0
           ? currentStudentScore
@@ -117,11 +124,11 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
       const timeSeconds =
         isMe && hasSubmitted && typeof currentStudentTimeSeconds === 'number' && currentStudentTimeSeconds > 0
           ? currentStudentTimeSeconds
-          : st.timeSeconds || Math.max(28, 128 - st.totalPoints);
+          : st.timeSeconds || 0;
       const streak =
         isMe && hasSubmitted && typeof currentStudentStreak === 'number' && currentStudentStreak > 0
           ? currentStudentStreak
-          : st.streak || Math.max(3, Math.round(st.totalPoints / 11));
+          : st.streak || 0;
       const avatarCode = buildAvatarCode(st.name, 'HV');
 
       const badgeTitle =
@@ -153,8 +160,8 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
     const hasCurrent = mapped.some(
       (e) => e.studentName.trim().toLowerCase() === currentStudentName.trim().toLowerCase()
     );
-    if (!hasCurrent && currentStudentName.trim()) {
-      const fallbackScore = hasSubmitted && currentStudentScore > 0 ? currentStudentScore : 91;
+    if (!hasCurrent && currentStudentName.trim() && hasSubmitted) {
+      const fallbackScore = currentStudentScore;
       const usedCodes = new Set(mapped.map((m) => m.studentCode));
       let nextIdx = Math.max(13, mapped.length + 1);
       while (usedCodes.has(`HV-${String(nextIdx).padStart(3, '0')}`)) {
@@ -166,15 +173,15 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
       mapped.push({
         id: 'current-user-lb',
         studentCode: resolvedCode,
-        hskLevel: 'HSK 3',
+        hskLevel: '',
         studentName: currentStudentName.trim(),
         avatarCode: buildAvatarCode(currentStudentName, 'HS'),
         score: fallbackScore,
-        streak: currentStudentStreak || 6,
-        timeSeconds: currentStudentTimeSeconds || 45,
+        streak: currentStudentStreak || 0,
+        timeSeconds: currentStudentTimeSeconds || 0,
         accuracyRate: fallbackScore,
         badgeTitle: fallbackScore >= 90 ? 'Hảo Thủ Hán Ngữ' : 'Nỗ Lực Vượt Bậc',
-        completedAt: hasSubmitted ? 'Vừa nộp bài' : 'Hôm nay',
+        completedAt: 'Vừa nộp bài',
         isCurrentUser: true,
       });
     }
@@ -204,6 +211,17 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
     (e) => e.studentName.trim().toLowerCase() === currentStudentName.trim().toLowerCase()
   );
 
+  if (allEntries.length === 0) {
+    return (
+      <EmptyState
+        testId="leaderboard-empty"
+        icon={<Trophy aria-hidden="true" />}
+        title="Chưa có ai trên bảng xếp hạng"
+        description="Bảng xếp hạng hiện khi học viên trong lớp nộp bài tập giáo viên giao."
+      />
+    );
+  }
+
   return (
     <div
       data-testid="student-leaderboard-card"
@@ -221,7 +239,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
                 Bảng Xếp Hạng Thi Đua Lớp Học
               </h2>
               <span className="px-2 py-0.5 rounded-full bg-primary-soft text-ink text-xs font-bold uppercase">
-                Đồng bộ {allEntries.length} Học viên · HSK 1–3
+                {allEntries.length} học viên
               </span>
             </div>
             <p className="text-xs text-ink-muted mt-1 max-w-[60ch]">

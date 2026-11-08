@@ -9,7 +9,6 @@ import {
   AlertCircle,
   KeyRound,
   LogIn,
-  PlayCircle,
   Loader2,
   Lock,
 } from 'lucide-react';
@@ -22,7 +21,6 @@ import {
 } from '../firebase';
 import {
   saveActiveClassroomSession,
-  setClassroomDataMode,
   setTeacherSessionUnlocked,
   setActiveStudentStorageId,
 } from '../utils/storageService';
@@ -50,7 +48,6 @@ interface AuthModalProps {
   studentName?: string;
   onSelectStudent?: (name: string, studentCode?: string, classId?: string) => void;
   onUnlockTeacher?: (classroom?: ClassroomMetadata) => void;
-  onEnterDemoMode?: (role?: 'student' | 'teacher') => void;
   standalonePage?: boolean;
 }
 
@@ -63,11 +60,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   studentName = currentUser?.name || 'Học viên HSK',
   onSelectStudent,
   onUnlockTeacher,
-  onEnterDemoMode,
   standalonePage = false,
 }) => {
   const [joinCodeInput, setJoinCodeInput] = useState(
-    currentUser?.classCode || 'HANU-HSK3'
+    currentUser?.classCode || ''
   );
   const [studentCodeInput, setStudentCodeInput] = useState(
     currentUser?.studentCode || ''
@@ -90,7 +86,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsTeacherLoading(true);
     try {
       const { user, classroom } = await signInTeacherWithGoogle();
-      setClassroomDataMode('new');
       setTeacherSessionUnlocked(true);
       const teacherName = user.displayName || user.email || 'Giảng viên HANU';
       saveActiveClassroomSession({
@@ -120,7 +115,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const msg =
         err instanceof Error
           ? err.message
-          : 'Không thể đăng nhập Google lúc này. Bạn có thể bấm "Xem bản demo" để trải nghiệm ngay.';
+          : 'Không thể đăng nhập Google lúc này. Vui lòng thử lại.';
       setTeacherError(msg);
     } finally {
       setIsTeacherLoading(false);
@@ -134,7 +129,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const cleanCode = studentCodeInput.trim().toUpperCase();
 
     if (!cleanJoin) {
-      setStudentError('Vui lòng nhập Mã lớp (ví dụ: HANU-HSK3) do Giảng viên cấp.');
+      setStudentError('Vui lòng nhập Mã lớp do giáo viên cấp.');
       return;
     }
     if (!useGooglePopup && !cleanCode) {
@@ -150,7 +145,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         useGooglePopup,
       });
 
-      setClassroomDataMode('new');
       setTeacherSessionUnlocked(false);
       setActiveStudentStorageId(user.uid);
       saveActiveClassroomSession({
@@ -185,61 +179,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     } finally {
       setIsStudentLoading(false);
     }
-  };
-
-  const handleActivateDemo = (targetRole: 'student' | 'teacher') => {
-    setClassroomDataMode('demo');
-    if (targetRole === 'teacher') {
-      setTeacherSessionUnlocked(true);
-      saveActiveClassroomSession({
-        classId: 'demo-hsk3-class',
-        className: 'Lớp HSK 3.0 Bản Demo (Offline)',
-        joinCode: 'DEMO-HSK3',
-        hskLevel: 'HSK 3',
-        role: 'teacher',
-        uid: 'demo-teacher-uid',
-        displayName: 'GV Nguyễn Văn Thụ (Demo)',
-        teacherName: 'GV Nguyễn Văn Thụ (Demo)',
-        isDemo: true,
-      });
-      onUnlockTeacher?.();
-      onSelectRoleAndLogin?.({
-        role: 'teacher',
-        name: 'GV Nguyễn Văn Thụ (Demo)',
-        uid: 'demo-teacher-uid',
-        classId: 'demo-hsk3-class',
-        classCode: 'DEMO-HSK3',
-        isDemo: true,
-      });
-    } else {
-      setTeacherSessionUnlocked(false);
-      setActiveStudentStorageId('HV-001');
-      saveActiveClassroomSession({
-        classId: 'demo-hsk3-class',
-        className: 'Lớp HSK 3.0 Bản Demo (Offline)',
-        joinCode: 'DEMO-HSK3',
-        hskLevel: 'HSK 3',
-        role: 'student',
-        uid: 'demo-student-hv001',
-        displayName: 'Lưu Thị Minh Thư',
-        studentCode: 'HV-001',
-        studentName: 'Lưu Thị Minh Thư',
-        isDemo: true,
-      });
-      onSelectStudent?.('Lưu Thị Minh Thư', 'HV-001', 'demo-hsk3-class');
-      onSelectRoleAndLogin?.({
-        role: 'student',
-        name: 'Lưu Thị Minh Thư',
-        uid: 'demo-student-hv001',
-        classId: 'demo-hsk3-class',
-        classCode: 'DEMO-HSK3',
-        studentCode: 'HV-001',
-        isDemo: true,
-      });
-    }
-
-    onEnterDemoMode?.(targetRole);
-    onClose();
   };
 
   const cardContent = (
@@ -321,7 +260,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       setJoinCodeInput(e.target.value.toUpperCase());
                       setStudentError('');
                     }}
-                    placeholder="VD: HANU-HSK3"
+                    placeholder="Mã lớp giáo viên gửi"
                     className="w-full pl-9 pr-3 py-2 rounded-xl border border-border bg-canvas text-sm font-bold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus uppercase"
                   />
                 </div>
@@ -471,35 +410,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               )}
               <span>Tiếp tục với Google</span>
             </button>
-          </div>
-
-          {/* Demo Mode Box */}
-          <div className="mt-5 pt-4 border-t border-border">
-            <div className="text-xs font-semibold text-ink mb-1.5 flex items-center gap-1.5">
-              <PlayCircle className="w-4 h-4 text-gold" />
-              <span>Dùng thử không cần tài khoản</span>
-            </div>
-            <p className="text-xs text-ink-muted mb-2.5">
-              Xem nhanh giao diện với dữ liệu mẫu. Không có gì được lưu lên máy chủ.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                data-testid="demo-mode-student-btn"
-                onClick={() => handleActivateDemo('student')}
-                className="py-2 px-2.5 rounded-xl font-semibold text-xs bg-canvas hover:bg-primary/10 text-primary border border-border transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-              >
-                Học viên mẫu
-              </button>
-              <button
-                type="button"
-                data-testid="demo-mode-teacher-btn"
-                onClick={() => handleActivateDemo('teacher')}
-                className="py-2 px-2.5 rounded-xl font-semibold text-xs bg-canvas hover:bg-accent/10 text-accent border border-border transition cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-              >
-                Giáo viên mẫu
-              </button>
-            </div>
           </div>
         </div>
       </div>

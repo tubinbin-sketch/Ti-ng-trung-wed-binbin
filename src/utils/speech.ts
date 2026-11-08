@@ -155,6 +155,66 @@ export function speakChinese(text: string, customRate?: number): void {
   playGentleChime(528, 0.12);
 }
 
+/** Rough duration of a Chinese utterance, used for shadowing pauses and fallbacks. */
+export function estimateChineseSpeechMs(text: string, rate = 1): number {
+  const chars = Array.from(text || '').filter((ch) => /[\u3400-\u9fff]/.test(ch)).length;
+  return Math.round((Math.max(1, chars) * 260) / Math.max(0.4, rate)) + 350;
+}
+
+/** Stop any sentence that is being read aloud. */
+export function cancelChineseSpeech(): void {
+  try {
+    window.speechSynthesis?.cancel();
+  } catch {
+    // ignore
+  }
+  notifySpeakingState(false);
+}
+
+/**
+ * Read a sentence aloud (no chime) and resolve when it has finished, so
+ * callers can chain listen → repeat steps. Resolves after an estimated
+ * duration if the browser has no Chinese voice or never fires `onend`.
+ */
+export function speakChineseAsync(text: string, rate = preferredSpeechRate): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !text) {
+      resolve();
+      return;
+    }
+    const clampedRate = Math.max(0.45, Math.min(1.5, rate));
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      window.clearTimeout(fallback);
+      notifySpeakingState(false);
+      resolve();
+    };
+    const fallback = window.setTimeout(finish, estimateChineseSpeechMs(text, clampedRate) * 2 + 1500);
+    try {
+      if (!('speechSynthesis' in window) || !window.speechSynthesis) {
+        window.clearTimeout(fallback);
+        window.setTimeout(finish, estimateChineseSpeechMs(text, clampedRate));
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.rate = clampedRate;
+      const voice = selectBestChineseVoice(window.speechSynthesis.getVoices?.() || []);
+      if (voice) utterance.voice = voice;
+      utterance.onstart = () => notifySpeakingState(true);
+      utterance.onend = finish;
+      utterance.onerror = finish;
+      notifySpeakingState(true);
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      finish();
+    }
+  });
+}
+
 export function playGentleChime(freq = 587.33, durationSec = 0.16): void {
   if (typeof window === 'undefined') return;
   try {

@@ -4,10 +4,13 @@ import App from './App.tsx';
 import { AppStoreProvider } from './context/AppStoreContext';
 import { AppErrorBoundary } from './components/LazyErrorBoundary';
 import './index.css';
+import { purgeLegacyDemoData } from './utils/storageService';
 
 import { registerSW } from 'virtual:pwa-register';
 
 if (typeof window !== 'undefined') {
+  // Remove sample data left by older versions before the app reads storage.
+  purgeLegacyDemoData();
   registerSW({ immediate: true });
 
   window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  AudioLines,
   BookOpen,
   Check,
   ChevronRight,
@@ -11,7 +12,6 @@ import {
   Presentation,
   Search,
   Target,
-  Trophy,
   Volume2,
   X,
 } from 'lucide-react';
@@ -19,6 +19,8 @@ import { VocabSlide } from '../data/chineseData';
 import { UserProfile } from './AuthModal';
 import { speakChinese } from '../utils/speech';
 import { Dialog } from './ui/Dialog';
+import { useAppStoreSelector } from '../context/AppStoreContext';
+import { countAssignmentQuestions, getStoredAssignment } from '../utils/assignmentParser';
 import {
   DailyGoalTarget,
   DailyStudyProgress,
@@ -47,6 +49,7 @@ interface HomeDashboardProps {
   onOpenFlashcard: () => void;
   onOpenHomework: () => void;
   onOpenLeaderboard: () => void;
+  onOpenShadowing: () => void;
   onOpenLessonBuilder: () => void;
   onOpenClassroom: () => void;
   onPickSlide: (index: number) => void;
@@ -99,11 +102,19 @@ export function HomeDashboard({
   onOpenFlashcard,
   onOpenHomework,
   onOpenLeaderboard,
+  onOpenShadowing,
   onOpenLessonBuilder,
   onOpenClassroom,
   onPickSlide,
   onToggleLearned,
 }: HomeDashboardProps) {
+  const latestAssignment = useAppStoreSelector((st) => st.latestAssignment);
+  const activeAssignment = useMemo(
+    () => latestAssignment || getStoredAssignment(),
+    [latestAssignment]
+  );
+  const assignedCount = countAssignmentQuestions(activeAssignment);
+  const assignedTitle = activeAssignment.sessionTitle || 'Bài tập';
   const [previewWord, setPreviewWord] = useState<{ slide: VocabSlide; index: number } | null>(null);
   const [unlearnedSearchQuery, setUnlearnedSearchQuery] = useState('');
   const [unlearnedFilter, setUnlearnedFilter] = useState<string>('all');
@@ -482,18 +493,20 @@ export function HomeDashboard({
               testId: 'home-flashcard-btn',
             },
             {
-              icon: PenTool,
-              title: 'Làm bài tập',
-              body: 'Đề HSK 3.0, ghép câu, kiểm tra tốc độ',
-              onClick: onOpenHomework,
-              testId: 'home-homework-btn',
+              icon: AudioLines,
+              title: 'Shadowing',
+              body: 'Nghe câu mẫu rồi đọc theo, chấm phát âm',
+              onClick: onOpenShadowing,
+              testId: 'home-shadowing-btn',
             },
             {
-              icon: Trophy,
-              title: 'Bảng xếp hạng',
-              body: 'Xem điểm và chuỗi ngày học của lớp',
-              onClick: onOpenLeaderboard,
-              testId: 'home-leaderboard-btn',
+              icon: PenTool,
+              title: 'Bài tập được giao',
+              body: assignedCount > 0
+                ? `${assignedCount} câu · ${assignedTitle}`
+                : 'Chưa có bài nào từ giáo viên',
+              onClick: onOpenHomework,
+              testId: 'home-homework-btn',
             },
           ].map(({ icon: Icon, title, body, onClick, testId }) => (
             <button

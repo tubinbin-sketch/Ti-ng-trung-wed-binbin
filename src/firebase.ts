@@ -49,6 +49,7 @@ import {
   registerFirebaseTokenGetter,
 } from './utils/chineseEngine';
 import {
+  EMPTY_ASSIGNMENT,
   extractAssignmentAnswerKey,
   sanitizeAssignmentForPublic,
   type UploadedAssignmentPackage,
@@ -748,6 +749,17 @@ export async function saveTeacherDeckToFirestore(
  * 1. Sanitized public questions at `/classes/{classId}/assignments/{assignmentId}` (readable by class members)
  * 2. Confidential answer key at `/classes/{classId}/answerKeys/{assignmentId}` (readable ONLY by the class teacher & server)
  */
+/** Remove every assignment (and its answer key) of a class. */
+export async function deleteAllTeacherAssignmentsFromFirestore(classId: string): Promise<void> {
+  const snap = await getDocs(collection(db, 'classes', classId, 'assignments'));
+  await Promise.all(
+    snap.docs.map(async (d) => {
+      await deleteDoc(doc(db, 'classes', classId, 'answerKeys', d.id)).catch(() => {});
+      await deleteDoc(d.ref);
+    })
+  );
+}
+
 export async function saveTeacherAssignmentToFirestore(
   classId: string,
   assignmentOrTeacherUid: UploadedAssignmentPackage | string,
@@ -1147,13 +1159,20 @@ export function subscribeToClassroom(
     onSnapshot(
       collection(db, 'classes', params.classId, 'assignments'),
       (snap) => {
-        if (!snap.empty && params.onAssignmentUpdate) {
-          const data = snap.docs[0].data() as UploadedAssignmentPackage;
-          params.onAssignmentUpdate({
-            ...data,
-            id: snap.docs[0].id,
-          });
+        if (!params.onAssignmentUpdate) return;
+        if (snap.empty) {
+          // The teacher removed every assignment: students see an empty page.
+          params.onAssignmentUpdate(EMPTY_ASSIGNMENT);
+          return;
         }
+        // Several assignments may exist; the most recently saved one is current.
+        const latest = [...snap.docs].sort((a, b) =>
+          String(b.data()?.updatedAt || '').localeCompare(String(a.data()?.updatedAt || ''))
+        )[0];
+        params.onAssignmentUpdate({
+          ...(latest.data() as UploadedAssignmentPackage),
+          id: latest.id,
+        });
       },
       (err) => void err
     )

@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Award,
-  Calendar,
   CheckCircle2,
   Dices,
   Download,
@@ -10,14 +9,12 @@ import {
   Plus,
   Printer,
   Search,
-  Send,
-  Sparkles,
   UploadCloud,
 } from 'lucide-react';
-import { ClassSession, INITIAL_CLASS_SESSIONS, INITIAL_VOCAB_SLIDES, VocabSlide } from '../data/chineseData';
+import { INITIAL_VOCAB_SLIDES, VocabSlide } from '../data/chineseData';
 import {
-  autoGradeClassSession,
   awardStudentBonusPoints,
+  isStudentNeedsSupport,
   filterClassroomStudents,
   generateRandomStudentCode,
   generateStudentsCsvContent,
@@ -25,8 +22,11 @@ import {
 } from '../utils/chineseEngine';
 import { playGentleChime } from '../utils/speech';
 import {
+  countAssignmentQuestions,
+  EMPTY_ASSIGNMENT,
   getStoredAssignment,
   parseAssignmentContent,
+  readAssignmentFileText,
   saveStoredAssignment,
   UploadedAssignmentPackage,
 } from '../utils/assignmentParser';
@@ -35,14 +35,12 @@ import { ClassroomLuckyWheelModal } from './ClassroomLuckyWheelModal';
 import { WorksheetPreviewModal } from './WorksheetPreviewModal';
 import {
   ActiveClassroomSession,
-  ClassroomDataMode,
-  getClassroomDataMode,
   loadActiveClassroomSession,
   saveActiveClassroomSession,
-  setClassroomDataMode,
 } from '../utils/storageService';
 import {
   createNewTeacherClass,
+  deleteAllTeacherAssignmentsFromFirestore,
   deleteTeacherStudentSlotFromFirestore,
   importLegacyBackupToFirestore,
   resetTeacherStudentSlotInFirestore,
@@ -52,16 +50,14 @@ import {
 import { appStore, useAppStoreSelector } from '../context/AppStoreContext';
 import {
   type ClassStudent,
-  DEFAULT_STUDENTS,
   getStoredStudentRoster,
   STORAGE_KEY_STUDENTS,
 } from './classroom/classroomRosterData';
 import { TeacherControlOverview } from './classroom/TeacherControlOverview';
-import { ClassroomScheduleTable } from './classroom/ClassroomScheduleTable';
 import { ClassroomGradingGrid } from './classroom/ClassroomGradingGrid';
 import { ClassroomAnalyticsPanel } from './classroom/ClassroomAnalyticsPanel';
 
-export { type ClassStudent, DEFAULT_STUDENTS, getStoredStudentRoster, STORAGE_KEY_STUDENTS };
+export { type ClassStudent, getStoredStudentRoster, STORAGE_KEY_STUDENTS };
 
 interface ClassroomManagerProps {
   onSwitchToStudentView?: () => void;
@@ -76,7 +72,6 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 }) => {
   const { classId: routeClassId } = useParams<{ classId?: string }>();
   const [studentsList, setStudentsList] = useState<ClassStudent[]>(() => getStoredStudentRoster());
-  const [classroomMode, setClassroomModeState] = useState<ClassroomDataMode>(() => getClassroomDataMode());
   const studentCount = studentsList.length;
 
   const [readingHistory, setReadingHistory] = useState<any[]>(() => {
@@ -105,19 +100,13 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
 
   const resolvedClassMeta = useMemo<ActiveClassroomSession>(() => {
     if (activeClassMeta) return activeClassMeta;
-    const isDemoHsk3 = routeClassId === 'demo-hsk3-class';
     return {
-      classId: routeClassId || 'demo-hsk3-class',
-      className: isDemoHsk3
-        ? 'Lớp HSK 3.0 Bản Demo (Offline)'
-        : 'HSK 1–3 — Lớp Tối 246 (19:30–21:00)',
-      joinCode: isDemoHsk3 ? 'DEMO-HSK3' : '722229',
-      hskLevel: 'HSK 3',
+      classId: '',
+      className: '',
+      joinCode: '',
       role: 'teacher',
-      uid: 'demo-teacher-uid',
-      displayName: 'GV Nguyễn Văn Thụ',
-      teacherName: 'GV Nguyễn Văn Thụ',
-      isDemo: true,
+      uid: '',
+      displayName: '',
     };
   }, [activeClassMeta, routeClassId]);
 
@@ -125,13 +114,11 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     students: s.studentsRosterVersion,
     srs: s.srsVersion,
     remote: s.syncStatus,
-    mode: s.classroomMode,
     reading: s.readingHistoryVersion,
     handwriting: s.handwritingHistoryVersion,
   }));
 
   useEffect(() => {
-    setClassroomModeState(getClassroomDataMode());
     setStudentsList(getStoredStudentRoster());
     setActiveClassMeta(loadActiveClassroomSession());
     try {
@@ -146,7 +133,6 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     storeRevisions.students,
     storeRevisions.srs,
     storeRevisions.remote,
-    storeRevisions.mode,
     storeRevisions.reading,
     storeRevisions.handwriting,
   ]);
@@ -155,18 +141,8 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     onStudentCountChange?.(studentCount);
   }, [studentCount, onStudentCountChange]);
 
-  const [sessions, setSessions] = useState<ClassSession[]>(() =>
-    INITIAL_CLASS_SESSIONS.map((s) => ({
-      ...autoGradeClassSession(s),
-      totalStudents: studentCount,
-      submissionsCount: studentCount,
-    }))
-  );
-  const [activeTab, setActiveTab] = useState<'schedule' | 'grading' | 'analytics'>('schedule');
-  const [actionBanner, setActionBanner] = useState<string>(
-    'Hoàn tất tự động: Đã giao bài và chấm điểm toàn bộ 19/19 buổi học trong khóa HSK 1–3!'
-  );
-  const [selectedReportSession, setSelectedReportSession] = useState<ClassSession | null>(null);
+  const [activeTab, setActiveTab] = useState<'grading' | 'analytics'>('grading');
+  const [actionBanner, setActionBanner] = useState<string>('');
   const [studentToDelete, setStudentToDelete] = useState<ClassStudent | null>(null);
   const [isAddStudentModalOpen, setIsAddStudentModalOpen] = useState(false);
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
@@ -186,20 +162,22 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     [studentsList]
   );
 
-  const [selectedSessionNumber, setSelectedSessionNumber] = useState<number>(14);
+  const [assignmentTitle, setAssignmentTitle] = useState('');
+  const [assignmentDueDate, setAssignmentDueDate] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [customPastedText, setCustomPastedText] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [activePackage, setActivePackage] = useState<UploadedAssignmentPackage>(() => getStoredAssignment());
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState<string | null>(null);
 
-  const totalCourseSessions = 19;
-  const completedCount = 10 + sessions.filter((s) => s.status === 'completed').length;
-  const assignedCount = 12 + sessions.filter((s) => s.homeworkAssigned).length;
-  const gradedCount = 12 + sessions.filter((s) => s.autoGraded).length;
+  const assignedQuestionCount = countAssignmentQuestions(activePackage);
+  const submittedCount = studentsList.filter((s) => s.status !== 'Chưa nộp').length;
+  const needsSupportCount = studentsList.filter(
+    (s) => s.status !== 'Chưa nộp' && isStudentNeedsSupport(s)
+  ).length;
 
-  const persistRosterAndSync = (updated: ClassStudent[], overrideMode?: ClassroomDataMode) => {
-    const targetMode = overrideMode || classroomMode;
+  const persistRosterAndSync = (updated: ClassStudent[]) => {
     setStudentsList(updated);
     try {
       localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
@@ -208,90 +186,83 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     }
     const nextTotal = updated.length;
     onStudentCountChange?.(nextTotal);
-    if (targetMode !== 'demo') {
-      const session = loadActiveClassroomSession();
-      if (session?.classId) {
-        updated.forEach((student) => {
-          void saveTeacherStudentSlotToFirestore(session.classId, student).catch(() => {});
-        });
-      }
+    const session = loadActiveClassroomSession();
+    if (session?.classId) {
+      updated.forEach((student) => {
+        void saveTeacherStudentSlotToFirestore(session.classId, student).catch(() => {});
+      });
     }
     appStore.notifyStudentsUpdated(nextTotal);
-    setSessions((prev) =>
-      prev.map((s) => ({
-        ...s,
-        totalStudents: nextTotal,
-        submissionsCount: s.autoGraded ? nextTotal : Math.min(s.submissionsCount, nextTotal),
-      }))
-    );
   };
 
-  const handleAssignUploadedFile = () => {
+  const handleAssignUploadedFile = async () => {
+    setAssignError(null);
+    setSuccessBanner(null);
+    const pasted = customPastedText.trim();
+    if (!selectedFile && !pasted) {
+      setAssignError('Chọn file đề (.txt, .docx) hoặc dán nội dung câu hỏi trước khi giao bài.');
+      return;
+    }
     setIsExtracting(true);
-    playGentleChime(587.33, 0.2);
-    setTimeout(() => {
-      const fileName = selectedFile
-        ? selectedFile.name
-        : customPastedText.trim()
-        ? 'Noi_Dung_De_Bai_Giao_Vien.txt'
-        : 'De_On_Tap_Buoi_14_HSK1-3.docx';
-      const parsedPkg = parseAssignmentContent(
-        customPastedText || fileName,
-        fileName,
-        selectedSessionNumber,
-        `Buổi ${selectedSessionNumber} - HSK 1–3`
-      );
-      saveStoredAssignment(parsedPkg);
-      setActivePackage(parsedPkg);
-      if (getClassroomDataMode() !== 'demo') {
-        const session = loadActiveClassroomSession();
-        if (session?.classId) {
-          void saveTeacherAssignmentToFirestore(session.classId, parsedPkg).catch(() => {});
-        }
+    try {
+      const text = selectedFile ? await readAssignmentFileText(selectedFile) : pasted;
+      const fileName = selectedFile ? selectedFile.name : 'Noi_dung_dan.txt';
+      const { pkg, warnings } = parseAssignmentContent(text, fileName, assignmentTitle, {
+        teacherName: resolvedClassMeta.displayName || resolvedClassMeta.teacherName || '',
+        dueDate: assignmentDueDate,
+      });
+      const total = countAssignmentQuestions(pkg);
+      if (total === 0) {
+        setAssignError(
+          `Không tìm thấy câu hỏi nào đúng mẫu.${warnings.length ? ` ${warnings[0]}` : ''} Xem mẫu định dạng trong mục "Dán văn bản".`
+        );
+        return;
       }
-      setIsExtracting(false);
-      setSuccessBanner(`✅ Đã trích xuất câu hỏi từ "${fileName}" và đồng bộ lên Firestore lớp học!`);
-      playGentleChime(783.99, 0.3);
-    }, 500);
-  };
-
-  const handleLoadDemoPackage = (pkg: UploadedAssignmentPackage) => {
-    setIsExtracting(true);
-    setTimeout(() => {
       saveStoredAssignment(pkg);
       setActivePackage(pkg);
-      setSelectedSessionNumber(pkg.sessionNumber);
-      if (getClassroomDataMode() !== 'demo') {
-        const session = loadActiveClassroomSession();
-        if (session?.classId) {
-          void saveTeacherAssignmentToFirestore(session.classId, pkg).catch(() => {});
-        }
+      const session = loadActiveClassroomSession();
+      if (session?.classId) {
+        void saveTeacherAssignmentToFirestore(session.classId, pkg).catch(() => {});
       }
+      setSelectedFile(null);
+      setCustomPastedText('');
+      setAssignmentTitle('');
+      setAssignmentDueDate('');
+      setSuccessBanner(
+        `Đã giao "${pkg.sessionTitle}" (${total} câu).${
+          warnings.length ? ` Bỏ qua ${warnings.length} mục chưa đúng mẫu.` : ''
+        }`
+      );
+      playGentleChime(783.99, 0.3);
+    } catch (err) {
+      setAssignError(err instanceof Error ? err.message : 'Không đọc được file đề.');
+    } finally {
       setIsExtracting(false);
-      setSuccessBanner(`✅ Đã giao đề "${pkg.fileName}" tới toàn bộ học sinh lớp HSK 1–3!`);
-      playGentleChime(659.25, 0.25);
-    }, 350);
+    }
   };
 
-  const handleActivateDemoClassroom = () => {
-    setClassroomDataMode('demo');
-    setClassroomModeState('demo');
-    persistRosterAndSync(DEFAULT_STUDENTS, 'demo');
-    setActionBanner(`🧪 Đã bật Chế độ Demo với ${DEFAULT_STUDENTS.length} học viên mẫu.`);
-    playGentleChime(659.25, 0.2);
+  const handleClearAssignment = () => {
+    saveStoredAssignment(EMPTY_ASSIGNMENT);
+    setActivePackage(EMPTY_ASSIGNMENT);
+    setSuccessBanner(null);
+    setActionBanner('Đã gỡ bài tập đang giao. Học viên sẽ thấy trang bài tập trống.');
+    const session = loadActiveClassroomSession();
+    if (session?.classId) {
+      void deleteAllTeacherAssignmentsFromFirestore(session.classId).catch(() => {
+        setActionBanner('Đã gỡ bài trên máy này nhưng chưa xóa được trên máy chủ. Kiểm tra mạng rồi thử lại.');
+      });
+    }
   };
 
   const handleCreateNewClassroom = async () => {
-    setClassroomDataMode('new');
-    setClassroomModeState('new');
-    persistRosterAndSync([], 'new');
+    persistRosterAndSync([]);
     setActiveTab('grading');
     try {
       const created = await createNewTeacherClass('Lớp HSK 1–3 Thực Tế', 'HSK 1–3');
       const nextSession = {
         role: 'teacher' as const,
         uid: created.teacherUid,
-        displayName: resolvedClassMeta.displayName || 'GV Nguyễn Văn Thụ',
+        displayName: resolvedClassMeta.displayName || 'Giáo viên',
         email: resolvedClassMeta.email,
         classId: created.id,
         className: created.name,
@@ -317,12 +288,10 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         parsedJson,
         resolvedClassMeta.className || 'HSK 1–3 — Lớp Di Chuyển Từ JSON'
       );
-      setClassroomDataMode('new');
-      setClassroomModeState('new');
       const nextSession = {
         role: 'teacher' as const,
         uid: resolvedClassMeta.uid || 'teacher',
-        displayName: resolvedClassMeta.displayName || 'GV Nguyễn Văn Thụ',
+        displayName: resolvedClassMeta.displayName || 'Giáo viên',
         email: resolvedClassMeta.email,
         classId: result.classDoc.id,
         className: result.classDoc.name,
@@ -356,14 +325,14 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
   const handleConfirmDelete = () => {
     if (!studentToDelete) return;
     const updated = studentsList.filter((s) => s.id !== studentToDelete.id);
-    if (classroomMode !== 'demo' && resolvedClassMeta.classId) {
+    if (resolvedClassMeta.classId) {
       void deleteTeacherStudentSlotFromFirestore(
         resolvedClassMeta.classId,
         studentToDelete.id,
         studentToDelete.studentCode
       ).catch(() => {});
     }
-    persistRosterAndSync(updated, updated.length === 0 ? 'new' : undefined);
+    persistRosterAndSync(updated);
     setActionBanner(`Đã xóa học viên "${studentToDelete.name}" khỏi lớp (Sĩ số mới: ${updated.length} học viên).`);
     setStudentToDelete(null);
   };
@@ -383,7 +352,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     const fallbackNewCode = generateRandomStudentCode('HV');
     let issuedCode = fallbackNewCode;
 
-    if (classroomMode !== 'demo' && resolvedClassMeta.classId) {
+    if (resolvedClassMeta.classId) {
       try {
         const res = await resetTeacherStudentSlotInFirestore(
           resolvedClassMeta.classId,
@@ -407,57 +376,40 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
     );
   };
 
-  const cleanTeacherName = (resolvedClassMeta.displayName || 'GV Nguyễn Văn Thụ')
-    .replace(/\s*\(Demo\)\s*/i, '')
-    .trim();
+  const cleanTeacherName = (resolvedClassMeta.displayName || resolvedClassMeta.teacherName || '').trim();
+  const hasClass = Boolean(resolvedClassMeta.classId && resolvedClassMeta.className);
 
   return (
     <div className="space-y-6 pb-20 lg:pb-12">
-      {/* Top Class Header — Full width title + metadata, separated action bar so title never wraps narrowly */}
-      <div className="space-y-4 pb-5 border-b border-border">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-ink-muted">
-              <span>Bảng điều khiển giáo viên</span>
-              <span aria-hidden="true">·</span>
-              <span
-                data-testid="active-class-join-code-badge"
-                className="text-primary font-semibold tabular-nums"
-              >
-                Mã lớp: {resolvedClassMeta.joinCode || 'DEMO-HSK3'}
-              </span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-ink leading-snug">
-              {resolvedClassMeta.className}
-            </h2>
-            {/* Structured inline metadata capped within comfortable reading measure */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted max-w-[60ch]">
-              <span>Lịch học: Thứ 2, 4, 6</span>
-              <span aria-hidden="true">·</span>
+      {/* Class header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-5 border-b border-border">
+        <div className="min-w-0 space-y-1.5">
+          <h2 className="text-xl sm:text-2xl font-semibold text-ink leading-snug text-balance">
+            {hasClass ? resolvedClassMeta.className : 'Chưa có lớp học'}
+          </h2>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
+            {hasClass ? (
               <span>
-                Tiến độ: <strong className="text-ink tabular-nums">{completedCount}/{totalCourseSessions} buổi</strong>
+                Mã lớp:{' '}
+                <strong
+                  data-testid="active-class-join-code-badge"
+                  className="font-semibold text-primary tabular-nums tracking-wide"
+                >
+                  {resolvedClassMeta.joinCode || '—'}
+                </strong>
               </span>
-              <span aria-hidden="true">·</span>
-              <span>Giảng viên: {cleanTeacherName}</span>
-            </div>
+            ) : (
+              <span>Tạo lớp để có mã lớp gửi cho học viên.</span>
+            )}
+            {cleanTeacherName && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>Giáo viên: {cleanTeacherName}</span>
+              </>
+            )}
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              playGentleChime(783.99, 0.24);
-              setSessions((prev) => prev.map((s) => autoGradeClassSession(s)));
-              setActionBanner('Hoàn tất tự động: Đã giao bài và chấm điểm toàn bộ 19/19 buổi học!');
-            }}
-            data-testid="batch-autograde-btn"
-            className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 rounded-xl bg-primary hover:bg-primary-hover text-on-primary text-xs sm:text-sm font-semibold transition-colors cursor-pointer shrink-0 self-start"
-          >
-            <Sparkles className="w-4 h-4 shrink-0" />
-            <span>Giao &amp; chấm toàn khóa</span>
-          </button>
         </div>
 
-        {/* Secondary Action Toolbar */}
         <div className="flex flex-wrap items-center gap-2">
           <input
             ref={legacyBackupInputRef}
@@ -471,106 +423,86 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             type="button"
             onClick={() => legacyBackupInputRef.current?.click()}
             data-testid="import-legacy-json-backup-btn"
-            className="inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl bg-transparent hover:bg-surface-2 text-ink-muted hover:text-ink border border-border text-xs font-medium transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl hover:bg-surface-2 text-ink-muted hover:text-ink border border-border text-xs font-medium transition-colors cursor-pointer"
           >
             <UploadCloud className="w-3.5 h-3.5 shrink-0" />
-            <span>Nhập dữ liệu cũ (.json)</span>
+            <span>Nhập dữ liệu cũ</span>
           </button>
           <button
             type="button"
-            onClick={handleActivateDemoClassroom}
-            data-testid="activate-demo-classroom-btn"
-            aria-pressed={classroomMode === 'demo' && studentsList.length > 0}
-            className={`inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl border text-xs font-medium transition-colors cursor-pointer ${
-              classroomMode === 'demo' && studentsList.length > 0
-                ? 'bg-surface-2 text-ink border-border-strong font-semibold'
-                : 'bg-transparent hover:bg-surface-2 text-ink-muted hover:text-ink border-border'
-            }`}
+            onClick={handleExportCsv}
+            disabled={studentsList.length === 0}
+            data-testid="header-export-csv-report-btn"
+            className="inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl hover:bg-surface-2 text-ink-muted hover:text-ink border border-border text-xs font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span>Dữ liệu mẫu</span>
+            <Download className="w-3.5 h-3.5 shrink-0" />
+            <span>Xuất bảng điểm</span>
           </button>
           <button
             type="button"
             onClick={handleCreateNewClassroom}
             data-testid="create-new-classroom-btn"
-            className={`inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl border text-xs font-medium transition-colors cursor-pointer ${
-              classroomMode === 'new' && studentsList.length === 0
-                ? 'bg-surface-2 text-ink border-border-strong font-semibold'
-                : 'bg-transparent hover:bg-surface-2 text-ink-muted hover:text-ink border-border'
+            className={`inline-flex items-center gap-1.5 min-h-10 px-3.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+              hasClass
+                ? 'border border-border hover:bg-surface-2 text-ink'
+                : 'bg-primary hover:bg-primary-hover text-on-primary'
             }`}
           >
             <Plus className="w-3.5 h-3.5 shrink-0" />
-            <span>Tạo lớp học mới</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            data-testid="header-export-csv-report-btn"
-            className="inline-flex items-center gap-1.5 min-h-10 px-3 rounded-xl bg-transparent hover:bg-surface-2 text-ink-muted hover:text-ink border border-border text-xs font-medium transition-colors cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 shrink-0" />
-            <span>Xuất bảng điểm (CSV)</span>
+            <span>Tạo lớp mới</span>
           </button>
         </div>
       </div>
 
-      {/* 4 Synchronized KPI Stat Strip — Single surface with hairline dividers */}
-      <dl className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-border rounded-2xl bg-surface border border-border">
-        <div className="p-4 sm:p-5 flex flex-col justify-between">
-          <dt className="flex items-center justify-between text-xs font-medium text-ink-muted">
-            <span>Tổng số buổi</span>
-            <Calendar className="w-3.5 h-3.5 text-gold shrink-0" />
-          </dt>
-          <dd className="text-xl sm:text-2xl font-bold text-ink mt-1.5 tabular-nums">{totalCourseSessions}</dd>
-          <dd className="text-xs text-ink-muted mt-0.5">Khóa chuẩn HSK 1–3</dd>
-        </div>
-        <div className="p-4 sm:p-5 flex flex-col justify-between">
-          <dt className="flex items-center justify-between text-xs font-medium text-ink-muted">
-            <span>Đã giao bài</span>
-            <Send className="w-3.5 h-3.5 text-ink-muted shrink-0" />
-          </dt>
-          <dd className="text-xl sm:text-2xl font-bold text-ink mt-1.5 tabular-nums" data-testid="assigned-sessions-count">
-            {assignedCount}/{totalCourseSessions}
-          </dd>
-          <dd className="text-xs text-primary font-semibold mt-0.5">Kèm Slide &amp; Đề chuẩn</dd>
-        </div>
-        <div className="p-4 sm:p-5 flex flex-col justify-between">
-          <dt className="flex items-center justify-between text-xs font-medium text-ink-muted">
-            <span>Đã tự chấm điểm</span>
-            <Sparkles className="w-3.5 h-3.5 text-ink-muted shrink-0" />
-          </dt>
-          <dd className="text-xl sm:text-2xl font-bold text-gold mt-1.5 tabular-nums" data-testid="graded-sessions-count">
-            {gradedCount}/{totalCourseSessions}
-          </dd>
-          <dd className="text-xs text-gold font-semibold mt-0.5">100% học viên đã chấm</dd>
-        </div>
-        <div className="p-4 sm:p-5 flex flex-col justify-between">
-          <dt className="flex items-center justify-between text-xs font-medium text-ink-muted">
-            <span>Sĩ số học viên</span>
-            <Award className="w-3.5 h-3.5 text-primary shrink-0" />
-          </dt>
-          <dd className="text-xl sm:text-2xl font-bold text-ink mt-1.5 tabular-nums">{studentCount}</dd>
-          <dd className="text-xs text-ink-muted mt-0.5">Đầy đủ tài khoản</dd>
-        </div>
+      {/* Real numbers only */}
+      <dl className="grid grid-cols-2 sm:grid-cols-4 rounded-2xl bg-surface border border-border divide-x divide-border [&>div:nth-child(n+3)]:border-t [&>div:nth-child(n+3)]:border-border sm:[&>div:nth-child(n+3)]:border-t-0">
+        {[
+          { label: 'Học viên', value: String(studentCount), note: studentCount === 0 ? 'Chưa có ai' : 'trong lớp' },
+          {
+            label: 'Bài đang giao',
+            value: assignedQuestionCount > 0 ? String(assignedQuestionCount) : '—',
+            note: assignedQuestionCount > 0 ? 'câu hỏi' : 'Chưa giao bài',
+            testId: 'assigned-sessions-count',
+          },
+          {
+            label: 'Đã nộp',
+            value: studentCount > 0 ? `${submittedCount}/${studentCount}` : '—',
+            note: 'học viên',
+            testId: 'graded-sessions-count',
+          },
+          { label: 'Cần kèm thêm', value: String(needsSupportCount), note: 'dưới 90 điểm' },
+        ].map((kpi) => (
+          <div key={kpi.label} className="px-4 py-3.5 sm:px-5 sm:py-4">
+            <dt className="text-xs font-medium text-ink-muted">{kpi.label}</dt>
+            <dd
+              data-testid={kpi.testId}
+              className="mt-1 text-xl sm:text-2xl font-semibold text-ink tabular-nums"
+            >
+              {kpi.value}
+            </dd>
+            <dd className="text-xs text-ink-subtle">{kpi.note}</dd>
+          </div>
+        ))}
       </dl>
 
       {/* Dedicated Teacher Control Overview (Class List, Assigned Homework, Unsubmitted Students) */}
       <TeacherControlOverview
-        activeClassMeta={resolvedClassMeta}
         studentsList={studentsList}
         activePackage={activePackage}
-        selectedSessionNumber={selectedSessionNumber}
-        onSelectSessionNumber={setSelectedSessionNumber}
+        assignmentTitle={assignmentTitle}
+        onChangeAssignmentTitle={setAssignmentTitle}
+        assignmentDueDate={assignmentDueDate}
+        onChangeAssignmentDueDate={setAssignmentDueDate}
         selectedFile={selectedFile}
         onSelectFile={setSelectedFile}
         customPastedText={customPastedText}
         onChangeCustomPastedText={setCustomPastedText}
         isExtracting={isExtracting}
         onAssignUploadedFile={handleAssignUploadedFile}
-        onLoadDemoPackage={handleLoadDemoPackage}
+        onClearAssignment={handleClearAssignment}
         successBanner={successBanner}
+        assignError={assignError}
         onSwitchToStudentView={onSwitchToStudentView}
-        onCreateNewClassroom={handleCreateNewClassroom}
         onFilterUnsubmitted={() => {
           setStudentStatusFilter('needs_support');
           setActiveTab('grading');
@@ -589,20 +521,6 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
             <button
               type="button"
               role="tab"
-              aria-selected={activeTab === 'schedule'}
-              onClick={() => setActiveTab('schedule')}
-              className={`inline-flex items-center gap-2 min-h-10 px-3.5 rounded-xl text-sm whitespace-nowrap transition-colors cursor-pointer ${
-                activeTab === 'schedule'
-                  ? 'bg-primary-soft text-primary font-semibold'
-                  : 'text-ink-muted hover:text-ink hover:bg-surface-2 font-medium'
-              }`}
-            >
-              <Calendar className="w-4 h-4 shrink-0" />
-              <span>Chương trình &amp; tiến độ</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
               aria-selected={activeTab === 'grading'}
               data-testid="tab-student-grading"
               onClick={() => setActiveTab('grading')}
@@ -613,7 +531,7 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
               }`}
             >
               <Award className="w-4 h-4 shrink-0" />
-              <span>Bảng điểm</span>
+              <span>Học viên &amp; điểm</span>
               <span className="text-xs tabular-nums opacity-80">({studentCount})</span>
             </button>
             <button
@@ -724,35 +642,21 @@ export const ClassroomManager: React.FC<ClassroomManagerProps> = ({
         </div>
       </div>
 
-      <div
-        className="flex items-center gap-2 text-xs font-medium text-ink-muted py-0.5"
-        data-testid="classroom-status-banner"
-      >
-        <CheckCircle2 className="w-4 h-4 text-gold shrink-0" />
-        <span className="leading-snug">{actionBanner}</span>
-      </div>
+      {actionBanner && (
+        <div
+          role="status"
+          className="flex items-center gap-2 text-sm text-ink-muted animate-rise-in"
+          data-testid="classroom-status-banner"
+        >
+          <CheckCircle2 className="w-4 h-4 text-success shrink-0" aria-hidden="true" />
+          <span className="leading-snug">{actionBanner}</span>
+        </div>
+      )}
 
-      {activeTab === 'schedule' ? (
-        <ClassroomScheduleTable
-          sessions={sessions}
-          studentsList={studentsList}
-          selectedReportSession={selectedReportSession}
-          onSelectReportSession={setSelectedReportSession}
-          onRegradeSession={(session) => {
-            playGentleChime(659.25, 0.2);
-            setSessions((prev) => prev.map((s) => (s.id === session.id ? autoGradeClassSession(s) : s)));
-            setActionBanner(`Đã chấm điểm tự động cho Buổi #${session.sessionNumber}: "${session.lessonTitle}".`);
-          }}
-          onDeleteStudentClick={(st, e) => {
-            e?.stopPropagation();
-            setStudentToDelete(st);
-          }}
-        />
-      ) : activeTab === 'grading' ? (
+      {activeTab === 'grading' ? (
         <ClassroomGradingGrid
           studentsList={studentsList}
           filteredStudents={filteredStudents}
-          onRestoreDefaultStudents={handleActivateDemoClassroom}
           onResetFilters={() => {
             setStudentSearchQuery('');
             setStudentStatusFilter('all');

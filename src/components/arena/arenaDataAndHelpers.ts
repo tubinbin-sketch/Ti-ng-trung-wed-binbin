@@ -1,29 +1,6 @@
 import { UploadedAssignmentPackage } from '../../utils/assignmentParser';
 import { ClassStudent } from '../ClassroomManager';
 
-export const LISTENING_CHALLENGES = [
-  {
-    id: 'lc-1',
-    audioText: '温暖',
-    pinyin: 'wēn nuǎn',
-    correctHanzi: '温暖',
-    meaning: 'ấm áp, đầm ấm',
-    explanation:
-      '“温暖” (wēn nuǎn - ấm áp) dùng để miêu tả thời tiết dễ chịu hoặc tình cảm gia đình, bạn bè ấm cúng.',
-    options: ['温暖 (ấm áp)', '空调 (điều hòa)', '花园 (vườn hoa)', '咱们 (chúng ta)'],
-  },
-  {
-    id: 'lc-2',
-    audioText: '咱们',
-    pinyin: 'zán men',
-    correctHanzi: '咱们',
-    meaning: 'chúng ta, chúng mình',
-    explanation:
-      '“咱们” (zán men - chúng ta) là đại từ ngôi thứ nhất số nhiều bao gồm cả người nói và người nghe.',
-    options: ['老师 (giáo viên)', '咱们 (chúng ta)', '聪明 (thông minh)', '愿意 (sẵn lòng)'],
-  },
-];
-
 export interface SpeedTestQuestion {
   id: string;
   skillLabel: string;
@@ -168,13 +145,18 @@ export const SPEED_TEST_10_QUESTIONS: SpeedTestQuestion[] = [
 ];
 
 export interface ArenaScoreBreakdown {
-  mcScore: number;
-  soScore: number;
-  esScore: number;
-  listeningScore: number;
-  avgWritingAccuracy: number;
+  /** Correct answers per part (question counts, not points). */
+  mcCorrect: number;
+  soCorrect: number;
+  esCorrect: number;
+  correctCount: number;
+  questionCount: number;
+  answeredCount: number;
   reviewWords: string[];
+  /** 0–100, same rule as the server: share of questions answered correctly. */
   totalScore: number;
+  /** False when the student copy has no answer key (the server grades it). */
+  canGradeLocally: boolean;
 }
 
 export function calculateArenaScoreBreakdown(params: {
@@ -182,105 +164,55 @@ export function calculateArenaScoreBreakdown(params: {
   mcAnswers: Record<string, string>;
   selectedTokensMap: Record<string, string[]>;
   essayAnswers: Record<string, string>;
-  listeningAnswers: Record<string, string>;
-  practicedChars: Record<string, number>;
-  uploadedHomeworkFile: File | null;
 }): ArenaScoreBreakdown {
-  const {
-    assignmentPackage,
-    mcAnswers,
-    selectedTokensMap,
-    essayAnswers,
-    listeningAnswers,
-    practicedChars,
-    uploadedHomeworkFile,
-  } = params;
-
-  let mcScore = 0;
-  const mcTotalPossible = 30;
-  const mcWeight =
-    assignmentPackage.multipleChoiceList.length > 0
-      ? mcTotalPossible / assignmentPackage.multipleChoiceList.length
-      : 10;
-
-  assignmentPackage.multipleChoiceList.forEach((q) => {
-    const selected = q.options.find((opt) => opt.key === mcAnswers[q.id]);
-    if (selected && selected.isCorrect) mcScore += mcWeight;
-  });
-
-  let soScore = 0;
-  const soTotalPossible = 40;
-  const soWeight =
-    assignmentPackage.sentenceOrderingList.length > 0
-      ? soTotalPossible / assignmentPackage.sentenceOrderingList.length
-      : 20;
-
-  assignmentPackage.sentenceOrderingList.forEach((q) => {
-    const userTokens = selectedTokensMap[q.id] || [];
-    if (userTokens.join('') === q.correctTokens.join('')) {
-      soScore += soWeight;
-    }
-  });
-
-  let esScore = 0;
-  const esTotalPossible = 30;
-  const esWeight =
-    assignmentPackage.essayList.length > 0
-      ? esTotalPossible / assignmentPackage.essayList.length
-      : 15;
-
-  assignmentPackage.essayList.forEach((q) => {
-    const text = (essayAnswers[q.id] || '').trim();
-    if (text.length >= 3 && text.includes(q.targetWord)) {
-      esScore += esWeight;
-    } else if (text.length >= 2 || uploadedHomeworkFile) {
-      esScore += Math.round(esWeight * 0.6);
-    }
-  });
-
-  let listeningBonus = 0;
-  LISTENING_CHALLENGES.forEach((lc) => {
-    if (listeningAnswers[lc.id]?.startsWith(lc.correctHanzi)) {
-      listeningBonus += 5;
-    }
-  });
-
-  const strokeValues = Object.values(practicedChars);
-  const avgWritingAccuracy =
-    strokeValues.length > 0
-      ? Math.round(strokeValues.reduce((a, b) => a + b, 0) / strokeValues.length)
-      : 94;
-
-  const rawScore = Math.round(mcScore + soScore + esScore + listeningBonus);
-  const totalScore = Math.min(100, Math.max(0, rawScore));
-
+  const { assignmentPackage, mcAnswers, selectedTokensMap, essayAnswers } = params;
   const reviewSet = new Set<string>();
-  assignmentPackage.multipleChoiceList.forEach((q) => {
+  let mcCorrect = 0;
+  let soCorrect = 0;
+  let esCorrect = 0;
+  let answeredCount = 0;
+
+  const mcList = assignmentPackage.multipleChoiceList || [];
+  const soList = assignmentPackage.sentenceOrderingList || [];
+  const esList = assignmentPackage.essayList || [];
+
+  mcList.forEach((q) => {
+    if (mcAnswers[q.id]) answeredCount += 1;
     const selected = q.options.find((opt) => opt.key === mcAnswers[q.id]);
-    if (!selected || !selected.isCorrect) {
-      if (q.targetWord) reviewSet.add(q.targetWord);
-    }
+    if (selected?.isCorrect) mcCorrect += 1;
+    else if (q.targetWord) reviewSet.add(q.targetWord);
   });
-  assignmentPackage.essayList.forEach((q) => {
+
+  soList.forEach((q) => {
+    const userTokens = selectedTokensMap[q.id] || [];
+    if (userTokens.length > 0) answeredCount += 1;
+    if (q.correctTokens.length > 0 && userTokens.join('') === q.correctTokens.join('')) soCorrect += 1;
+    else if (q.targetWord) reviewSet.add(q.targetWord);
+  });
+
+  esList.forEach((q) => {
     const text = (essayAnswers[q.id] || '').trim();
-    if (!text.includes(q.targetWord)) {
-      if (q.targetWord) reviewSet.add(q.targetWord);
-    }
+    if (text) answeredCount += 1;
+    if (text.length >= 2 && (!q.targetWord || text.includes(q.targetWord))) esCorrect += 1;
+    else if (q.targetWord) reviewSet.add(q.targetWord);
   });
-  LISTENING_CHALLENGES.forEach((lc) => {
-    if (listeningAnswers[lc.id] && !listeningAnswers[lc.id].startsWith(lc.correctHanzi)) {
-      reviewSet.add(lc.correctHanzi);
-    }
-  });
+
+  const questionCount = mcList.length + soList.length + esList.length;
+  const correctCount = mcCorrect + soCorrect + esCorrect;
+  const canGradeLocally =
+    mcList.every((q) => q.options.some((o) => o.isCorrect)) &&
+    soList.every((q) => q.correctTokens.length > 0);
 
   return {
-    mcScore: Math.round(mcScore),
-    soScore: Math.round(soScore),
-    esScore: Math.round(esScore),
-    listeningScore: listeningBonus,
-    avgWritingAccuracy,
+    mcCorrect,
+    soCorrect,
+    esCorrect,
+    correctCount,
+    questionCount,
+    answeredCount,
     reviewWords: Array.from(reviewSet),
-    totalScore,
+    totalScore: questionCount > 0 ? Math.round((correctCount / questionCount) * 100) : 0,
+    canGradeLocally,
   };
 }
 

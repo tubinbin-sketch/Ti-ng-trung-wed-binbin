@@ -15,12 +15,13 @@ import {
 } from 'react-router-dom';
 import {
   AlertTriangle,
+  AudioLines,
   BookOpen,
+  Puzzle,
   Check,
   Cloud,
   CloudOff,
   Download,
-  FlaskConical,
   GraduationCap,
   Home,
   Layers,
@@ -42,7 +43,6 @@ const SlideDeckStudio = React.lazy(() =>
   import('./components/SlideDeckStudio').then((m) => ({ default: m.SlideDeckStudio }))
 );
 import {
-  DEFAULT_STUDENTS,
   getStoredStudentRoster,
   STORAGE_KEY_STUDENTS,
 } from './components/classroom/classroomRosterData';
@@ -51,6 +51,7 @@ import { LazyErrorBoundary } from './components/LazyErrorBoundary';
 import { HomeDashboard } from './components/HomeDashboard';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { PageSkeleton } from './components/ui/PageSkeleton';
+import { EmptyState } from './components/ui/EmptyState';
 import { appStore, useAppStoreSelector } from './context/AppStoreContext';
 import {
   AppSidebar,
@@ -71,6 +72,12 @@ const StrokeWritingModal = React.lazy(() =>
 const StudentAssignmentArena = React.lazy(() =>
   import('./components/StudentAssignmentArena').then((m) => ({ default: m.StudentAssignmentArena }))
 );
+const PracticeStudio = React.lazy(() =>
+  import('./components/PracticeStudio').then((m) => ({ default: m.PracticeStudio }))
+);
+const ShadowingStudio = React.lazy(() =>
+  import('./components/ShadowingStudio').then((m) => ({ default: m.ShadowingStudio }))
+);
 const ClassroomManager = React.lazy(() =>
   import('./components/ClassroomManager').then((m) => ({ default: m.ClassroomManager }))
 );
@@ -90,7 +97,6 @@ import {
 import {
   applyStudentLearnedToSlides,
   exportFullSystemBackupToFile,
-  getClassroomDataMode,
   getCurrentSyncStatus,
   getStudentLearnedSlideIds,
   isTeacherSessionUnlocked,
@@ -99,7 +105,6 @@ import {
   saveActiveClassroomSession,
   saveStudentLearnedSlideIds,
   setActiveStudentStorageId,
-  setClassroomDataMode,
   setTeacherSessionUnlocked,
   SyncStatus,
 } from './utils/storageService';
@@ -135,16 +140,10 @@ function AssignmentRouteWrapper({
   onSwitchToTeacherView: () => void;
 }) {
   const { id } = useParams<{ id?: string }>();
-  const normalizedSection =
-    id === 'speedtest' || id === 'kiem-tra'
-      ? 'speedtest'
-      : id === 'sentence-builder' || id === 'ghep-cau'
-      ? 'sentence-builder'
-      : id === 'leaderboard' || id === 'xep-hang'
-      ? 'leaderboard'
-      : id
-      ? 'homework'
-      : undefined;
+  // Practice used to live under /bai-tap; keep old links working.
+  if (id === 'speedtest' || id === 'kiem-tra') return <Navigate to="/luyen-tap/trac-nghiem" replace />;
+  if (id === 'sentence-builder' || id === 'ghep-cau') return <Navigate to="/luyen-tap/ghep-cau" replace />;
+  const normalizedSection = id === 'leaderboard' || id === 'xep-hang' ? 'leaderboard' : 'homework';
 
   return (
     <LazyErrorBoundary fallbackLabel="Không thể tải khu vực Bài tập HSK.">
@@ -189,7 +188,7 @@ export default function App() {
         uid: activeSession.uid,
         email: activeSession.email,
         classId: activeSession.classId,
-        classCode: activeSession.joinCode || '722229',
+        classCode: activeSession.joinCode || undefined,
         studentCode: activeSession.studentCode,
         isDemo: activeSession.isDemo,
       };
@@ -199,8 +198,6 @@ export default function App() {
     return {
       role: 'student',
       name: initialStudent,
-      classId: 'demo-class-722229',
-      classCode: '722229',
     };
   });
 
@@ -230,9 +227,6 @@ export default function App() {
     () => getStoredStudentRoster().length
   );
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => getCurrentSyncStatus());
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(
-    () => getClassroomDataMode() === 'demo'
-  );
 
   // Sync URL pathname with userProfile.role, studentTab, and teacherTab
   useEffect(() => {
@@ -257,22 +251,20 @@ export default function App() {
         setUserProfile((prev) => ({
           ...prev,
           role: 'teacher',
-          name: prev.role === 'teacher' ? prev.name : 'GV Nguyễn Văn Thụ',
+          name: prev.role === 'teacher' ? prev.name : 'Giáo viên',
         }));
       }
       setTeacherTab('lesson-builder');
     } else if (path.startsWith('/giao-vien/lop/')) {
       const routeClassId = path.split('/giao-vien/lop/')[1]?.split('/')[0] || '';
-      const isDemoHsk3Route = routeClassId === 'demo-hsk3-class';
       setUserProfile((prev) => ({
         ...prev,
         role: 'teacher',
         name:
           prev.role === 'teacher' && !/^học viên/i.test(prev.name)
             ? prev.name
-            : 'GV Nguyễn Văn Thụ',
-        classId: routeClassId || prev.classId || 'demo-hsk3-class',
-        classCode: isDemoHsk3Route ? 'DEMO-HSK3' : prev.classCode || '722229',
+            : 'Giáo viên',
+        classId: prev.classId || routeClassId || undefined,
       }));
       setTeacherTab('class-manager');
     }
@@ -281,6 +273,10 @@ export default function App() {
   // Firebase loads in the background after the first screen (see firebaseClient.ts).
   // firebaseUid is the reactive "signed in" signal for the effects below.
   const [firebaseUid, setFirebaseUid] = useState<string | null>(null);
+
+  // Teacher pages need a teacher sign-in on this device (the server re-checks every request).
+  const hasTeacherAccess = () =>
+    isTeacherSessionUnlocked() || loadActiveClassroomSession()?.role === 'teacher';
 
   // Listen to Firebase Auth state changes and active classroom Firestore subscriptions
   useEffect(() => {
@@ -313,7 +309,6 @@ export default function App() {
 
   // Real-time Firestore listener for active class (slides, assignment, roster/leaderboard)
   useEffect(() => {
-    if (isDemoMode) return;
     // Wait for the restored Firebase session (it arrives asynchronously after load).
     if (!firebaseUid) return;
     const activeSession = loadActiveClassroomSession();
@@ -388,11 +383,11 @@ export default function App() {
       cancelled = true;
       unsubClassroom?.();
     };
-  }, [userProfile.classId, userProfile.role, isDemoMode, firebaseUid]);
+  }, [userProfile.classId, userProfile.role, firebaseUid]);
 
   // Real-time Firestore listener for personal Student SRS ("users/{uid}/srs/{wordId}")
   useEffect(() => {
-    if (isDemoMode || userProfile.role !== 'student') return;
+    if (userProfile.role !== 'student') return;
     const uid = firebaseUid || userProfile.uid;
     if (!uid || uid.startsWith('demo-')) return;
 
@@ -427,7 +422,6 @@ export default function App() {
     userProfile.role,
     userProfile.studentCode,
     selectedStudentName,
-    isDemoMode,
   ]);
 
   const totalVocabBankCount = React.useMemo(() => {
@@ -443,7 +437,6 @@ export default function App() {
   }));
   const isBinBinDockedOpen = binbinDock.isOpen && binbinDock.mode === 'docked';
   const storeSyncStatus = useAppStoreSelector((st) => st.syncStatus);
-  const storeClassroomMode = useAppStoreSelector((st) => st.classroomMode);
   const binbinApplyPayload = useAppStoreSelector((st) => st.binbinApplySlidePayload);
   const isFirstStoreSync = useRef(true);
 
@@ -454,10 +447,6 @@ export default function App() {
     }
     setSyncStatus(storeSyncStatus);
   }, [storeSyncStatus]);
-
-  useEffect(() => {
-    setIsDemoMode(getClassroomDataMode() === 'demo');
-  }, [storeClassroomMode]);
 
   useEffect(() => {
     const handleRosterUpdate = (e: Event) => {
@@ -556,66 +545,6 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleActivateInMemoryDemo = (targetRole: UserRole = 'student') => {
-    setClassroomDataMode('demo');
-    setIsDemoMode(true);
-    try {
-      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(DEFAULT_STUDENTS));
-    } catch {
-      // ignore
-    }
-    setClassroomStudentCount(DEFAULT_STUDENTS.length);
-    window.dispatchEvent(
-      new CustomEvent('hanu_students_updated', { detail: DEFAULT_STUDENTS.length })
-    );
-    if (targetRole === 'teacher') {
-      setTeacherSessionUnlocked(true);
-      const demoTeacher: UserProfile = {
-        role: 'teacher',
-        name: 'Nguyễn Văn Thụ (阮文受 · Demo)',
-        uid: 'demo-teacher',
-        classId: 'demo-class-722229',
-        classCode: '722229',
-        isDemo: true,
-      };
-      setUserProfile(demoTeacher);
-      saveActiveClassroomSession({
-        role: 'teacher',
-        uid: 'demo-teacher',
-        displayName: demoTeacher.name,
-        classId: 'demo-class-722229',
-        className: 'HSK 1–3 — Lớp Demo (Trong Bộ Nhớ)',
-        joinCode: '722229',
-        isDemo: true,
-      });
-      navigate('/giao-vien/lop/demo-class-722229');
-    } else {
-      const demoStudent = DEFAULT_STUDENTS[0];
-      setSelectedStudentName(demoStudent.name);
-      const demoProfile: UserProfile = {
-        role: 'student',
-        name: demoStudent.name,
-        uid: 'demo-student-hv001',
-        classId: 'demo-class-722229',
-        classCode: '722229',
-        studentCode: demoStudent.studentCode,
-        isDemo: true,
-      };
-      setUserProfile(demoProfile);
-      saveActiveClassroomSession({
-        role: 'student',
-        uid: 'demo-student-hv001',
-        displayName: demoStudent.name,
-        classId: 'demo-class-722229',
-        className: 'HSK 1–3 — Lớp Demo (Trong Bộ Nhớ)',
-        joinCode: '722229',
-        studentCode: demoStudent.studentCode,
-        isDemo: true,
-      });
-      navigate('/hoc');
-    }
-  };
-
   const applyRoleSwitch = (targetRole: UserRole, desiredTeacherTab?: TeacherTab) => {
     const roster = getStoredStudentRoster();
     const validStudentName = roster.some((s) => s.name === selectedStudentName)
@@ -624,7 +553,7 @@ export default function App() {
     if (targetRole === 'student' && validStudentName !== selectedStudentName) {
       setSelectedStudentName(validStudentName);
     }
-    const nextClassId = userProfile.classId || 'demo-class-722229';
+    const nextClassId = userProfile.classId || 'lop-cua-toi';
     setUserProfile((prev) => ({
       ...prev,
       role: targetRole,
@@ -632,9 +561,8 @@ export default function App() {
         targetRole === 'teacher'
           ? prev.role === 'teacher'
             ? prev.name
-            : 'Nguyễn Văn Thụ (阮文受)'
+            : 'Giáo viên'
           : validStudentName,
-      classCode: prev.classCode || '722229',
     }));
 
     if (targetRole === 'teacher') {
@@ -652,7 +580,7 @@ export default function App() {
 
   const handleQuickSwitchRole = (targetRole: UserRole, desiredTeacherTab?: TeacherTab) => {
     if (targetRole === 'teacher' && userProfile.role !== 'teacher') {
-      if (isTeacherSessionUnlocked() || firebaseUid || isDemoMode) {
+      if (hasTeacherAccess()) {
         applyRoleSwitch('teacher', desiredTeacherTab);
         return;
       }
@@ -693,7 +621,6 @@ export default function App() {
       localStorage.setItem('hanu_custom_vocab_slides_v2', JSON.stringify(customOnly));
       if (
         userProfile.role === 'teacher' &&
-        !isDemoMode &&
         userProfile.classId &&
         !userProfile.classId.startsWith('demo-')
       ) {
@@ -728,7 +655,7 @@ export default function App() {
       saveStudentLearnedSlideIds(learnedIds, studentKey);
       persistCustomSlides(updated);
       const signedInUid = currentFirebaseUid();
-      if (!isDemoMode && signedInUid && targetSlide) {
+      if (signedInUid && targetSlide) {
         const record = {
           slideId,
           hanzi: targetSlide.hanzi,
@@ -838,13 +765,9 @@ export default function App() {
   }, [binbinApplyPayload]);
 
   const isDarkTheme = selectedTheme.id === 'moon-night';
-  const activeClassIdForUrl = userProfile.classId || 'demo-class-722229';
+  const activeClassIdForUrl = userProfile.classId || 'lop-cua-toi';
   const displayName = userProfile.name.replace(/\s*\(.*?\)\s*/g, '').trim() || 'Học viên';
-  const teacherLocked =
-    userProfile.role !== 'teacher' &&
-    !isTeacherSessionUnlocked() &&
-    !firebaseUid &&
-    !isDemoMode;
+  const teacherLocked = !hasTeacherAccess();
 
   const goStudent = (path: string) => {
     if (path === '/flashcard') setStudentTab('flashcard-srs');
@@ -866,6 +789,10 @@ export default function App() {
       ? 'leaderboard'
       : path.startsWith('/bai-tap')
       ? 'homework'
+      : path.startsWith('/luyen-tap')
+      ? 'practice'
+      : path === '/shadowing'
+      ? 'shadowing'
       : path === '/giao-vien/soan-bai'
       ? 'builder'
       : path.startsWith('/giao-vien')
@@ -877,6 +804,8 @@ export default function App() {
     lesson: 'Bài học',
     flashcard: 'Flashcard',
     homework: 'Bài tập',
+    practice: 'Luyện tập',
+    shadowing: 'Shadowing',
     leaderboard: 'Bảng xếp hạng',
     builder: 'Soạn bài giảng',
     classroom: 'Quản lý lớp',
@@ -914,9 +843,24 @@ export default function App() {
     onSelect: () => goStudent('/flashcard'),
     testId: 'student-tab-flashcard',
   };
+  const navShadowing: NavItem = {
+    id: 'shadowing',
+    label: 'Shadowing',
+    icon: AudioLines,
+    onSelect: () => goStudent('/shadowing'),
+    testId: 'nav-shadowing',
+  };
+  const navPractice: NavItem = {
+    id: 'practice',
+    label: 'Luyện tập',
+    shortLabel: 'Luyện tập',
+    icon: Puzzle,
+    onSelect: () => goStudent('/luyen-tap'),
+    testId: 'nav-practice',
+  };
   const navHomework: NavItem = {
     id: 'homework',
-    label: 'Bài tập HSK',
+    label: 'Bài tập được giao',
     shortLabel: 'Bài tập',
     icon: PenTool,
     onSelect: () => goStudent('/bai-tap'),
@@ -952,31 +896,40 @@ export default function App() {
 
   const navSections: NavSection[] = [
     { id: 'main', label: '', items: [navHome] },
-    { id: 'learn', label: 'Học tập', items: [navLesson, navFlashcard, navHomework, navLeaderboard] },
+    { id: 'learn', label: 'Học tập', items: [navLesson, navFlashcard, navShadowing, navPractice, navHomework, navLeaderboard] },
     { id: 'teach', label: 'Giảng dạy', items: [navBuilder, navClassroom] },
   ];
 
   const tabBarItems: NavItem[] =
     userProfile.role === 'teacher'
       ? [navHome, navBuilder, navClassroom, navLesson, navHomework]
-      : [navHome, navLesson, navFlashcard, navHomework, navLeaderboard];
+      : [navHome, navLesson, navFlashcard, navShadowing, navHomework];
 
-  const syncLabel = isDemoMode
-    ? 'Bản demo — dữ liệu không được lưu'
-    : syncStatus === 'syncing'
+  const syncLabel = syncStatus === 'syncing'
     ? 'Đang đồng bộ…'
     : syncStatus === 'offline'
     ? 'Ngoại tuyến — sẽ đồng bộ khi có mạng'
     : 'Đã đồng bộ';
-  const SyncIcon = isDemoMode
-    ? FlaskConical
-    : syncStatus === 'syncing'
+  const SyncIcon = syncStatus === 'syncing'
     ? RefreshCw
     : syncStatus === 'offline'
     ? CloudOff
     : Cloud;
 
   const roleLabel = userProfile.role === 'teacher' ? 'Giáo viên' : 'Học viên';
+
+  const teacherGate = (
+    <EmptyState
+      testId="teacher-signin-gate"
+      icon={<Lock aria-hidden="true" />}
+      title="Đăng nhập giáo viên để tiếp tục"
+      description="Khu soạn bài và quản lý lớp chỉ dành cho giáo viên. Đăng nhập bằng tài khoản Google đã được cấp quyền giáo viên."
+      actionLabel="Đăng nhập giáo viên"
+      onAction={() => setAuthModalOpen(true)}
+      secondaryActionLabel="Về trang học"
+      onSecondaryAction={() => goStudent('/hoc')}
+    />
+  );
 
   return (
     <div
@@ -1040,13 +993,6 @@ export default function App() {
               {pageTitle}
             </h1>
 
-            {isDemoMode && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-highlight/15 text-gold text-xs font-medium shrink-0">
-                <FlaskConical className="w-3.5 h-3.5" aria-hidden="true" />
-                Bản demo
-              </span>
-            )}
-
             <PWAInstallButton />
 
             <button
@@ -1076,9 +1022,7 @@ export default function App() {
                 <span
                   aria-hidden="true"
                   className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface ${
-                    isDemoMode
-                      ? 'bg-highlight'
-                      : syncStatus === 'offline'
+                    syncStatus === 'offline'
                       ? 'bg-ink-subtle'
                       : syncStatus === 'syncing'
                       ? 'bg-highlight'
@@ -1111,7 +1055,7 @@ export default function App() {
                       className="flex items-center gap-2 text-xs text-ink-muted"
                     >
                       <SyncIcon
-                        className={`w-4 h-4 shrink-0 ${syncStatus === 'syncing' && !isDemoMode ? 'animate-spin' : ''}`}
+                        className={`w-4 h-4 shrink-0 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`}
                         aria-hidden="true"
                       />
                       <span>{syncLabel}</span>
@@ -1193,20 +1137,6 @@ export default function App() {
                     <button
                       type="button"
                       role="menuitem"
-                      data-testid="navbar-view-demo-btn"
-                      onClick={() => {
-                        setSettingsMenuOpen(false);
-                        handleActivateInMemoryDemo(userProfile.role);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 h-9 rounded-lg hover:bg-surface-2 text-sm text-ink transition-colors cursor-pointer"
-                    >
-                      <FlaskConical className="w-4 h-4 text-ink-muted" aria-hidden="true" />
-                      <span className="flex-1 text-left">Dùng thử với dữ liệu mẫu</span>
-                      {isDemoMode && <Check className="w-4 h-4 text-primary" aria-hidden="true" />}
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
                       data-testid="navbar-full-backup-btn"
                       onClick={() => {
                         setSettingsMenuOpen(false);
@@ -1257,6 +1187,7 @@ export default function App() {
                 onOpenFlashcard={() => goStudent('/flashcard')}
                 onOpenHomework={() => goStudent('/bai-tap')}
                 onOpenLeaderboard={() => goStudent('/bai-tap/leaderboard')}
+                onOpenShadowing={() => goStudent('/shadowing')}
                 onOpenLessonBuilder={() => handleQuickSwitchRole('teacher', 'lesson-builder')}
                 onOpenClassroom={() => handleQuickSwitchRole('teacher', 'class-manager')}
                 onPickSlide={(index) => {
@@ -1376,6 +1307,33 @@ export default function App() {
             }
           />
 
+          {/* /shadowing: listen-and-repeat practice by HSK level */}
+          <Route
+            path="/shadowing"
+            element={
+              <LazyErrorBoundary fallbackLabel="Không thể tải trang Shadowing.">
+                <Suspense fallback={<PageSkeleton label="Đang tải Shadowing…" />}>
+                  <ShadowingStudio slides={slides} />
+                </Suspense>
+              </LazyErrorBoundary>
+            }
+          />
+
+          {/* /luyen-tap: self-practice (not graded for the class) */}
+          {['/luyen-tap', '/luyen-tap/:tab'].map((routePath) => (
+            <Route
+              key={routePath}
+              path={routePath}
+              element={
+                <LazyErrorBoundary fallbackLabel="Không thể tải trang Luyện tập.">
+                  <Suspense fallback={<PageSkeleton label="Đang tải Luyện tập…" />}>
+                    <PracticeStudio slides={slides} studentName={userProfile.name} />
+                  </Suspense>
+                </LazyErrorBoundary>
+              }
+            />
+          ))}
+
           {/* /giao-vien: Redirects to /giao-vien/lop/:classId */}
           <Route
             path="/giao-vien"
@@ -1386,6 +1344,9 @@ export default function App() {
           <Route
             path="/giao-vien/soan-bai"
             element={
+              teacherLocked ? (
+                teacherGate
+              ) : (
               <LazyErrorBoundary fallbackLabel="Không thể tải Studio Soạn bài giảng.">
                 <Suspense fallback={<PageSkeleton label="Đang tải Studio soạn bài giảng…" />}>
                   <SlideDeckStudio
@@ -1407,6 +1368,7 @@ export default function App() {
                   />
                 </Suspense>
               </LazyErrorBoundary>
+              )
             }
           />
 
@@ -1414,6 +1376,9 @@ export default function App() {
           <Route
             path="/giao-vien/lop/:classId"
             element={
+              teacherLocked ? (
+                teacherGate
+              ) : (
               <LazyErrorBoundary fallbackLabel="Không thể tải Bảng điều khiển Quản lý Lớp học.">
                 <Suspense
                   fallback={<PageSkeleton label="Đang tải trang quản lý lớp…" />}
@@ -1429,6 +1394,7 @@ export default function App() {
                   />
                 </Suspense>
               </LazyErrorBoundary>
+              )
             }
           />
 
@@ -1446,10 +1412,9 @@ export default function App() {
                       setSelectedStudentName(nextProfile.name);
                     }
                     setUserProfile(nextProfile);
-                    setIsDemoMode(Boolean(nextProfile.isDemo));
                     if (nextProfile.role === 'teacher') {
                       setTeacherTab('class-manager');
-                      navigate(`/giao-vien/lop/${nextProfile.classId || 'demo-class-722229'}`);
+                      navigate(`/giao-vien/lop/${nextProfile.classId || 'lop-cua-toi'}`);
                     } else {
                       setStudentTab('today-lesson');
                       navigate('/hoc');
@@ -1537,11 +1502,10 @@ export default function App() {
                 setSelectedStudentName(nextProfile.name);
               }
               setUserProfile(nextProfile);
-              setIsDemoMode(Boolean(nextProfile.isDemo));
               setAuthModalOpen(false);
               if (nextProfile.role === 'teacher') {
                 setTeacherTab('class-manager');
-                navigate(`/giao-vien/lop/${nextProfile.classId || 'demo-class-722229'}`);
+                navigate(`/giao-vien/lop/${nextProfile.classId || 'lop-cua-toi'}`);
               } else {
                 setStudentTab('today-lesson');
                 navigate('/hoc');

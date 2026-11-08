@@ -66,7 +66,7 @@ export const WorksheetPreviewModal: React.FC<WorksheetPreviewModalProps> = ({
             </div>
             <div className="text-xs text-ink-muted space-y-1 sm:text-right">
               <div>Họ và tên học viên: ___________________________</div>
-              <div>Lớp: HSK 1–3 (Mã lớp: 722229) · Điểm: _______/100</div>
+              <div>Lớp: ______________ · Điểm: _______/100</div>
             </div>
           </div>
 
