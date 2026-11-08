@@ -42,9 +42,9 @@ export const ArenaSentenceBuilderSection: React.FC<ArenaSentenceBuilderSectionPr
           <div className="text-xs font-bold text-primary">
             PHÒNG LUYỆN CẤU TRÚC CÂU &amp; TRẬT TỰ TỪ HSK 3.0 · <span lang="zh-CN">连词成句</span>
           </div>
-          <h3 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
+          <h2 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
             🧩 Lắp Ghép Thẻ Từ Loại &amp; Chẩn Đoán Ngữ Pháp Hán Ngữ ({HSK3_SENTENCE_BUILDER_CHALLENGES.length} cấu trúc trọng tâm)
-          </h3>
+          </h2>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -111,7 +111,7 @@ export const ArenaSentenceBuilderSection: React.FC<ArenaSentenceBuilderSectionPr
             <div
               key={challenge.id}
               data-testid={`sentence-builder-card-${challenge.id}`}
-              className="p-4 sm:p-5 rounded-2xl bg-canvas border border-border space-y-3.5"
+              className="py-5 border-t border-border first:border-t-0 first:pt-0 space-y-3.5"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">

@@ -56,20 +56,20 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
   return (
     <div className="space-y-6">
       {/* SECTION A: TRẮC NGHIỆM TỪ VỰNG & NGỮ CẢNH (30 ĐIỂM) */}
-      <div className="rounded-2xl bg-surface/90 border border-border shadow-2xs p-5 sm:p-6 space-y-5">
+      <div className="rounded-2xl bg-surface border border-border p-5 sm:p-6 space-y-5">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <div className="flex items-center gap-2">
             <span className="w-7 h-7 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center justify-center">
               A
             </span>
-            <h3 className="text-sm sm:text-base font-bold text-ink">
+            <h2 className="text-sm sm:text-base font-bold text-ink">
               Phần A · Trắc Nghiệm Từ Vựng &amp; Ngữ Cảnh ({assignmentPackage.multipleChoiceList.length} câu · 30 điểm)
-            </h3>
+            </h2>
           </div>
           <span className="text-xs text-gold font-semibold">10 điểm / câu</span>
         </div>
 
-        <div className="space-y-4">
+        <div>
           {assignmentPackage.multipleChoiceList.map((q, idx) => {
             const userChoice = mcAnswers[q.id];
             const selectedOpt = q.options.find((o) => o.key === userChoice);
@@ -109,7 +109,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                     }
                   }
                 }}
-                className="rounded-2xl bg-canvas border border-border p-4 sm:p-5 space-y-3"
+                className="py-5 border-t border-border first:border-t-0 first:pt-0 space-y-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="w-full">
@@ -144,12 +144,12 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                       </div>
                     ) : (
                       <>
-                        <h4
+                        <h3
                           lang="zh-CN"
                           className="text-sm sm:text-base font-bold text-ink mt-1.5 font-['Noto_Sans_SC']"
                         >
                           {q.question}
-                        </h4>
+                        </h3>
                         {q.pinyinSentence && (
                           <p className="text-xs text-gold font-medium mt-1">
                             {q.pinyinSentence}
@@ -205,7 +205,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                           >
                             {opt.key}
                           </span>
-                          <span lang="zh-CN" className="truncate font-['Noto_Sans_SC'] text-sm">
+                          <span lang="zh-CN" className="break-words min-w-0 font-['Noto_Sans_SC'] text-sm">
                             {opt.label}
                           </span>
                         </div>
@@ -277,20 +277,20 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
       </div>
 
       {/* SECTION B: SẮP XẾP CÂU TIẾNG TRUNG (40 ĐIỂM) */}
-      <div className="rounded-2xl bg-surface/90 border border-border shadow-2xs p-5 sm:p-6 space-y-5">
+      <div className="rounded-2xl bg-surface border border-border p-5 sm:p-6 space-y-5">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <div className="flex items-center gap-2">
             <span className="w-7 h-7 rounded-xl bg-accent text-on-primary text-xs font-bold flex items-center justify-center">
               B
             </span>
-            <h3 className="text-sm sm:text-base font-bold text-ink">
+            <h2 className="text-sm sm:text-base font-bold text-ink">
               Phần B · Sắp Xếp Câu Tiếng Trung ({assignmentPackage.sentenceOrderingList.length} câu · 40 điểm)
-            </h3>
+            </h2>
           </div>
           <span className="text-xs text-gold font-semibold">20 điểm / câu</span>
         </div>
 
-        <div className="space-y-4">
+        <div>
           {assignmentPackage.sentenceOrderingList.map((q, idx) => {
             const userTokens = selectedTokensMap[q.id] || [];
             const remainingTokens = availableTokensMap[q.id] || [];
@@ -299,15 +299,15 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
             return (
               <div
                 key={q.id}
-                className="rounded-2xl bg-canvas border border-border p-4 sm:p-5 space-y-3.5"
+                className="py-5 border-t border-border first:border-t-0 first:pt-0 space-y-3.5"
               >
                 <div>
                   <span className="px-2.5 py-0.5 rounded-lg bg-primary/10 text-primary text-xs font-bold">
                     Câu {idx + 1}
                   </span>
-                  <h4 className="text-sm font-bold text-ink mt-1">
+                  <h3 className="text-sm font-bold text-ink mt-1">
                     Dịch nghĩa cần sắp xếp: &ldquo;{q.vietnameseMeaning}&rdquo;
-                  </h4>
+                  </h3>
                   <div className="flex flex-wrap items-center gap-2 mt-1.5">
                     {(isSubmitted || revealedPinyinHints[q.id]) && (
                       <p

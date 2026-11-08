@@ -104,9 +104,9 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
           <div className="text-xs font-bold text-accent">
             CHẾ ĐỘ THI THỬ TỐC ĐỘ 15 PHÚT · ĐÁNH GIÁ CHUẨN HSK 3.0
           </div>
-          <h3 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
+          <h2 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
             🏆 Bài Kiểm Tra Nhanh 10 Câu Toàn Diện (Nghe · Đọc · Ngữ Pháp · Hán Tự · Dịch)
-          </h3>
+          </h2>
           <p className="text-xs text-ink-muted mt-1" data-testid="quiz-keyboard-shortcuts-hint">
             ⌨️ Điều hướng bàn phím: <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">↑/↓</kbd> hoặc <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">←/→</kbd> chuyển câu · <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">1–4</kbd> / <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">A–D</kbd> chọn đáp án · <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">Space</kbd> nghe phát âm
           </p>
@@ -160,9 +160,9 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
                 <div className="text-xs font-semibold text-gold">
                   HANU × 阮文受 · CHỨNG NHẬN NĂNG LỰC HÁN NGỮ QUỐC TẾ
                 </div>
-                <h4 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
+                <h3 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
                   📜 PHIẾU CHỨNG NHẬN HOÀN THÀNH BÀI HỌC CHUẨN HSK 3.0
-                </h4>
+                </h3>
                 <p className="text-xs text-ink-muted mt-0.5">
                   Cấp cho học viên: <strong className="text-ink">{activeStudentName}</strong> · Lớp HSK 1–3
                 </p>

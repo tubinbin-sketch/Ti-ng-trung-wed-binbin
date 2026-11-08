@@ -1319,7 +1319,7 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
 
           {/* Top-Left Word & Meaning Badge */}
           <div className="absolute top-3 left-3 bg-[#182A21]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-highlight/60 shadow-lg flex items-center gap-2 max-w-[60%]">
-            <span className="w-2 h-2 rounded-full bg-highlight animate-pulse shrink-0" />
+            <span className="w-2 h-2 rounded-full bg-highlight shrink-0" />
             <div className="flex flex-col min-w-0">
               <span className="font-['Noto_Sans_SC'] text-base font-bold text-[#F7E29C] leading-tight truncate">
                 {hanzi}

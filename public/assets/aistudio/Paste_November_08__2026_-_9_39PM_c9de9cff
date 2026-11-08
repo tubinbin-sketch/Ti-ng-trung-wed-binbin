@@ -1,0 +1,633 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index 3c5be7e..b0702d0 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -979,7 +979,7 @@ export default function App() {
+                 <span className="app-seal">汉</span>
+               </button>
+             </div>
+-            <h1 className="flex-1 min-w-0 text-base lg:text-lg font-semibold text-ink">
++            <h1 className="flex-1 min-w-0 text-lg lg:text-2xl font-semibold text-ink">
+               {pageTitle}
+             </h1>
+ 
+diff --git a/src/components/BinBinPandaAI.tsx b/src/components/BinBinPandaAI.tsx
+index 993a929..d588777 100644
+--- a/src/components/BinBinPandaAI.tsx
++++ b/src/components/BinBinPandaAI.tsx
+@@ -726,7 +726,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
+           className="group relative w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-primary text-on-primary border-2 border-highlight hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer"
+         >
+           <span className="text-base sm:text-lg leading-none select-none">🐼</span>
+-          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#10B981] border border-primary animate-pulse" />
++          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#10B981] border border-primary" />
+         </button>
+       </div>
+     );
+diff --git a/src/components/SlideIllustration.tsx b/src/components/SlideIllustration.tsx
+index 8782f58..3c46fdc 100644
+--- a/src/components/SlideIllustration.tsx
++++ b/src/components/SlideIllustration.tsx
+@@ -1319,7 +1319,7 @@ export const SlideIllustration: React.FC<SlideIllustrationProps> = ({
+ 
+           {/* Top-Left Word & Meaning Badge */}
+           <div className="absolute top-3 left-3 bg-[#182A21]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-highlight/60 shadow-lg flex items-center gap-2 max-w-[60%]">
+-            <span className="w-2 h-2 rounded-full bg-highlight animate-pulse shrink-0" />
++            <span className="w-2 h-2 rounded-full bg-highlight shrink-0" />
+             <div className="flex flex-col min-w-0">
+               <span className="font-['Noto_Sans_SC'] text-base font-bold text-[#F7E29C] leading-tight truncate">
+                 {hanzi}
+diff --git a/src/components/StudentLeaderboard.tsx b/src/components/StudentLeaderboard.tsx
+index f23f0cc..da16513 100644
+--- a/src/components/StudentLeaderboard.tsx
++++ b/src/components/StudentLeaderboard.tsx
+@@ -198,7 +198,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+   return (
+     <div
+       data-testid="student-leaderboard-card"
+-      className="rounded-3xl bg-surface/65 backdrop-blur-md border border-border p-5 sm:p-6 space-y-5 shadow-xs"
++      className="rounded-3xl bg-surface border border-border p-5 sm:p-6 space-y-6"
+     >
+       {/* Leaderboard Header */}
+       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+@@ -208,15 +208,15 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+           </div>
+           <div>
+             <div className="flex flex-wrap items-center gap-2">
+-              <h4 className="text-base sm:text-lg font-bold text-ink">
++              <h2 className="text-xl font-bold text-ink">
+                 Bảng Xếp Hạng Thi Đua Lớp Học
+-              </h4>
+-              <span className="px-2 py-0.5 rounded-full bg-gold/20 text-ink text-xs font-bold uppercase">
++              </h2>
++              <span className="px-2 py-0.5 rounded-full bg-primary-soft text-ink text-xs font-bold uppercase">
+                 Đồng bộ {allEntries.length} Học viên · HSK 1–3
+               </span>
+             </div>
+-            <p className="text-xs text-ink-muted mt-0.5">
+-              Cập nhật tức thì điểm số thực tế, thời gian hoàn thành (giây) & chuỗi Streak từ danh sách lớp
++            <p className="text-xs text-ink-muted mt-1 max-w-[60ch]">
++              Điểm, thời gian hoàn thành (giây) và chuỗi Streak của cả lớp
+             </p>
+           </div>
+         </div>
+@@ -228,15 +228,15 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+             data-testid="leaderboard-privacy-mask-toggle"
+             onClick={togglePrivacyMask}
+             title="Ẩn bớt Mã học viên & Họ tên khi chiếu bảng xếp hạng trên lớp"
+-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
++            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
+               privacyMaskEnabled
+-                ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
++                ? 'bg-primary-soft border-primary text-ink'
+                 : 'bg-surface border-border text-ink-muted hover:text-ink'
+             }`}
+           >
+             {privacyMaskEnabled ? (
+               <>
+-                <EyeOff className="w-3.5 h-3.5 text-emerald-700" />
++                <EyeOff className="w-3.5 h-3.5 text-primary" />
+                 <span>Đã che Mã HV</span>
+               </>
+             ) : (
+@@ -257,7 +257,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+                 key={tab.id}
+                 type="button"
+                 onClick={() => setFilterPeriod(tab.id as 'today' | 'week' | 'all')}
+-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
++                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                   filterPeriod === tab.id
+                     ? 'bg-inverse text-white shadow-2xs'
+                     : 'text-ink-muted hover:text-ink'
+@@ -274,11 +274,11 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+       <div className="grid grid-cols-3 gap-2.5 sm:gap-4 pt-2">
+         {/* Rank 2 - Silver */}
+         {allEntries[1] && (
+-          <div className="relative rounded-2xl bg-surface border border-border p-3 sm:p-4 flex flex-col items-center text-center shadow-2xs mt-4">
+-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-200 border-2 border-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center -mt-7 sm:-mt-8 mb-1.5 shadow-xs">
++          <div className="relative rounded-2xl bg-surface-2 p-3 sm:p-4 flex flex-col items-center text-center mt-4">
++            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-border-strong text-ink font-bold text-xs flex items-center justify-center -mt-7 sm:-mt-8 mb-1.5">
+               2
+             </div>
+-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-primary-soft border border-border-strong/40 font-bold text-xs sm:text-sm text-ink flex items-center justify-center mb-1">
++            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-surface border border-border font-bold text-xs sm:text-sm text-ink flex items-center justify-center mb-1">
+               {allEntries[1].avatarCode}
+             </div>
+             <div className="text-xs font-bold text-gold">
+@@ -303,14 +303,14 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+ 
+         {/* Rank 1 - Gold (Center, prominent) */}
+         {allEntries[0] && (
+-          <div className="relative rounded-2xl bg-surface-2 border-2 border-border-strong p-3 sm:p-4 flex flex-col items-center text-center shadow-sm">
++          <div className="relative rounded-2xl bg-primary-soft p-3 sm:p-4 flex flex-col items-center text-center">
+             <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+-              <Crown className="w-6 h-6 text-gold fill-gold drop-shadow-xs" />
++              <Crown className="w-6 h-6 text-gold fill-gold" />
+             </div>
+-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-amber-100 border-2 border-border-strong text-ink font-bold text-sm flex items-center justify-center -mt-6 sm:-mt-7 mb-1.5 shadow-xs">
++            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-highlight text-on-highlight font-bold text-sm flex items-center justify-center -mt-6 sm:-mt-7 mb-1.5">
+               1
+             </div>
+-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-inverse text-white font-bold text-xs sm:text-sm flex items-center justify-center mb-1 border-2 border-highlight">
++            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-primary text-on-primary font-bold text-xs sm:text-sm flex items-center justify-center mb-1">
+               {allEntries[0].avatarCode}
+             </div>
+             <div className="text-xs font-semibold text-gold">
+@@ -326,7 +326,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+             <div className="text-xs sm:text-sm font-bold text-gold mt-0.5">
+               {allEntries[0].score} điểm
+             </div>
+-            <span className="px-1.5 py-0.5 rounded-md bg-gold/20 text-ink text-xs font-bold uppercase mt-1">
++            <span className="px-1.5 py-0.5 rounded-md bg-highlight text-on-highlight text-xs font-bold uppercase mt-1">
+               {allEntries[0].badgeTitle || 'Dẫn Đầu Lớp'}
+             </span>
+           </div>
+@@ -334,11 +334,11 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+ 
+         {/* Rank 3 - Bronze */}
+         {allEntries[2] && (
+-          <div className="relative rounded-2xl bg-surface border border-border p-3 sm:p-4 flex flex-col items-center text-center shadow-2xs mt-4">
+-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-700/20 border-2 border-amber-700/40 text-amber-900 font-bold text-xs flex items-center justify-center -mt-7 sm:-mt-8 mb-1.5 shadow-xs">
++          <div className="relative rounded-2xl bg-surface-2 p-3 sm:p-4 flex flex-col items-center text-center mt-4">
++            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-warning/25 text-ink font-bold text-xs flex items-center justify-center -mt-7 sm:-mt-8 mb-1.5">
+               3
+             </div>
+-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-primary-soft border border-border-strong/40 font-bold text-xs sm:text-sm text-ink flex items-center justify-center mb-1">
++            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-surface border border-border font-bold text-xs sm:text-sm text-ink flex items-center justify-center mb-1">
+               {allEntries[2].avatarCode}
+             </div>
+             <div className="text-xs font-bold text-gold">
+@@ -365,26 +365,26 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+       {/* Current Student Quick Status Strip */}
+       <div
+         data-testid="leaderboard-current-student-banner"
+-        className="p-3 sm:p-3.5 rounded-2xl bg-inverse text-white flex flex-wrap items-center justify-between gap-3 shadow-sm"
++        className="py-3 pl-4 pr-3 border-l-4 border-primary bg-primary-soft text-ink rounded-r-xl flex flex-wrap items-center justify-between gap-3"
+       >
+         <div className="flex items-center gap-3">
+           <div
+             data-testid="leaderboard-current-rank-badge"
+-            className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-highlight font-semibold text-xs"
++            className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center font-bold text-xs"
+           >
+             #{myRank > 0 ? myRank : '-'}
+           </div>
+           <div>
+-            <div className="text-xs font-bold text-white flex flex-wrap items-center gap-1.5">
++            <div className="text-xs font-bold text-ink flex flex-wrap items-center gap-1.5">
+               <span>
+                 Vị trí của bạn: {myEntry?.studentCode ? `${myEntry.studentCode} · ` : ''}
+                 {currentStudentName}
+               </span>
+-              <span className="px-1.5 py-0.5 rounded bg-white/20 text-xs font-semibold">
++              <span className="px-1.5 py-0.5 rounded bg-surface text-ink text-xs font-semibold">
+                 Đang chọn
+               </span>
+             </div>
+-            <div className="text-xs text-white/80 mt-0.5">
++            <div className="text-xs text-ink-muted mt-0.5">
+               {myEntry
+                 ? `Đạt ${myEntry.score}/100 điểm · Thời gian ${myEntry.timeSeconds}s · Xếp hạng #${myRank}/${allEntries.length} toàn lớp`
+                 : 'Hãy hoàn thành bài tập để ghi danh lên bảng vàng!'}
+@@ -395,17 +395,17 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+         <div className="flex items-center gap-2 text-xs">
+           <div
+             data-testid="leaderboard-current-streak-badge"
+-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/15 text-highlight font-bold"
++            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface text-ink font-bold"
+           >
+-            <Flame className="w-3.5 h-3.5 fill-[#C5B358]" />
++            <Flame className="w-3.5 h-3.5 text-highlight fill-highlight" />
+             <span>Streak {myEntry?.streak || 6} ngày</span>
+           </div>
+         </div>
+       </div>
+ 
+       {/* Detailed Full Roster List */}
+-      <div className="space-y-1.5" data-testid="leaderboard-full-roster-list">
+-        <div className="flex items-center justify-between text-xs font-bold uppercase text-ink-muted px-3 pb-1">
++      <div data-testid="leaderboard-full-roster-list">
++        <div className="flex items-center justify-between text-xs font-bold uppercase text-ink-muted px-3 pb-2 border-b border-border">
+           <span>Mã HV / Học Viên / Thứ Hạng</span>
+           <div className="flex items-center gap-6">
+             <span>Tốc độ</span>
+@@ -422,35 +422,33 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+             <div
+               key={item.id}
+               data-testid={`leaderboard-row-${item.studentCode || idx + 1}`}
+-              className={`flex items-center justify-between p-2.5 sm:p-3 rounded-2xl transition-all border ${
+-                isMe
+-                  ? 'bg-primary-soft border-border-strong shadow-xs'
+-                  : 'bg-surface border-border hover:border-border'
++              className={`flex items-center justify-between px-3 py-3 sm:py-3.5 border-b border-border last:border-b-0 transition-colors ${
++                isMe ? 'bg-primary-soft' : 'hover:bg-surface-2'
+               }`}
+             >
+               <div className="flex items-center gap-3 min-w-0">
+                 <div
+-                  className={`w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 ${
++                  className={`min-w-7 h-7 px-1 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 ${
+                     rank === 1
+-                      ? 'bg-gold text-white'
++                      ? 'bg-highlight text-on-highlight'
+                       : rank === 2
+-                      ? 'bg-slate-300 text-slate-800'
++                      ? 'bg-border-strong text-ink'
+                       : rank === 3
+-                      ? 'bg-amber-600 text-white'
+-                      : 'bg-black/5 text-ink-muted'
++                      ? 'bg-warning/25 text-ink'
++                      : 'bg-surface-2 text-ink-muted'
+                   }`}
+                 >
+                   #{rank}
+                 </div>
+ 
+-                <div className="w-8 h-8 rounded-full bg-surface border border-border font-bold text-xs text-ink flex items-center justify-center shrink-0">
++                <div className="w-8 h-8 rounded-full bg-surface-2 font-bold text-xs text-ink flex items-center justify-center shrink-0">
+                   {item.avatarCode}
+                 </div>
+ 
+                 <div className="min-w-0">
+                   <div className="flex flex-wrap items-center gap-1.5">
+                     {item.studentCode && (
+-                      <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-xs font-semibold shrink-0">
++                      <span className="px-1.5 py-0.5 rounded bg-primary-soft text-ink text-xs font-semibold shrink-0">
+                         {privacyMaskEnabled
+                           ? maskStudentCodeForPrivacy(item.studentCode, isMe)
+                           : item.studentCode}
+@@ -462,7 +460,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+                         : item.studentName}
+                     </span>
+                     {item.hskLevel && (
+-                      <span className="px-1.5 py-0.5 rounded bg-primary-soft text-ink-muted text-xs font-bold shrink-0">
++                      <span className="px-1.5 py-0.5 rounded bg-surface-2 text-ink-muted text-xs font-bold shrink-0">
+                         {item.hskLevel}
+                       </span>
+                     )}
+@@ -472,7 +470,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
+                       </span>
+                     )}
+                     {item.badgeTitle && (
+-                      <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-gold/15 text-ink text-xs font-semibold">
++                      <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-surface-2 text-ink text-xs font-semibold">
+                         {item.badgeTitle}
+                       </span>
+                     )}
+diff --git a/src/components/arena/ArenaHomeworkPartAB.tsx b/src/components/arena/ArenaHomeworkPartAB.tsx
+index ede218c..77634f8 100644
+--- a/src/components/arena/ArenaHomeworkPartAB.tsx
++++ b/src/components/arena/ArenaHomeworkPartAB.tsx
+@@ -56,20 +56,20 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
+   return (
+     <div className="space-y-6">
+       {/* SECTION A: TRẮC NGHIỆM TỪ VỰNG & NGỮ CẢNH (30 ĐIỂM) */}
+-      <div className="rounded-2xl bg-surface/90 border border-border shadow-2xs p-5 sm:p-6 space-y-5">
++      <div className="rounded-2xl bg-surface border border-border p-5 sm:p-6 space-y-5">
+         <div className="flex items-center justify-between border-b border-border pb-3">
+           <div className="flex items-center gap-2">
+             <span className="w-7 h-7 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center justify-center">
+               A
+             </span>
+-            <h3 className="text-sm sm:text-base font-bold text-ink">
++            <h2 className="text-sm sm:text-base font-bold text-ink">
+               Phần A · Trắc Nghiệm Từ Vựng &amp; Ngữ Cảnh ({assignmentPackage.multipleChoiceList.length} câu · 30 điểm)
+-            </h3>
++            </h2>
+           </div>
+           <span className="text-xs text-gold font-semibold">10 điểm / câu</span>
+         </div>
+ 
+-        <div className="space-y-4">
++        <div>
+           {assignmentPackage.multipleChoiceList.map((q, idx) => {
+             const userChoice = mcAnswers[q.id];
+             const selectedOpt = q.options.find((o) => o.key === userChoice);
+@@ -109,7 +109,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
+                     }
+                   }
+                 }}
+-                className="rounded-2xl bg-canvas border border-border p-4 sm:p-5 space-y-3"
++                className="py-5 border-t border-border first:border-t-0 first:pt-0 space-y-3"
+               >
+                 <div className="flex items-start justify-between gap-3">
+                   <div className="w-full">
+@@ -144,12 +144,12 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
+                       </div>
+                     ) : (
+                       <>
+-                        <h4
++                        <h3
+                           lang="zh-CN"
+                           className="text-sm sm:text-base font-bold text-ink mt-1.5 font-['Noto_Sans_SC']"
+                         >
+                           {q.question}
+-                        </h4>
++                        </h3>
+                         {q.pinyinSentence && (
+                           <p className="text-xs text-gold font-medium mt-1">
+                             {q.pinyinSentence}
+@@ -205,7 +205,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
+                           >
+                             {opt.key}
+                           </span>
+-                          <span lang="zh-CN" className="truncate font-['Noto_Sans_SC'] text-sm">
++                          <span lang="zh-CN" className="break-words min-w-0 font-['Noto_Sans_SC'] text-sm">
+                             {opt.label}
+                           </span>
+                         </div>
+@@ -277,20 +277,20 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
+       </div>
+ 
+       {/* SECTION B: SẮP XẾP CÂU TIẾNG TRUNG (40 ĐIỂM) */}
+-      <div className="rounded-2xl bg-surface/90 border border-border shadow-2xs p-5 sm:p-6 space-y-5">
++      <div className="rounded-2xl bg-surface border border-border p-5 sm:p-6 space-y-5">
+         <div className="flex items-center justify-between border-b border-border pb-3">
+           <div className="flex items-center gap-2">
+             <span className="w-7 h-7 rounded-xl bg-accent text-on-primary text-xs font-bold flex items-center justify-center">
+               B
+             </span>
+-            <h3 className="text-sm sm:text-base font-bold text-ink">
++            <h2 className="text-sm sm:text-base font-bold text-ink">
+               Phần B · Sắp Xếp Câu Tiếng Trung ({assignmentPackage.sentenceOrderingList.length} câu · 40 điểm)
+-            </h3>
++            </h2>
+           </div>
+           <span className="text-xs text-gold font-semibold">20 điểm / câu</span>
+         </div>
+ 
+-        <div className="space-y-4">
++        <div>
+           {assignmentPackage.sentenceOrderingList.map((q, idx) => {
+             const userTokens = selectedTokensMap[q.id] || [];
+             const remainingTokens = availableTokensMap[q.id] || [];
+@@ -299,15 +299,15 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
+             return (
+               <div
+                 key={q.id}
+-                className="rounded-2xl bg-canvas border border-border p-4 sm:p-5 space-y-3.5"
++                className="py-5 border-t border-border first:border-t-0 first:pt-0 space-y-3.5"
+               >
+                 <div>
+                   <span className="px-2.5 py-0.5 rounded-lg bg-primary/10 text-primary text-xs font-bold">
+                     Câu {idx + 1}
+                   </span>
+-                  <h4 className="text-sm font-bold text-ink mt-1">
++                  <h3 className="text-sm font-bold text-ink mt-1">
+                     Dịch nghĩa cần sắp xếp: &ldquo;{q.vietnameseMeaning}&rdquo;
+-                  </h4>
++                  </h3>
+                   <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                     {(isSubmitted || revealedPinyinHints[q.id]) && (
+                       <p
+diff --git a/src/components/arena/ArenaHomeworkPartCDE.tsx b/src/components/arena/ArenaHomeworkPartCDE.tsx
+index 6b21ec6..1bd8584 100644
+--- a/src/components/arena/ArenaHomeworkPartCDE.tsx
++++ b/src/components/arena/ArenaHomeworkPartCDE.tsx
+@@ -61,20 +61,20 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
+   return (
+     <div className="space-y-6">
+       {/* SECTION C: TỰ LUẬN ĐẶT CÂU & TẢI ẢNH BÀI LÀM VIẾT TAY */}
+-      <div className="rounded-2xl bg-surface/90 border border-border shadow-2xs p-5 sm:p-6 space-y-5">
++      <div className="rounded-2xl bg-surface border border-border p-5 sm:p-6 space-y-5">
+         <div className="flex items-center justify-between border-b border-border pb-3">
+           <div className="flex items-center gap-2">
+             <span className="w-7 h-7 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center justify-center">
+               C
+             </span>
+-            <h3 className="text-sm sm:text-base font-bold text-ink">
++            <h2 className="text-sm sm:text-base font-bold text-ink">
+               Phần C · Tự Luận Đặt Câu &amp; Chấm Chữa Chi Tiết ({assignmentPackage.essayList.length} câu · 30 điểm)
+-            </h3>
++            </h2>
+           </div>
+           <span className="text-xs text-gold font-semibold">15 điểm / câu</span>
+         </div>
+ 
+-        <div className="p-4 rounded-2xl bg-canvas border border-border-strong flex flex-col sm:flex-row items-center justify-between gap-3">
++        <div className="p-4 rounded-2xl bg-surface-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+           <div className="flex items-center gap-3">
+             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+               <Camera className="w-5 h-5 text-primary" />
+@@ -128,7 +128,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
+           </div>
+         )}
+ 
+-        <div className="space-y-4">
++        <div>
+           {assignmentPackage.essayList.map((q, idx) => {
+             const userText = essayAnswers[q.id] || '';
+             const hasTarget = userText.includes(q.targetWord);
+@@ -137,19 +137,19 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
+             return (
+               <div
+                 key={q.id}
+-                className="rounded-2xl bg-canvas border border-border p-4 sm:p-5 space-y-3"
++                className="py-5 border-t border-border first:border-t-0 first:pt-0 space-y-3"
+               >
+                 <div>
+                   <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold">
+                     Câu {idx + 1}
+                   </span>
+-                  <h4 className="text-sm font-bold text-ink mt-1">
++                  <h3 className="text-sm font-bold text-ink mt-1">
+                     Đặt câu có chứa từ: &ldquo;
+                     <span lang="zh-CN" className="font-['Noto_Sans_SC'] text-base text-gold">
+                       {q.targetWord}
+                     </span>
+                     &rdquo; ({q.pinyin} · {q.meaning})
+-                  </h4>
++                  </h3>
+                   <p className="text-xs text-ink-muted mt-0.5">{q.suggestedPrompt}</p>
+                 </div>
+ 
+@@ -263,15 +263,15 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
+       </div>
+ 
+       {/* SECTION D: NGHE ÂM CHỌN CHỮ & KIỂM TRA VIẾT NÉT CHỮ HÁN */}
+-      <div className="rounded-2xl bg-surface/90 border border-border shadow-2xs p-5 sm:p-6 space-y-4">
++      <div className="rounded-2xl bg-surface border border-border p-5 sm:p-6 space-y-4">
+         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+           <div className="flex items-center gap-2">
+             <span className="w-7 h-7 rounded-xl bg-primary text-gold text-xs font-bold flex items-center justify-center">
+               D
+             </span>
+-            <h3 className="text-sm sm:text-base font-bold text-ink">
++            <h2 className="text-sm sm:text-base font-bold text-ink">
+               Phần D · Nghe Âm Chọn Chữ &amp; Luyện Viết Nét Chữ Hán (<span lang="zh-CN">米字格</span>)
+-            </h3>
++            </h2>
+           </div>
+           <span className="text-xs text-gold font-semibold">
+             Đồng bộ độ chuẩn nét viết vào sổ điểm
+@@ -287,7 +287,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
+             return (
+               <div
+                 key={lc.id}
+-                className="p-4 rounded-2xl bg-canvas border border-border space-y-3"
++                className="py-5 border-t border-border first:border-t-0 first:pt-0 space-y-3"
+               >
+                 <div className="flex items-center justify-between gap-2">
+                   <span className="text-xs font-bold text-ink">
+@@ -362,7 +362,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
+           })}
+         </div>
+ 
+-        <div className="p-4 rounded-2xl bg-canvas border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
++        <div className="p-4 rounded-2xl bg-surface-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+           <div>
+             <div className="text-xs font-bold text-ink flex items-center gap-1.5">
+               <Edit3 className="w-3.5 h-3.5 text-gold" />
+@@ -404,7 +404,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
+       {/* SECTION E: LUYỆN DỊCH & ĐẶT CÂU CHUẨN HSK 3.0 */}
+       <div
+         data-testid="student-part-e-translation"
+-        className="rounded-2xl bg-surface/90 border border-border shadow-2xs p-5 sm:p-6 space-y-5"
++        className="rounded-2xl bg-surface border border-border p-5 sm:p-6 space-y-5"
+       >
+         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+           <div className="flex items-center gap-2.5">
+@@ -412,9 +412,9 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
+               E
+             </span>
+             <div>
+-              <h3 className="text-sm sm:text-base font-bold text-ink">
++              <h2 className="text-sm sm:text-base font-bold text-ink">
+                 Phần E · Luyện Dịch &amp; Đặt Câu Chuẩn HSK 3.0 (<span lang="zh-CN">翻译与造句</span>)
+-              </h3>
++              </h2>
+               <p className="text-xs text-ink-muted">
+                 Kỹ năng thứ 5 của HSK 3.0: Dịch câu tiếng Việt sang tiếng Trung có chứa từ trọng tâm
+               </p>
+@@ -436,7 +436,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
+               <div
+                 key={tr.id}
+                 data-testid={`part-e-challenge-${tr.id}`}
+-                className="rounded-2xl bg-canvas border border-border p-4 sm:p-5 space-y-3.5"
++                className="py-5 border-t border-border first:border-t-0 first:pt-0 space-y-3.5"
+               >
+                 <div className="flex flex-wrap items-start justify-between gap-2">
+                   <div>
+@@ -448,9 +448,9 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
+                         Từ khóa bắt buộc: {tr.targetKeyword} ({tr.targetPinyin})
+                       </span>
+                     </div>
+-                    <h4 className="text-sm sm:text-base font-bold text-ink mt-2">
++                    <h3 className="text-sm sm:text-base font-bold text-ink mt-2">
+                       Câu tiếng Việt cần dịch: &ldquo;{tr.vietnameseSource}&rdquo;
+-                    </h4>
++                    </h3>
+                   </div>
+ 
+                   <button
+@@ -570,13 +570,13 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
+       {!isSubmitted && (
+         <div
+           data-testid="sticky-submit-assignment-bar"
+-          className="sticky bottom-4 z-20 p-3 sm:px-5 sm:py-3.5 rounded-2xl bg-primary text-on-primary border border-transparent shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3"
++          className="sticky bottom-4 z-20 p-3 sm:px-5 sm:py-3.5 rounded-2xl bg-surface text-ink border border-border-strong shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3"
+         >
+           <div className="flex items-center gap-2.5 text-xs">
+-            <Sparkles className="w-4 h-4 text-gold shrink-0" />
++            <Sparkles className="w-4 h-4 text-primary shrink-0" />
+             <span>
+               Học viên:{' '}
+-              <strong data-testid="bottom-bar-student-name" className="text-gold">
++              <strong data-testid="bottom-bar-student-name" className="text-ink">
+                 {activeStudentName}
+               </strong>{' '}
+               · Buổi {assignmentPackage.sessionNumber} · Tự động lưu kết quả bài làm.
+@@ -588,9 +588,9 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
+             data-testid="submit-student-assignment-btn"
+             disabled={isGrading}
+             onClick={onSubmitAssignment}
+-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-canvas hover:bg-surface text-ink font-bold text-xs transition-all whitespace-nowrap cursor-pointer"
++            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-on-primary font-bold text-xs transition-colors whitespace-nowrap cursor-pointer"
+           >
+-            <Send className="w-4 h-4 text-gold" />
++            <Send className="w-4 h-4" />
+             <span>
+               {isGrading ? 'Đang phân tích & chấm điểm...' : 'Nộp Bài & Chấm Chữa Ngay (100đ)'}
+             </span>
+diff --git a/src/components/arena/ArenaSentenceBuilderSection.tsx b/src/components/arena/ArenaSentenceBuilderSection.tsx
+index bfeab2e..71db309 100644
+--- a/src/components/arena/ArenaSentenceBuilderSection.tsx
++++ b/src/components/arena/ArenaSentenceBuilderSection.tsx
+@@ -42,9 +42,9 @@ export const ArenaSentenceBuilderSection: React.FC<ArenaSentenceBuilderSectionPr
+           <div className="text-xs font-bold text-primary">
+             PHÒNG LUYỆN CẤU TRÚC CÂU &amp; TRẬT TỰ TỪ HSK 3.0 · <span lang="zh-CN">连词成句</span>
+           </div>
+-          <h3 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
++          <h2 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
+             🧩 Lắp Ghép Thẻ Từ Loại &amp; Chẩn Đoán Ngữ Pháp Hán Ngữ ({HSK3_SENTENCE_BUILDER_CHALLENGES.length} cấu trúc trọng tâm)
+-          </h3>
++          </h2>
+         </div>
+ 
+         <div className="flex flex-wrap items-center gap-2">
+@@ -111,7 +111,7 @@ export const ArenaSentenceBuilderSection: React.FC<ArenaSentenceBuilderSectionPr
+             <div
+               key={challenge.id}
+               data-testid={`sentence-builder-card-${challenge.id}`}
+-              className="p-4 sm:p-5 rounded-2xl bg-canvas border border-border space-y-3.5"
++              className="py-5 border-t border-border first:border-t-0 first:pt-0 space-y-3.5"
+             >
+               <div className="flex flex-wrap items-center justify-between gap-2">
+                 <div className="flex flex-wrap items-center gap-2">
+diff --git a/src/components/arena/ArenaSpeedTestSection.tsx b/src/components/arena/ArenaSpeedTestSection.tsx
+index 5dc2b41..dbf38d5 100644
+--- a/src/components/arena/ArenaSpeedTestSection.tsx
++++ b/src/components/arena/ArenaSpeedTestSection.tsx
+@@ -104,9 +104,9 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
+           <div className="text-xs font-bold text-accent">
+             CHẾ ĐỘ THI THỬ TỐC ĐỘ 15 PHÚT · ĐÁNH GIÁ CHUẨN HSK 3.0
+           </div>
+-          <h3 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
++          <h2 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
+             🏆 Bài Kiểm Tra Nhanh 10 Câu Toàn Diện (Nghe · Đọc · Ngữ Pháp · Hán Tự · Dịch)
+-          </h3>
++          </h2>
+           <p className="text-xs text-ink-muted mt-1" data-testid="quiz-keyboard-shortcuts-hint">
+             ⌨️ Điều hướng bàn phím: <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">↑/↓</kbd> hoặc <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">←/→</kbd> chuyển câu · <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">1–4</kbd> / <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">A–D</kbd> chọn đáp án · <kbd className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-ink font-mono">Space</kbd> nghe phát âm
+           </p>
+@@ -160,9 +160,9 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
+                 <div className="text-xs font-semibold text-gold">
+                   HANU × 阮文受 · CHỨNG NHẬN NĂNG LỰC HÁN NGỮ QUỐC TẾ
+                 </div>
+-                <h4 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
++                <h3 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
+                   📜 PHIẾU CHỨNG NHẬN HOÀN THÀNH BÀI HỌC CHUẨN HSK 3.0
+-                </h4>
++                </h3>
+                 <p className="text-xs text-ink-muted mt-0.5">
+                   Cấp cho học viên: <strong className="text-ink">{activeStudentName}</strong> · Lớp HSK 1–3
+                 </p>
+diff --git a/src/components/arena/ArenaTopSummarySection.tsx b/src/components/arena/ArenaTopSummarySection.tsx
+index 765ab38..c9edd48 100644
+--- a/src/components/arena/ArenaTopSummarySection.tsx
++++ b/src/components/arena/ArenaTopSummarySection.tsx
+@@ -249,7 +249,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
+                 <div
+                   key={pillar.id}
+                   data-testid={`hsk3-pillar-${pillar.id}`}
+-                  className="p-3 rounded-2xl bg-canvas border border-border space-y-1.5"
++                  className="p-3 rounded-2xl bg-surface-2 space-y-1.5"
+                 >
+                   <div className="flex items-center justify-between gap-2">
+                     <span className="text-xs font-bold text-ink">{pillar.titleVi}</span>
+@@ -366,13 +366,13 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
+                   <span>·</span>
+                   <span className="text-ink">HSK 1–3 CHUẨN</span>
+                 </div>
+-                <h3 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
++                <h2 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
+                   {totalScore >= 85
+                     ? '🎉 Xuất sắc! Bạn đã nắm rất vững kiến thức và ngữ pháp bài học!'
+                     : totalScore >= 70
+                     ? '👍 Kết quả khá tốt! Cần chú ý thêm vị trí trạng ngữ & trợ từ kết cấu.'
+                     : '💪 Đã nộp bài thành công! Hãy xem kỹ phần chữa lỗi sai bên dưới nhé.'}
+-                </h3>
++                </h2>
+                 <p className="text-xs text-ink-muted mt-1">
+                   Bài làm của học viên <strong className="text-ink">{activeStudentName}</strong> đã được ghi nhận vào hệ thống lớp học.
+                 </p>

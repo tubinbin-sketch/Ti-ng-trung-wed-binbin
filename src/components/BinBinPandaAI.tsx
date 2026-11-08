@@ -726,7 +726,7 @@ export const BinBinPandaAI: React.FC<BinBinPandaAIProps> = ({
           className="group relative w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-primary text-on-primary border-2 border-highlight hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center cursor-pointer"
         >
           <span className="text-base sm:text-lg leading-none select-none">🐼</span>
-          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#10B981] border border-primary animate-pulse" />
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#10B981] border border-primary" />
         </button>
       </div>
     );

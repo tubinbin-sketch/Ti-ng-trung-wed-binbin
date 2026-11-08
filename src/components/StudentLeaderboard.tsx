@@ -198,7 +198,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
   return (
     <div
       data-testid="student-leaderboard-card"
-      className="rounded-3xl bg-surface/65 backdrop-blur-md border border-border p-5 sm:p-6 space-y-5 shadow-xs"
+      className="rounded-3xl bg-surface border border-border p-5 sm:p-6 space-y-6"
     >
       {/* Leaderboard Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
@@ -208,15 +208,15 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h4 className="text-base sm:text-lg font-bold text-ink">
+              <h2 className="text-xl font-bold text-ink">
                 Bảng Xếp Hạng Thi Đua Lớp Học
-              </h4>
-              <span className="px-2 py-0.5 rounded-full bg-gold/20 text-ink text-xs font-bold uppercase">
+              </h2>
+              <span className="px-2 py-0.5 rounded-full bg-primary-soft text-ink text-xs font-bold uppercase">
                 Đồng bộ {allEntries.length} Học viên · HSK 1–3
               </span>
             </div>
-            <p className="text-xs text-ink-muted mt-0.5">
-              Cập nhật tức thì điểm số thực tế, thời gian hoàn thành (giây) & chuỗi Streak từ danh sách lớp
+            <p className="text-xs text-ink-muted mt-1 max-w-[60ch]">
+              Điểm, thời gian hoàn thành (giây) và chuỗi Streak của cả lớp
             </p>
           </div>
         </div>
@@ -228,15 +228,15 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
             data-testid="leaderboard-privacy-mask-toggle"
             onClick={togglePrivacyMask}
             title="Ẩn bớt Mã học viên & Họ tên khi chiếu bảng xếp hạng trên lớp"
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
               privacyMaskEnabled
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                ? 'bg-primary-soft border-primary text-ink'
                 : 'bg-surface border-border text-ink-muted hover:text-ink'
             }`}
           >
             {privacyMaskEnabled ? (
               <>
-                <EyeOff className="w-3.5 h-3.5 text-emerald-700" />
+                <EyeOff className="w-3.5 h-3.5 text-primary" />
                 <span>Đã che Mã HV</span>
               </>
             ) : (
@@ -257,7 +257,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setFilterPeriod(tab.id as 'today' | 'week' | 'all')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                   filterPeriod === tab.id
                     ? 'bg-inverse text-white shadow-2xs'
                     : 'text-ink-muted hover:text-ink'
@@ -274,11 +274,11 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
       <div className="grid grid-cols-3 gap-2.5 sm:gap-4 pt-2">
         {/* Rank 2 - Silver */}
         {allEntries[1] && (
-          <div className="relative rounded-2xl bg-surface border border-border p-3 sm:p-4 flex flex-col items-center text-center shadow-2xs mt-4">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-200 border-2 border-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center -mt-7 sm:-mt-8 mb-1.5 shadow-xs">
+          <div className="relative rounded-2xl bg-surface-2 p-3 sm:p-4 flex flex-col items-center text-center mt-4">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-border-strong text-ink font-bold text-xs flex items-center justify-center -mt-7 sm:-mt-8 mb-1.5">
               2
             </div>
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-primary-soft border border-border-strong/40 font-bold text-xs sm:text-sm text-ink flex items-center justify-center mb-1">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-surface border border-border font-bold text-xs sm:text-sm text-ink flex items-center justify-center mb-1">
               {allEntries[1].avatarCode}
             </div>
             <div className="text-xs font-bold text-gold">
@@ -303,14 +303,14 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
 
         {/* Rank 1 - Gold (Center, prominent) */}
         {allEntries[0] && (
-          <div className="relative rounded-2xl bg-surface-2 border-2 border-border-strong p-3 sm:p-4 flex flex-col items-center text-center shadow-sm">
+          <div className="relative rounded-2xl bg-primary-soft p-3 sm:p-4 flex flex-col items-center text-center">
             <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-              <Crown className="w-6 h-6 text-gold fill-gold drop-shadow-xs" />
+              <Crown className="w-6 h-6 text-gold fill-gold" />
             </div>
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-amber-100 border-2 border-border-strong text-ink font-bold text-sm flex items-center justify-center -mt-6 sm:-mt-7 mb-1.5 shadow-xs">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-highlight text-on-highlight font-bold text-sm flex items-center justify-center -mt-6 sm:-mt-7 mb-1.5">
               1
             </div>
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-inverse text-white font-bold text-xs sm:text-sm flex items-center justify-center mb-1 border-2 border-highlight">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-primary text-on-primary font-bold text-xs sm:text-sm flex items-center justify-center mb-1">
               {allEntries[0].avatarCode}
             </div>
             <div className="text-xs font-semibold text-gold">
@@ -326,7 +326,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
             <div className="text-xs sm:text-sm font-bold text-gold mt-0.5">
               {allEntries[0].score} điểm
             </div>
-            <span className="px-1.5 py-0.5 rounded-md bg-gold/20 text-ink text-xs font-bold uppercase mt-1">
+            <span className="px-1.5 py-0.5 rounded-md bg-highlight text-on-highlight text-xs font-bold uppercase mt-1">
               {allEntries[0].badgeTitle || 'Dẫn Đầu Lớp'}
             </span>
           </div>
@@ -334,11 +334,11 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
 
         {/* Rank 3 - Bronze */}
         {allEntries[2] && (
-          <div className="relative rounded-2xl bg-surface border border-border p-3 sm:p-4 flex flex-col items-center text-center shadow-2xs mt-4">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-700/20 border-2 border-amber-700/40 text-amber-900 font-bold text-xs flex items-center justify-center -mt-7 sm:-mt-8 mb-1.5 shadow-xs">
+          <div className="relative rounded-2xl bg-surface-2 p-3 sm:p-4 flex flex-col items-center text-center mt-4">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-warning/25 text-ink font-bold text-xs flex items-center justify-center -mt-7 sm:-mt-8 mb-1.5">
               3
             </div>
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-primary-soft border border-border-strong/40 font-bold text-xs sm:text-sm text-ink flex items-center justify-center mb-1">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-surface border border-border font-bold text-xs sm:text-sm text-ink flex items-center justify-center mb-1">
               {allEntries[2].avatarCode}
             </div>
             <div className="text-xs font-bold text-gold">
@@ -365,26 +365,26 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
       {/* Current Student Quick Status Strip */}
       <div
         data-testid="leaderboard-current-student-banner"
-        className="p-3 sm:p-3.5 rounded-2xl bg-inverse text-white flex flex-wrap items-center justify-between gap-3 shadow-sm"
+        className="py-3 pl-4 pr-3 border-l-4 border-primary bg-primary-soft text-ink rounded-r-xl flex flex-wrap items-center justify-between gap-3"
       >
         <div className="flex items-center gap-3">
           <div
             data-testid="leaderboard-current-rank-badge"
-            className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-highlight font-semibold text-xs"
+            className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center font-bold text-xs"
           >
             #{myRank > 0 ? myRank : '-'}
           </div>
           <div>
-            <div className="text-xs font-bold text-white flex flex-wrap items-center gap-1.5">
+            <div className="text-xs font-bold text-ink flex flex-wrap items-center gap-1.5">
               <span>
                 Vị trí của bạn: {myEntry?.studentCode ? `${myEntry.studentCode} · ` : ''}
                 {currentStudentName}
               </span>
-              <span className="px-1.5 py-0.5 rounded bg-white/20 text-xs font-semibold">
+              <span className="px-1.5 py-0.5 rounded bg-surface text-ink text-xs font-semibold">
                 Đang chọn
               </span>
             </div>
-            <div className="text-xs text-white/80 mt-0.5">
+            <div className="text-xs text-ink-muted mt-0.5">
               {myEntry
                 ? `Đạt ${myEntry.score}/100 điểm · Thời gian ${myEntry.timeSeconds}s · Xếp hạng #${myRank}/${allEntries.length} toàn lớp`
                 : 'Hãy hoàn thành bài tập để ghi danh lên bảng vàng!'}
@@ -395,17 +395,17 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
         <div className="flex items-center gap-2 text-xs">
           <div
             data-testid="leaderboard-current-streak-badge"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/15 text-highlight font-bold"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface text-ink font-bold"
           >
-            <Flame className="w-3.5 h-3.5 fill-[#C5B358]" />
+            <Flame className="w-3.5 h-3.5 text-highlight fill-highlight" />
             <span>Streak {myEntry?.streak || 6} ngày</span>
           </div>
         </div>
       </div>
 
       {/* Detailed Full Roster List */}
-      <div className="space-y-1.5" data-testid="leaderboard-full-roster-list">
-        <div className="flex items-center justify-between text-xs font-bold uppercase text-ink-muted px-3 pb-1">
+      <div data-testid="leaderboard-full-roster-list">
+        <div className="flex items-center justify-between text-xs font-bold uppercase text-ink-muted px-3 pb-2 border-b border-border">
           <span>Mã HV / Học Viên / Thứ Hạng</span>
           <div className="flex items-center gap-6">
             <span>Tốc độ</span>
@@ -422,35 +422,33 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
             <div
               key={item.id}
               data-testid={`leaderboard-row-${item.studentCode || idx + 1}`}
-              className={`flex items-center justify-between p-2.5 sm:p-3 rounded-2xl transition-all border ${
-                isMe
-                  ? 'bg-primary-soft border-border-strong shadow-xs'
-                  : 'bg-surface border-border hover:border-border'
+              className={`flex items-center justify-between px-3 py-3 sm:py-3.5 border-b border-border last:border-b-0 transition-colors ${
+                isMe ? 'bg-primary-soft' : 'hover:bg-surface-2'
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div
-                  className={`w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 ${
+                  className={`min-w-7 h-7 px-1 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 ${
                     rank === 1
-                      ? 'bg-gold text-white'
+                      ? 'bg-highlight text-on-highlight'
                       : rank === 2
-                      ? 'bg-slate-300 text-slate-800'
+                      ? 'bg-border-strong text-ink'
                       : rank === 3
-                      ? 'bg-amber-600 text-white'
-                      : 'bg-black/5 text-ink-muted'
+                      ? 'bg-warning/25 text-ink'
+                      : 'bg-surface-2 text-ink-muted'
                   }`}
                 >
                   #{rank}
                 </div>
 
-                <div className="w-8 h-8 rounded-full bg-surface border border-border font-bold text-xs text-ink flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-full bg-surface-2 font-bold text-xs text-ink flex items-center justify-center shrink-0">
                   {item.avatarCode}
                 </div>
 
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
                     {item.studentCode && (
-                      <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-xs font-semibold shrink-0">
+                      <span className="px-1.5 py-0.5 rounded bg-primary-soft text-ink text-xs font-semibold shrink-0">
                         {privacyMaskEnabled
                           ? maskStudentCodeForPrivacy(item.studentCode, isMe)
                           : item.studentCode}
@@ -462,7 +460,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
                         : item.studentName}
                     </span>
                     {item.hskLevel && (
-                      <span className="px-1.5 py-0.5 rounded bg-primary-soft text-ink-muted text-xs font-bold shrink-0">
+                      <span className="px-1.5 py-0.5 rounded bg-surface-2 text-ink-muted text-xs font-bold shrink-0">
                         {item.hskLevel}
                       </span>
                     )}
@@ -472,7 +470,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
                       </span>
                     )}
                     {item.badgeTitle && (
-                      <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-gold/15 text-ink text-xs font-semibold">
+                      <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-surface-2 text-ink text-xs font-semibold">
                         {item.badgeTitle}
                       </span>
                     )}

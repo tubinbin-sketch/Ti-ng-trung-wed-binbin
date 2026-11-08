@@ -979,7 +979,7 @@ export default function App() {
                 <span className="app-seal">汉</span>
               </button>
             </div>
-            <h1 className="flex-1 min-w-0 text-base lg:text-lg font-semibold text-ink">
+            <h1 className="flex-1 min-w-0 text-lg lg:text-2xl font-semibold text-ink">
               {pageTitle}
             </h1>
 

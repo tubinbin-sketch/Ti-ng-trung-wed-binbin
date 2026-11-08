@@ -249,7 +249,7 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
                 <div
                   key={pillar.id}
                   data-testid={`hsk3-pillar-${pillar.id}`}
-                  className="p-3 rounded-2xl bg-canvas border border-border space-y-1.5"
+                  className="p-3 rounded-2xl bg-surface-2 space-y-1.5"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-bold text-ink">{pillar.titleVi}</span>
@@ -366,13 +366,13 @@ export const ArenaTopSummarySection: React.FC<ArenaTopSummarySectionProps> = ({
                   <span>·</span>
                   <span className="text-ink">HSK 1–3 CHUẨN</span>
                 </div>
-                <h3 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
+                <h2 className="text-lg sm:text-xl font-bold text-ink mt-0.5">
                   {totalScore >= 85
                     ? '🎉 Xuất sắc! Bạn đã nắm rất vững kiến thức và ngữ pháp bài học!'
                     : totalScore >= 70
                     ? '👍 Kết quả khá tốt! Cần chú ý thêm vị trí trạng ngữ & trợ từ kết cấu.'
                     : '💪 Đã nộp bài thành công! Hãy xem kỹ phần chữa lỗi sai bên dưới nhé.'}
-                </h3>
+                </h2>
                 <p className="text-xs text-ink-muted mt-1">
                   Bài làm của học viên <strong className="text-ink">{activeStudentName}</strong> đã được ghi nhận vào hệ thống lớp học.
                 </p>
