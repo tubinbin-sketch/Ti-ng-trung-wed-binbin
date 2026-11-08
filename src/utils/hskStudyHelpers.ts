@@ -1333,18 +1333,16 @@ export function getDailyStudyProgress(
 ): DailyStudyProgress {
   const todayKey = getLocalDateKey(nowDate);
   const yesterdayKey = getYesterdayDateKey(nowDate);
-  const initialLearnedIds = slides
-    .filter((s) => s.learned)
-    .map((s) => s.id)
-    .slice(0, 5);
+  void slides; // kept for API compatibility
 
+  // A learner who hasn't reviewed anything yet has no streak and nothing done today.
   const fallback: DailyStudyProgress = {
-    streakDays: Math.max(1, initialLearnedIds.length > 0 ? 3 : 1),
-    lastActiveDate: todayKey,
+    streakDays: 0,
+    lastActiveDate: '',
     todayDate: todayKey,
     dailyGoal: 10,
-    reviewedWordIdsToday: initialLearnedIds,
-    reviewedCountToday: initialLearnedIds.length,
+    reviewedWordIdsToday: [],
+    reviewedCountToday: 0,
   };
 
   if (typeof window === 'undefined') return fallback;
@@ -1363,16 +1361,16 @@ export function getDailyStudyProgress(
 
     const storedToday = String(parsed.todayDate || '');
     const storedLastActive = String(parsed.lastActiveDate || '');
-    const storedStreak = Math.max(1, Number(parsed.streakDays) || 1);
+    const storedStreak = Math.max(0, Number(parsed.streakDays) || 0);
 
     if (storedToday === todayKey) {
       const ids = Array.isArray(parsed.reviewedWordIdsToday)
         ? parsed.reviewedWordIdsToday.map(String)
-        : initialLearnedIds;
+        : [];
       const count = Math.max(ids.length, Number(parsed.reviewedCountToday) || 0);
       return {
         streakDays: storedStreak,
-        lastActiveDate: storedLastActive || todayKey,
+        lastActiveDate: storedLastActive,
         todayDate: todayKey,
         dailyGoal: validGoal,
         reviewedWordIdsToday: ids,
@@ -1380,13 +1378,12 @@ export function getDailyStudyProgress(
       };
     }
 
-    // New day transition
-    const isConsecutiveFromYesterday =
-      storedLastActive === yesterdayKey || storedToday === yesterdayKey;
-    const nextStreak = isConsecutiveFromYesterday ? storedStreak : 1;
+    // New day: the streak survives only if the learner actually reviewed words
+    // yesterday (just opening the app doesn't count).
+    const nextStreak = storedLastActive === yesterdayKey ? storedStreak : 0;
     const rolled: DailyStudyProgress = {
       streakDays: nextStreak,
-      lastActiveDate: storedLastActive || yesterdayKey,
+      lastActiveDate: storedLastActive,
       todayDate: todayKey,
       dailyGoal: validGoal,
       reviewedWordIdsToday: [],
@@ -1411,11 +1408,7 @@ export function recordDailyWordReview(
 
   let nextStreak = current.streakDays;
   if (current.lastActiveDate !== todayKey) {
-    if (current.lastActiveDate === yesterdayKey) {
-      nextStreak = current.streakDays + 1;
-    } else {
-      nextStreak = Math.max(1, current.streakDays);
-    }
+    nextStreak = current.lastActiveDate === yesterdayKey ? current.streakDays + 1 : 1;
   }
 
   const nextSet = new Set(current.reviewedWordIdsToday);

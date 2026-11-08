@@ -201,11 +201,18 @@ export function HomeDashboard({
             className="inline-flex items-center gap-2.5 min-h-11"
             title="Chuỗi ngày học liên tiếp"
           >
-            <Flame className="w-5 h-5 text-gold fill-current shrink-0" aria-hidden="true" />
+            <Flame
+              className={`w-5 h-5 shrink-0 ${
+                dailyProgress.streakDays > 0 ? 'text-gold fill-current' : 'text-ink-subtle'
+              }`}
+              aria-hidden="true"
+            />
             <div className="leading-tight">
               <span className="block text-xs text-ink-muted">Chuỗi ngày học</span>
               <span className="block text-sm font-semibold text-ink tabular-nums">
-                {dailyProgress.streakDays} ngày liên tiếp
+                {dailyProgress.streakDays > 0
+                  ? `${dailyProgress.streakDays} ngày liên tiếp`
+                  : 'Ôn 1 từ để bắt đầu'}
               </span>
             </div>
           </div>
@@ -284,8 +291,8 @@ export function HomeDashboard({
             style={{ '--stagger': 1 } as React.CSSProperties}
             aria-labelledby="continue-heading"
           >
-            <div className="flex items-center justify-between gap-2">
-              <h3 id="continue-heading" className="text-sm font-semibold text-ink-muted">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <h3 id="continue-heading" className="text-sm font-semibold text-ink-muted whitespace-nowrap">
                 Tiếp tục bài học
               </h3>
               <span className="text-xs text-ink-subtle tabular-nums">
@@ -831,6 +838,7 @@ export function HomeDashboard({
             {/* Speech Recognition Pronunciation Result inside Popup */}
             <PronunciationResultBanner
               result={popupPronunciation.result}
+              error={popupPronunciation.error}
               targetHanzi={activePreviewSlide.hanzi}
               onRetry={popupPronunciation.startOrStopPractice}
               onClose={popupPronunciation.clearResult}

@@ -157,6 +157,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
                   <textarea
                     rows={2}
                     disabled={isSubmitted}
+                    aria-label={`Câu tiếng Trung của bạn có dùng từ ${q.targetWord}`}
                     value={userText}
                     onChange={(e) => onChangeEssayAnswer(q.id, e.target.value)}
                     placeholder={`Gõ câu tiếng Trung của bạn ở đây (bắt buộc có chữ "${q.targetWord}")...`}
@@ -511,6 +512,7 @@ export const ArenaHomeworkPartCDE: React.FC<ArenaHomeworkPartCDEProps> = ({
                   <input
                     type="text"
                     data-testid={`part-e-input-${tr.id}`}
+                    aria-label={`Bản dịch tiếng Trung có từ ${tr.targetKeyword}`}
                     value={userVal}
                     onChange={(e) => onChangeTranslationAnswer(tr.id, e.target.value)}
                     placeholder={`Nhập bản dịch tiếng Trung có từ “${tr.targetKeyword}”...`}
