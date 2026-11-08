@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Mic, RefreshCw, Sparkles, Volume2, X } from 'lucide-react';
+import { CheckCircle2, MicOff, Mic, RefreshCw, Sparkles, Volume2, X } from 'lucide-react';
 import {
+  describeSpeechFailure,
   practiceChinesePronunciationWithMic,
   PronunciationEvaluationResult,
   speakChinese,
+  SpeechFailureReason,
 } from '../utils/speech';
 import { recordDailyWordReview } from '../utils/hskStudyHelpers';
 
@@ -14,11 +16,13 @@ export function usePronunciationPractice(
 ) {
   const [isRecording, setIsRecording] = useState(false);
   const [result, setResult] = useState<PronunciationEvaluationResult | null>(null);
+  const [error, setError] = useState<SpeechFailureReason | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     setIsRecording(false);
     setResult(null);
+    setError(null);
     if (stopRef.current) {
       stopRef.current();
       stopRef.current = null;
@@ -45,6 +49,7 @@ export function usePronunciationPractice(
     }
 
     setResult(null);
+    setError(null);
     setIsRecording(true);
     stopRef.current = practiceChinesePronunciationWithMic({
       targetHanzi,
@@ -52,16 +57,26 @@ export function usePronunciationPractice(
       onResult: (evalRes) => {
         setIsRecording(false);
         setResult(evalRes);
+        // Only a real attempt counts towards today's study goal.
         recordDailyWordReview(wordIdForStreak || targetHanzi);
+      },
+      onUnavailable: (reason) => {
+        setIsRecording(false);
+        stopRef.current = null;
+        if (reason !== 'aborted') setError(reason);
       },
     });
   };
 
-  const clearResult = () => setResult(null);
+  const clearResult = () => {
+    setResult(null);
+    setError(null);
+  };
 
   return {
     isRecording,
     result,
+    error,
     startOrStopPractice,
     clearResult,
   };
@@ -103,17 +118,54 @@ export function PronunciationPracticeButton({
 
 export function PronunciationResultBanner({
   result,
+  error = null,
   targetHanzi,
   onRetry,
   onClose,
   testId = 'pronunciation-score-result',
 }: {
   result: PronunciationEvaluationResult | null;
+  /** Why nothing could be graded (mic blocked, no speech…). Shown instead of a score. */
+  error?: SpeechFailureReason | null;
   targetHanzi: string;
   onRetry?: () => void;
   onClose?: () => void;
   testId?: string;
 }) {
+  if (!result && error) {
+    return (
+      <div
+        role="status"
+        data-testid={`${testId}-unavailable`}
+        className="rounded-2xl bg-surface-2 border border-border p-3.5 text-left flex items-start gap-2.5 animate-fade-in"
+      >
+        <MicOff className="w-4 h-4 mt-0.5 text-ink-muted shrink-0" />
+        <p className="flex-1 text-sm text-ink-muted leading-relaxed">{describeSpeechFailure(error)}</p>
+        <div className="flex items-center gap-1 shrink-0">
+          {onRetry && error !== 'unsupported' && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-medium text-primary hover:bg-primary-soft transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Thử lại</span>
+            </button>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Đóng thông báo"
+              className="w-8 h-8 rounded-lg grid place-items-center text-ink-subtle hover:text-ink hover:bg-surface transition-colors cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
   if (!result) return null;
 
   const badgeTone =

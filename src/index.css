@@ -76,13 +76,13 @@
   --token-inverse: #1B1E24;
   --token-inverse-hover: #2B2F37;
 
-  --token-accent: #CF3A30;        /* seal red */
+  --token-accent: #C4352B;        /* seal red, ≥4.5:1 on accent-soft */
   --token-accent-soft: #FCECEA;
   --token-gold: #93600A;          /* readable amber for small labels */
   --token-highlight: #F1B83A;     /* stars, streaks, "correct" glints */
   --token-on-highlight: #1B1E24;
 
-  --token-success: #12804D;
+  --token-success: #117A49;        /* ≥4.5:1 on success-soft */
   --token-success-soft: #E7F5EE;
   --token-warning: #B45309;
   --token-danger: #C8312A;
