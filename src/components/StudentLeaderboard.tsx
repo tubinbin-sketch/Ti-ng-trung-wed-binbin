@@ -19,8 +19,9 @@ function maskStudentCodeForPrivacy(code?: string, isMe?: boolean): string {
 
 function maskStudentNameForPrivacy(fullName: string, isMe?: boolean): string {
   if (isMe) return fullName;
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length <= 1) return fullName;
+  const clean = fullName.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return clean || fullName;
   const first = parts[0];
   const last = parts[parts.length - 1];
   const midInitials = parts
@@ -28,6 +29,20 @@ function maskStudentNameForPrivacy(fullName: string, isMe?: boolean): string {
     .map((p) => `${p[0]?.toUpperCase() || ''}.`)
     .join(' ');
   return midInitials ? `${first} ${midInitials} ${last}` : `${first} ${last[0]?.toUpperCase() || ''}.`;
+}
+
+export function buildAvatarCode(fullName: string, fallback = 'HV'): string {
+  const clean = fullName.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return fallback;
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase() || fallback;
+  return (
+    parts
+      .slice(-2)
+      .map((p) => p[0] || '')
+      .join('')
+      .toUpperCase() || fallback
+  );
 }
 
 export interface ClassLeaderboardItem extends LeaderboardEntry {
@@ -107,14 +122,7 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
         isMe && hasSubmitted && typeof currentStudentStreak === 'number' && currentStudentStreak > 0
           ? currentStudentStreak
           : st.streak || Math.max(3, Math.round(st.totalPoints / 11));
-      const avatarCode =
-        st.name
-          .split(' ')
-          .filter(Boolean)
-          .map((n) => n[0])
-          .slice(-2)
-          .join('')
-          .toUpperCase() || 'HV';
+      const avatarCode = buildAvatarCode(st.name, 'HV');
 
       const badgeTitle =
         score >= 97
@@ -141,25 +149,26 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
       };
     });
 
-    // If currentStudentName wasn't in roster yet and submitted, append them
+    // If currentStudentName wasn't in roster yet and submitted, append them with HV-013 (non-colliding code)
     const hasCurrent = mapped.some(
       (e) => e.studentName.trim().toLowerCase() === currentStudentName.trim().toLowerCase()
     );
     if (!hasCurrent && currentStudentName.trim()) {
       const fallbackScore = hasSubmitted && currentStudentScore > 0 ? currentStudentScore : 91;
+      const usedCodes = new Set(mapped.map((m) => m.studentCode));
+      let nextIdx = Math.max(13, mapped.length + 1);
+      while (usedCodes.has(`HV-${String(nextIdx).padStart(3, '0')}`)) {
+        nextIdx += 1;
+      }
+      const resolvedCode = usedCodes.has('HV-013')
+        ? `HV-${String(nextIdx).padStart(3, '0')}`
+        : 'HV-013';
       mapped.push({
         id: 'current-user-lb',
-        studentCode: `HV-${String(mapped.length + 1).padStart(3, '0')}`,
-        hskLevel: 'HSK 2',
+        studentCode: resolvedCode,
+        hskLevel: 'HSK 3',
         studentName: currentStudentName.trim(),
-        avatarCode:
-          currentStudentName
-            .split(' ')
-            .filter(Boolean)
-            .map((n) => n[0])
-            .slice(-2)
-            .join('')
-            .toUpperCase() || 'HS',
+        avatarCode: buildAvatarCode(currentStudentName, 'HS'),
         score: fallbackScore,
         streak: currentStudentStreak || 6,
         timeSeconds: currentStudentTimeSeconds || 45,
@@ -304,10 +313,10 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({
         {/* Rank 1 - Gold (Center, prominent) */}
         {allEntries[0] && (
           <div className="relative rounded-2xl bg-primary-soft p-3 sm:p-4 flex flex-col items-center text-center">
-            <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-              <Crown className="w-6 h-6 text-gold fill-gold" />
+            <div className="absolute -top-7 sm:-top-8 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+              <Crown className="w-5 h-5 text-gold fill-gold" />
             </div>
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-highlight text-on-highlight font-bold text-sm flex items-center justify-center -mt-6 sm:-mt-7 mb-1.5">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-highlight text-on-highlight font-bold text-sm flex items-center justify-center -mt-5 sm:-mt-6 mb-1.5 relative z-10">
               1
             </div>
             <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-primary text-on-primary font-bold text-xs sm:text-sm flex items-center justify-center mb-1">

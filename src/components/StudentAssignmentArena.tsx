@@ -99,13 +99,13 @@ export const StudentAssignmentArena: React.FC<StudentAssignmentArenaProps> = ({
     return [
       {
         id: 'st-active-default',
-        studentCode: 'HV-001',
+        studentCode: 'HV-013',
         hskLevel: 'HSK 3',
         name: activeStudentName,
         vocabScore: '18/18 từ',
         writingScore: '96% độ chuẩn nét',
-        quizScore: '10/10 câu đúng',
-        totalPoints: 98,
+        quizScore: '9/10 câu đúng',
+        totalPoints: 91,
         status: 'Đã chấm tự động',
         feedback: 'Đang làm bài trực tuyến.',
       },
