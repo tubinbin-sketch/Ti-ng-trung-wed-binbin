@@ -1,8 +1,7 @@
 import React from 'react';
-import { AlertCircle, BookOpen, CheckCircle2, Headphones, Sparkles, Volume2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Headphones, Sparkles, Volume2 } from 'lucide-react';
 import { UploadedAssignmentPackage } from '../../utils/assignmentParser';
 import { speakChinese } from '../../utils/speech';
-import { EmptyState } from '../ui/EmptyState';
 
 interface ArenaHomeworkPartABProps {
   assignmentPackage: UploadedAssignmentPackage;
@@ -17,7 +16,6 @@ interface ArenaHomeworkPartABProps {
   isListeningExamMode: boolean;
   isSubmitted: boolean;
   onAskBinBinAboutQuestion: (targetWord: string, questionText: string, explanationText?: string) => void;
-  onLoadDefaultAssignment: () => void;
 }
 
 export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
@@ -33,40 +31,21 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
   isListeningExamMode,
   isSubmitted,
   onAskBinBinAboutQuestion,
-  onLoadDefaultAssignment,
 }) => {
-  const totalQuestionsCount =
-    assignmentPackage.multipleChoiceList.length +
-    assignmentPackage.sentenceOrderingList.length +
-    assignmentPackage.essayList.length;
-
-  if (totalQuestionsCount === 0) {
-    return (
-      <EmptyState
-        testId="empty-state-zero-assignments"
-        icon={<BookOpen className="w-7 h-7" />}
-        title="Chưa có bài tập nào được giao"
-        description="Hiện tại lớp học chưa có phiếu bài tập mới hoặc gói đề đang trống. Bạn có thể nạp bộ đề ôn tập chuẩn HSK 1–3 Buổi 14 để luyện tập ngay."
-        actionLabel="Nạp đề chuẩn Buổi 14 (HSK 1–3)"
-        onAction={onLoadDefaultAssignment}
-      />
-    );
-  }
+  const mcList = assignmentPackage.multipleChoiceList;
+  const soList = assignmentPackage.sentenceOrderingList;
 
   return (
     <div className="space-y-6">
-      {/* SECTION A: TRẮC NGHIỆM TỪ VỰNG & NGỮ CẢNH (30 ĐIỂM) */}
-      <div className="rounded-2xl bg-surface border border-border p-5 sm:p-6 space-y-5">
-        <div className="flex items-center justify-between border-b border-border pb-3">
-          <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-xl bg-primary text-on-primary text-xs font-bold flex items-center justify-center">
-              A
-            </span>
-            <h2 className="text-sm sm:text-base font-bold text-ink">
-              Phần A · Trắc Nghiệm Từ Vựng &amp; Ngữ Cảnh ({assignmentPackage.multipleChoiceList.length} câu · 30 điểm)
-            </h2>
-          </div>
-          <span className="text-xs text-gold font-semibold">10 điểm / câu</span>
+      {mcList.length > 0 && (
+      <section aria-labelledby="part-a-heading" className="rounded-2xl bg-surface border border-border p-5 sm:p-6 space-y-5">
+        <div className="flex items-center gap-2.5 border-b border-border pb-3">
+          <span className="w-7 h-7 rounded-lg bg-primary-soft text-primary text-xs font-bold flex items-center justify-center">
+            A
+          </span>
+          <h2 id="part-a-heading" className="text-base font-semibold text-ink">
+            Trắc nghiệm <span className="text-sm font-normal text-ink-muted">({mcList.length} câu)</span>
+          </h2>
         </div>
 
         <div>
@@ -74,7 +53,9 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
             const userChoice = mcAnswers[q.id];
             const selectedOpt = q.options.find((o) => o.key === userChoice);
             const isCorrect = selectedOpt?.isCorrect === true;
-            const fullSpokenSentence = q.question.replace('______', q.targetWord);
+            // Students receive questions without the answer key; the server grades them.
+            const hasAnswerKey = q.options.some((o) => o.isCorrect);
+            const fullSpokenSentence = q.question.replace(/_{2,}|（\s*）|\(\s*\)/g, q.targetWord || '');
 
             return (
               <div
@@ -170,7 +151,11 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                     let optionStyle =
                       'bg-surface border-border text-ink hover:border-border-strong';
 
-                    if (isSubmitted) {
+                    if (isSubmitted && !hasAnswerKey) {
+                      optionStyle = isChosen
+                        ? 'bg-primary border-transparent text-on-primary font-semibold'
+                        : 'bg-surface/60 opacity-60 border-border text-ink-muted';
+                    } else if (isSubmitted) {
                       if (opt.isCorrect) {
                         optionStyle =
                           'bg-primary border-transparent text-on-primary font-bold tactile-pill-correct';
@@ -221,7 +206,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                   })}
                 </div>
 
-                {isSubmitted && (
+                {isSubmitted && hasAnswerKey && (
                   <div
                     className={`p-3.5 rounded-xl text-xs space-y-2 ${
                       isCorrect
@@ -234,13 +219,14 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         {isCorrect ? (
                           <>
                             <CheckCircle2 className="w-4 h-4 text-success" />
-                            <span>Đáp án chính xác! (+10 điểm)</span>
+                            <span>Đúng</span>
                           </>
                         ) : (
                           <>
                             <AlertCircle className="w-4 h-4 text-danger" />
                             <span>
-                              Chưa chính xác (0/10 điểm) — Bạn đã chọn {userChoice || 'trống'} · Đã lưu từ &ldquo;<span lang="zh-CN">{q.targetWord}</span>&rdquo; vào 📓 Sổ từ khó.
+                              Chưa đúng — bạn chọn {userChoice || 'trống'}
+                              {q.targetWord ? ' · đã thêm từ vào Sổ từ khó' : ''}
                             </span>
                           </>
                         )}
@@ -257,9 +243,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         <span>🐼 Hỏi 彬彬 câu này</span>
                       </button>
                     </div>
-                    <div className="text-sm">
-                      <strong>Giải thích chuẩn xác:</strong> {q.explanation}
-                    </div>
+                    {q.explanation && <div className="text-sm">{q.explanation}</div>}
                     {q.grammarTip && (
                       <div className="text-xs pt-1 border-t border-border flex items-start gap-1">
                         <Sparkles className="w-3.5 h-3.5 shrink-0 text-gold mt-0.5" />
@@ -274,27 +258,26 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
             );
           })}
         </div>
-      </div>
+      </section>
+      )}
 
-      {/* SECTION B: SẮP XẾP CÂU TIẾNG TRUNG (40 ĐIỂM) */}
-      <div className="rounded-2xl bg-surface border border-border p-5 sm:p-6 space-y-5">
-        <div className="flex items-center justify-between border-b border-border pb-3">
-          <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-xl bg-accent text-on-primary text-xs font-bold flex items-center justify-center">
-              B
-            </span>
-            <h2 className="text-sm sm:text-base font-bold text-ink">
-              Phần B · Sắp Xếp Câu Tiếng Trung ({assignmentPackage.sentenceOrderingList.length} câu · 40 điểm)
-            </h2>
-          </div>
-          <span className="text-xs text-gold font-semibold">20 điểm / câu</span>
+      {soList.length > 0 && (
+      <section aria-labelledby="part-b-heading" className="rounded-2xl bg-surface border border-border p-5 sm:p-6 space-y-5">
+        <div className="flex items-center gap-2.5 border-b border-border pb-3">
+          <span className="w-7 h-7 rounded-lg bg-primary-soft text-primary text-xs font-bold flex items-center justify-center">
+            {mcList.length > 0 ? 'B' : 'A'}
+          </span>
+          <h2 id="part-b-heading" className="text-base font-semibold text-ink">
+            Sắp xếp câu <span className="text-sm font-normal text-ink-muted">({soList.length} câu)</span>
+          </h2>
         </div>
 
         <div>
           {assignmentPackage.sentenceOrderingList.map((q, idx) => {
             const userTokens = selectedTokensMap[q.id] || [];
             const remainingTokens = availableTokensMap[q.id] || [];
-            const isCorrect = userTokens.join('') === q.correctTokens.join('');
+            const hasAnswerKey = q.correctTokens.length > 0;
+            const isCorrect = hasAnswerKey && userTokens.join('') === q.correctTokens.join('');
 
             return (
               <div
@@ -305,11 +288,13 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                   <span className="px-2.5 py-0.5 rounded-lg bg-primary/10 text-primary text-xs font-bold">
                     Câu {idx + 1}
                   </span>
-                  <h3 className="text-sm font-bold text-ink mt-1">
-                    Dịch nghĩa cần sắp xếp: &ldquo;{q.vietnameseMeaning}&rdquo;
+                  <h3 className="text-sm font-semibold text-ink mt-1">
+                    {q.vietnameseMeaning
+                      ? <>Sắp xếp thành câu: &ldquo;{q.vietnameseMeaning}&rdquo;</>
+                      : 'Sắp xếp các từ thành câu đúng'}
                   </h3>
                   <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                    {(isSubmitted || revealedPinyinHints[q.id]) && (
+                    {q.pinyin && (isSubmitted || revealedPinyinHints[q.id]) && (
                       <p
                         data-testid={`part-b-pinyin-${q.id}`}
                         className="text-xs text-gold font-medium"
@@ -317,7 +302,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         {q.pinyin}
                       </p>
                     )}
-                    {!isSubmitted && (
+                    {!isSubmitted && q.pinyin && (
                       <button
                         type="button"
                         data-testid={`toggle-pinyin-hint-${q.id}`}
@@ -329,20 +314,22 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         </span>
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => speakChinese(q.correctTokens.join(''))}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface border border-border text-xs font-semibold text-ink hover:border-border-strong transition-all cursor-pointer"
-                    >
-                      <Volume2 className="w-3.5 h-3.5 inline text-gold" />
-                      <span>Nghe câu</span>
-                    </button>
+                    {hasAnswerKey && (
+                      <button
+                        type="button"
+                        onClick={() => speakChinese(q.correctTokens.join(''))}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-surface border border-border text-xs font-semibold text-ink hover:border-border-strong transition-all cursor-pointer"
+                      >
+                        <Volume2 className="w-3.5 h-3.5 inline text-gold" />
+                        <span>Nghe câu</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 <div
                   className={`min-h-[58px] p-2.5 rounded-2xl bg-surface border-2 border-dashed flex flex-wrap items-center gap-2 transition-all ${
-                    isSubmitted
+                    isSubmitted && hasAnswerKey
                       ? isCorrect
                         ? 'border-primary tactile-pill-correct'
                         : 'border-accent tactile-pill-wrong'
@@ -389,7 +376,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                   </div>
                 )}
 
-                {isSubmitted && (
+                {isSubmitted && hasAnswerKey && (
                   <div
                     className={`p-3.5 rounded-xl text-xs space-y-2 ${
                       isCorrect
@@ -402,12 +389,12 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         {isCorrect ? (
                           <>
                             <CheckCircle2 className="w-4 h-4 text-success" />
-                            <span>Chính xác hoàn hảo! (+20 điểm)</span>
+                            <span>Đúng</span>
                           </>
                         ) : (
                           <>
                             <AlertCircle className="w-4 h-4 text-danger" />
-                            <span>Chưa chính xác (0/20 điểm)</span>
+                            <span>Chưa đúng</span>
                           </>
                         )}
                       </div>
@@ -416,7 +403,7 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                         data-testid={`ask-binbin-so-${q.id}`}
                         onClick={() =>
                           onAskBinBinAboutQuestion(
-                            q.correctTokens[0] || '温暖',
+                            q.targetWord || q.correctTokens[0] || '',
                             q.correctTokens.join(''),
                             q.explanation
                           )
@@ -442,14 +429,15 @@ export const ArenaHomeworkPartAB: React.FC<ArenaHomeworkPartABProps> = ({
                       </button>
                     </div>
 
-                    <p className="text-sm leading-relaxed">{q.explanation}</p>
+                    {q.explanation && <p className="text-sm leading-relaxed">{q.explanation}</p>}
                   </div>
                 )}
               </div>
             );
           })}
         </div>
-      </div>
+      </section>
+      )}
     </div>
   );
 };

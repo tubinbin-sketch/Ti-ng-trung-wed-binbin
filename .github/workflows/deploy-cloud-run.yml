@@ -1,0 +1,101 @@
+# Deploy the web app + API to Google Cloud Run.
+#
+# Runs when started by hand (Actions → "Deploy to Cloud Run" → Run workflow).
+# To deploy automatically after every merge to main, uncomment the `push` trigger.
+#
+# One-time setup (see docs/DEPLOY_CLOUD_RUN.md):
+#   Repository secret   GCP_SA_KEY        JSON key of the deploy service account
+#   Repository variable GCP_PROJECT_ID    e.g. gen-lang-client-0729047629
+#   Optional variables  GCP_REGION (asia-southeast1), CLOUD_RUN_SERVICE (hanu-hsk),
+#                       TEACHER_EMAIL_ALLOWLIST, ALLOWED_ORIGINS,
+#                       VITE_RECAPTCHA_ENTERPRISE_SITE_KEY, ENFORCE_APP_CHECK
+# The Gemini key lives in Secret Manager (secret "gemini-api-key"), created by
+# scripts/deploy-cloud-run.sh on the first run.
+name: Deploy to Cloud Run
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cloud-run
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  REGION: ${{ vars.GCP_REGION || 'asia-southeast1' }}
+  SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'hanu-hsk' }}
+  REPO: hanu
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check configuration
+        env:
+          HAS_KEY: ${{ secrets.GCP_SA_KEY != '' }}
+        run: |
+          if [ "$HAS_KEY" != "true" ] || [ -z "$PROJECT_ID" ]; then
+            echo "::error::Thiếu secret GCP_SA_KEY hoặc biến GCP_PROJECT_ID. Xem docs/DEPLOY_CLOUD_RUN.md."
+            exit 1
+          fi
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build image (Cloud Build)
+        env:
+          RECAPTCHA_KEY: ${{ vars.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY }}
+        run: |
+          IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/${SERVICE}:${GITHUB_SHA::12}"
+          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+          gcloud builds submit --project "$PROJECT_ID" --config cloudbuild.yaml \
+            --substitutions="_IMAGE=${IMAGE},_RECAPTCHA_SITE_KEY=${RECAPTCHA_KEY}" .
+
+      - name: Deploy
+        env:
+          RECAPTCHA_KEY: ${{ vars.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY }}
+          ENFORCE_APP_CHECK_VAR: ${{ vars.ENFORCE_APP_CHECK }}
+          TEACHER_EMAIL_ALLOWLIST: ${{ vars.TEACHER_EMAIL_ALLOWLIST }}
+          ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS }}
+        run: |
+          # Enforce App Check only when the client has a site key to obtain tokens.
+          ENFORCE="${ENFORCE_APP_CHECK_VAR:-$([ -n "$RECAPTCHA_KEY" ] && echo true || echo false)}"
+          cat > env.yaml <<EOF
+          NODE_ENV: "production"
+          FIREBASE_PROJECT_ID: "${PROJECT_ID}"
+          ENFORCE_APP_CHECK: "${ENFORCE}"
+          TEACHER_EMAIL_ALLOWLIST: "${TEACHER_EMAIL_ALLOWLIST}"
+          ALLOWED_ORIGINS: "${ALLOWED_ORIGINS}"
+          AI_DAILY_LIMIT: "60"
+          MAX_SUBMISSION_ATTEMPTS: "1"
+          EOF
+          gcloud run deploy "$SERVICE" --project "$PROJECT_ID" \
+            --image "$IMAGE" --region "$REGION" --allow-unauthenticated \
+            --port 8080 --cpu 1 --memory 512Mi \
+            --min-instances 0 --max-instances 5 --concurrency 80 --timeout 60s \
+            --env-vars-file env.yaml \
+            --set-secrets "GEMINI_API_KEY=gemini-api-key:latest,RATE_LIMIT_HMAC_SECRET=rate-limit-hmac-secret:latest" \
+            --quiet
+          URL=$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')
+          echo "### ✅ Đã deploy: $URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test
+        run: |
+          URL=$(gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')
+          for i in 1 2 3 4 5; do
+            if curl -fsS "$URL/healthz"; then echo; exit 0; fi
+            sleep 5
+          done
+          echo "::error::$URL/healthz không phản hồi"
+          exit 1

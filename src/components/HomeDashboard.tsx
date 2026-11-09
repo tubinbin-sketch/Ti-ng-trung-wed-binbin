@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  AudioLines,
   BookOpen,
   Check,
   ChevronRight,
@@ -11,7 +12,6 @@ import {
   Presentation,
   Search,
   Target,
-  Trophy,
   Volume2,
   X,
 } from 'lucide-react';
@@ -19,6 +19,8 @@ import { VocabSlide } from '../data/chineseData';
 import { UserProfile } from './AuthModal';
 import { speakChinese } from '../utils/speech';
 import { Dialog } from './ui/Dialog';
+import { useAppStoreSelector } from '../context/AppStoreContext';
+import { countAssignmentQuestions, getStoredAssignment } from '../utils/assignmentParser';
 import {
   DailyGoalTarget,
   DailyStudyProgress,
@@ -47,6 +49,7 @@ interface HomeDashboardProps {
   onOpenFlashcard: () => void;
   onOpenHomework: () => void;
   onOpenLeaderboard: () => void;
+  onOpenShadowing: () => void;
   onOpenLessonBuilder: () => void;
   onOpenClassroom: () => void;
   onPickSlide: (index: number) => void;
@@ -99,11 +102,19 @@ export function HomeDashboard({
   onOpenFlashcard,
   onOpenHomework,
   onOpenLeaderboard,
+  onOpenShadowing,
   onOpenLessonBuilder,
   onOpenClassroom,
   onPickSlide,
   onToggleLearned,
 }: HomeDashboardProps) {
+  const latestAssignment = useAppStoreSelector((st) => st.latestAssignment);
+  const activeAssignment = useMemo(
+    () => latestAssignment || getStoredAssignment(),
+    [latestAssignment]
+  );
+  const assignedCount = countAssignmentQuestions(activeAssignment);
+  const assignedTitle = activeAssignment.sessionTitle || 'Bài tập';
   const [previewWord, setPreviewWord] = useState<{ slide: VocabSlide; index: number } | null>(null);
   const [unlearnedSearchQuery, setUnlearnedSearchQuery] = useState('');
   const [unlearnedFilter, setUnlearnedFilter] = useState<string>('all');
@@ -201,11 +212,18 @@ export function HomeDashboard({
             className="inline-flex items-center gap-2.5 min-h-11"
             title="Chuỗi ngày học liên tiếp"
           >
-            <Flame className="w-5 h-5 text-gold fill-current shrink-0" aria-hidden="true" />
+            <Flame
+              className={`w-5 h-5 shrink-0 ${
+                dailyProgress.streakDays > 0 ? 'text-gold fill-current' : 'text-ink-subtle'
+              }`}
+              aria-hidden="true"
+            />
             <div className="leading-tight">
               <span className="block text-xs text-ink-muted">Chuỗi ngày học</span>
               <span className="block text-sm font-semibold text-ink tabular-nums">
-                {dailyProgress.streakDays} ngày liên tiếp
+                {dailyProgress.streakDays > 0
+                  ? `${dailyProgress.streakDays} ngày liên tiếp`
+                  : 'Ôn 1 từ để bắt đầu'}
               </span>
             </div>
           </div>
@@ -284,8 +302,8 @@ export function HomeDashboard({
             style={{ '--stagger': 1 } as React.CSSProperties}
             aria-labelledby="continue-heading"
           >
-            <div className="flex items-center justify-between gap-2">
-              <h3 id="continue-heading" className="text-sm font-semibold text-ink-muted">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <h3 id="continue-heading" className="text-sm font-semibold text-ink-muted whitespace-nowrap">
                 Tiếp tục bài học
               </h3>
               <span className="text-xs text-ink-subtle tabular-nums">
@@ -475,18 +493,20 @@ export function HomeDashboard({
               testId: 'home-flashcard-btn',
             },
             {
-              icon: PenTool,
-              title: 'Làm bài tập',
-              body: 'Đề HSK 3.0, ghép câu, kiểm tra tốc độ',
-              onClick: onOpenHomework,
-              testId: 'home-homework-btn',
+              icon: AudioLines,
+              title: 'Shadowing',
+              body: 'Nghe câu mẫu rồi đọc theo, chấm phát âm',
+              onClick: onOpenShadowing,
+              testId: 'home-shadowing-btn',
             },
             {
-              icon: Trophy,
-              title: 'Bảng xếp hạng',
-              body: 'Xem điểm và chuỗi ngày học của lớp',
-              onClick: onOpenLeaderboard,
-              testId: 'home-leaderboard-btn',
+              icon: PenTool,
+              title: 'Bài tập được giao',
+              body: assignedCount > 0
+                ? `${assignedCount} câu · ${assignedTitle}`
+                : 'Chưa có bài nào từ giáo viên',
+              onClick: onOpenHomework,
+              testId: 'home-homework-btn',
             },
           ].map(({ icon: Icon, title, body, onClick, testId }) => (
             <button
@@ -831,6 +851,7 @@ export function HomeDashboard({
             {/* Speech Recognition Pronunciation Result inside Popup */}
             <PronunciationResultBanner
               result={popupPronunciation.result}
+              error={popupPronunciation.error}
               targetHanzi={activePreviewSlide.hanzi}
               onRetry={popupPronunciation.startOrStopPractice}
               onClose={popupPronunciation.clearResult}

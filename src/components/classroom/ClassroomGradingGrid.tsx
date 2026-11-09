@@ -3,12 +3,11 @@ import { RefreshCw, Trash2, Users } from 'lucide-react';
 import { isStudentNeedsSupport } from '../../utils/chineseEngine';
 import { Dialog } from '../ui/Dialog';
 import { EmptyState } from '../ui/EmptyState';
-import { ClassStudent, DEFAULT_STUDENTS } from './classroomRosterData';
+import { ClassStudent } from './classroomRosterData';
 
 interface ClassroomGradingGridProps {
   studentsList: ClassStudent[];
   filteredStudents: ClassStudent[];
-  onRestoreDefaultStudents: () => void;
   onResetFilters: () => void;
   onOpenAddStudentModal: () => void;
   onDeleteStudentClick: (student: ClassStudent, e?: React.MouseEvent) => void;
@@ -22,7 +21,6 @@ interface ClassroomGradingGridProps {
 export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
   studentsList,
   filteredStudents,
-  onRestoreDefaultStudents,
   onResetFilters,
   onOpenAddStudentModal,
   onDeleteStudentClick,
@@ -35,29 +33,14 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
   return (
     <>
       <section className="space-y-4 pb-12" aria-labelledby="grading-grid-heading">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border">
-          <div>
-            <h3 id="grading-grid-heading" className="text-sm font-semibold text-ink">
-              Kết quả tự động chấm bài tập về nhà (HSK 1–3) — Hiển thị: {filteredStudents.length}/{studentsList.length} học viên
-            </h3>
-            <p className="text-xs text-ink-muted mt-0.5 max-w-[65ch]">
-              Bấm &ldquo;Thêm học viên&rdquo; để cấp Mã học viên (HV-001...) hoặc &ldquo;Xuất bảng điểm (CSV)&rdquo; để tải về máy.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-success font-semibold">
-              ● 100% Đã chấm tự động
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 id="grading-grid-heading" className="text-sm font-semibold text-ink">
+            Học viên{' '}
+            <span className="font-normal text-ink-muted tabular-nums">
+              ({filteredStudents.length}/{studentsList.length})
             </span>
-            {studentsList.length < DEFAULT_STUDENTS.length && (
-              <button
-                type="button"
-                onClick={onRestoreDefaultStudents}
-                className="text-xs text-gold hover:text-ink font-semibold underline underline-offset-2 transition-colors cursor-pointer"
-              >
-                Khôi phục {DEFAULT_STUDENTS.length} học viên ban đầu
-              </button>
-            )}
-          </div>
+          </h3>
+          <p className="text-xs text-ink-muted">Điểm được máy chủ chấm khi học viên nộp bài.</p>
         </div>
 
         {filteredStudents.length === 0 ? (
@@ -66,11 +49,9 @@ export const ClassroomGradingGrid: React.FC<ClassroomGradingGridProps> = ({
               testId="empty-state-zero-students"
               icon={<Users className="w-7 h-7" />}
               title="Lớp học chưa có học viên nào"
-              description="Hãy bấm '+ Thêm học viên mới' để cấp mã học viên (HV-001...) cho học sinh thực tế hoặc nạp danh sách 12 học viên mẫu để trải nghiệm thử."
-              actionLabel="+ Thêm học viên đầu tiên"
+              description="Thêm học viên để cấp mã học viên, hoặc gửi mã lớp để học viên tự tham gia."
+              actionLabel="Thêm học viên đầu tiên"
               onAction={onOpenAddStudentModal}
-              secondaryActionLabel={`Khôi phục ${DEFAULT_STUDENTS.length} học viên mẫu`}
-              onSecondaryAction={onRestoreDefaultStudents}
             />
           ) : (
             <EmptyState

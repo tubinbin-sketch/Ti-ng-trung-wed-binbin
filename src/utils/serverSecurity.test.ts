@@ -1,3 +1,4 @@
+import { SAMPLE_ASSIGNMENT } from './testFixtures';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -32,7 +33,6 @@ import {
 } from '../../server';
 import {
   extractAssignmentAnswerKey,
-  PRESET_ASSIGNMENT_BUOI_14,
   sanitizeAssignmentForPublic,
 } from './assignmentParser';
 import {
@@ -260,7 +260,7 @@ test('Server Security & Classroom API Suite (Bootstrap, Atomic Join, Atomic Grad
   });
 
   await t.test('3. Sanitize public assignment vs private answerKey & Speed Test option diversity', () => {
-    const sanitized = sanitizeAssignmentForPublic(PRESET_ASSIGNMENT_BUOI_14);
+    const sanitized = sanitizeAssignmentForPublic(SAMPLE_ASSIGNMENT);
     for (const mc of sanitized.multipleChoiceList) {
       for (const opt of mc.options) {
         assert.equal(opt.isCorrect, false, 'Public assignment must strip isCorrect answers');
@@ -274,7 +274,7 @@ test('Server Security & Classroom API Suite (Bootstrap, Atomic Join, Atomic Grad
       assert.equal(es.sampleSentence, '', 'Public assignment must strip sampleSentence');
     }
 
-    const key = extractAssignmentAnswerKey(PRESET_ASSIGNMENT_BUOI_14, 'teacher-uid-1');
+    const key = extractAssignmentAnswerKey(SAMPLE_ASSIGNMENT, 'teacher-uid-1');
     assert.equal(key.multipleChoiceAnswers['mc-14-1'], 'A');
     assert.equal(key.multipleChoiceAnswers['mc-14-2'], 'B');
     assert.equal(key.multipleChoiceAnswers['mc-14-3'], 'C');
@@ -384,7 +384,7 @@ test('Server Security & Classroom API Suite (Bootstrap, Atomic Join, Atomic Grad
 
   await t.test('5. POST /api/submissions executes atomically, prevents concurrent double-submissions, and ignores forged client timeSeconds', async () => {
     const answerKey = extractAssignmentAnswerKey(
-      PRESET_ASSIGNMENT_BUOI_14,
+      SAMPLE_ASSIGNMENT,
       'teacher-uid-1',
       1
     );

@@ -1388,6 +1388,35 @@ export function getStrokeDataForChar(char: string, fallbackPinyin?: string): Str
   };
 }
 
+type HanziWriterJson = { strokes: string[]; medians: number[][][] };
+
+// Same package/version the Node server serves at /hanzi-data. Used when the app
+// is deployed without the server (static hosting) or the local route fails.
+const HANZI_WRITER_CDN = 'https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1';
+
+async function fetchStrokeJson(url: string): Promise<HanziWriterJson | null> {
+  const res = await fetch(url);
+  // A static host may answer an unknown path with the app's index.html (200):
+  // only accept a real JSON body.
+  const type = res.headers.get('content-type') || '';
+  if (!res.ok || !type.includes('json')) return null;
+  const data = (await res.json()) as HanziWriterJson;
+  return Array.isArray(data?.strokes) && data.strokes.length > 0 ? data : null;
+}
+
+async function loadHanziWriterJson(char: string): Promise<HanziWriterJson> {
+  const name = `${encodeURIComponent(char)}.json`;
+  try {
+    const local = await fetchStrokeJson(`/hanzi-data/${name}`);
+    if (local) return local;
+  } catch {
+    // fall through to the CDN
+  }
+  const remote = await fetchStrokeJson(`${HANZI_WRITER_CDN}/${name}`);
+  if (remote) return remote;
+  throw new Error(`No stroke data for ${char}`);
+}
+
 /**
  * Fetches 100% authentic SVG stroke outlines and medians for ANY Chinese character
  * directly from the locally installed `hanzi-writer-data` package served at:
@@ -1410,15 +1439,7 @@ export async function fetchHanziWriterCharacter(
     fallbackRadical || existingLib?.radical || meta?.radical || 'Bộ thủ chuẩn';
 
   try {
-    const url = `/hanzi-data/${encodeURIComponent(char)}.json`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`Local hanzi-writer-data returned ${res.status}`);
-    }
-    const data = (await res.json()) as {
-      strokes: string[];
-      medians: number[][][];
-    };
+    const data = await loadHanziWriterJson(char);
 
     if (Array.isArray(data.strokes) && data.strokes.length > 0) {
       // Convert HanziWriter 1024x1024 medians (where y=900 is top, y=-124 is bottom)
@@ -4049,7 +4070,9 @@ export function applyStudentSubmissionToRoster(
     return {
       ...st,
       vocabScore: `${submission.learnedVocabCount}/${submission.totalVocabCount} từ`,
-      writingScore: `${clampedWriting}% độ chuẩn nét`,
+      // Only overwrite handwriting accuracy when this submission actually measured it.
+      writingScore:
+        submission.writingAccuracy > 0 ? `${clampedWriting}% độ chuẩn nét` : st.writingScore,
       quizScore: `${submission.quizCorrectCount}/${submission.quizTotalCount} câu đúng`,
       totalPoints: clampedTotal,
       status,
@@ -4073,7 +4096,7 @@ export function applyStudentSubmissionToRoster(
       {
         ...created,
         vocabScore: `${submission.learnedVocabCount}/${submission.totalVocabCount} từ`,
-        writingScore: `${clampedWriting}% độ chuẩn nét`,
+        writingScore: submission.writingAccuracy > 0 ? `${clampedWriting}% độ chuẩn nét` : '',
         quizScore: `${submission.quizCorrectCount}/${submission.quizTotalCount} câu đúng`,
         reviewWords: cleanReview,
         lastSubmittedAt: nowLabel,

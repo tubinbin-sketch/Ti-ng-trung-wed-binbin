@@ -11,7 +11,6 @@ interface ArenaSpeedTestSectionProps {
   speedTestAnswers: Record<string, string>;
   onSelectSpeedTestAnswer: (qId: string, opt: string) => void;
   isListeningExamMode: boolean;
-  onQuickFillSpeedTest: () => void;
   onResetSpeedTest: () => void;
   onSubmitSpeedTest: () => void;
   onAskBinBinAboutQuestion: (targetWord: string, questionText: string, explanationText?: string) => void;
@@ -31,7 +30,6 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
   speedTestAnswers,
   onSelectSpeedTestAnswer,
   isListeningExamMode,
-  onQuickFillSpeedTest,
   onResetSpeedTest,
   onSubmitSpeedTest,
   onAskBinBinAboutQuestion,
@@ -121,16 +119,7 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
             <span>{formatTimerMmSs(speedTestSecondsLeft)}</span>
           </div>
 
-          {!isSpeedTestSubmitted ? (
-            <button
-              type="button"
-              data-testid="speed-test-quick-fill-btn"
-              onClick={onQuickFillSpeedTest}
-              className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-ink border border-border-strong text-xs font-bold cursor-pointer"
-            >
-              ⚡ Điền nhanh 10 câu mẫu
-            </button>
-          ) : (
+          {isSpeedTestSubmitted && (
             <button
               type="button"
               data-testid="speed-test-reset-btn"
@@ -164,7 +153,7 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
                   📜 PHIẾU CHỨNG NHẬN HOÀN THÀNH BÀI HỌC CHUẨN HSK 3.0
                 </h3>
                 <p className="text-xs text-ink-muted mt-0.5">
-                  Cấp cho học viên: <strong className="text-ink">{activeStudentName}</strong> · Lớp HSK 1–3
+                  Bài luyện tập của <strong className="text-ink">{activeStudentName}</strong> · không tính vào điểm lớp
                 </p>
               </div>
             </div>
@@ -204,7 +193,7 @@ export const ArenaSpeedTestSection: React.FC<ArenaSpeedTestSectionProps> = ({
 
           <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-ink-muted">
             <span>
-              ✅ Đã đồng bộ tự động vào Sổ điểm của <strong>GV Nguyễn Văn Thụ (阮文受)</strong>.
+              Bài tự luyện: kết quả không gửi cho giáo viên.
             </span>
           </div>
         </div>

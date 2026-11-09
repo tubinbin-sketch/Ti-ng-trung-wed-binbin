@@ -98,7 +98,7 @@ export const PrivacyPolicyPage: React.FC = () => {
           <ArrowLeft className="w-4 h-4" />
           Quay về trang học
         </Link>
-        <span className="px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
+        <span className="px-2.5 py-1 rounded-full bg-success-soft border border-success/30 text-success text-xs font-semibold">
           Tuân thủ Luật BVDLCN 91/2025/QH15 & NĐ 356/2025/NĐ-CP
         </span>
       </div>
@@ -141,7 +141,7 @@ export const PrivacyPolicyPage: React.FC = () => {
             type="button"
             data-testid="privacy-export-json-btn"
             onClick={handleExportPersonalData}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-on-primary text-sm font-semibold hover:bg-primary-hover transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             Xuất dữ liệu cá nhân (.json)

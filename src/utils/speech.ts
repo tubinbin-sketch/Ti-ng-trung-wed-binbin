@@ -155,6 +155,66 @@ export function speakChinese(text: string, customRate?: number): void {
   playGentleChime(528, 0.12);
 }
 
+/** Rough duration of a Chinese utterance, used for shadowing pauses and fallbacks. */
+export function estimateChineseSpeechMs(text: string, rate = 1): number {
+  const chars = Array.from(text || '').filter((ch) => /[\u3400-\u9fff]/.test(ch)).length;
+  return Math.round((Math.max(1, chars) * 260) / Math.max(0.4, rate)) + 350;
+}
+
+/** Stop any sentence that is being read aloud. */
+export function cancelChineseSpeech(): void {
+  try {
+    window.speechSynthesis?.cancel();
+  } catch {
+    // ignore
+  }
+  notifySpeakingState(false);
+}
+
+/**
+ * Read a sentence aloud (no chime) and resolve when it has finished, so
+ * callers can chain listen → repeat steps. Resolves after an estimated
+ * duration if the browser has no Chinese voice or never fires `onend`.
+ */
+export function speakChineseAsync(text: string, rate = preferredSpeechRate): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !text) {
+      resolve();
+      return;
+    }
+    const clampedRate = Math.max(0.45, Math.min(1.5, rate));
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      window.clearTimeout(fallback);
+      notifySpeakingState(false);
+      resolve();
+    };
+    const fallback = window.setTimeout(finish, estimateChineseSpeechMs(text, clampedRate) * 2 + 1500);
+    try {
+      if (!('speechSynthesis' in window) || !window.speechSynthesis) {
+        window.clearTimeout(fallback);
+        window.setTimeout(finish, estimateChineseSpeechMs(text, clampedRate));
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.rate = clampedRate;
+      const voice = selectBestChineseVoice(window.speechSynthesis.getVoices?.() || []);
+      if (voice) utterance.voice = voice;
+      utterance.onstart = () => notifySpeakingState(true);
+      utterance.onend = finish;
+      utterance.onerror = finish;
+      notifySpeakingState(true);
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      finish();
+    }
+  });
+}
+
 export function playGentleChime(freq = 587.33, durationSec = 0.16): void {
   if (typeof window === 'undefined') return;
   try {
@@ -339,12 +399,53 @@ export function evaluateChinesePronunciation(
   };
 }
 
+/**
+ * Why speech recognition produced no transcript. Mirrors the Web Speech API
+ * error codes plus our own 'unsupported' / 'no-result' / 'timeout'.
+ */
+export type SpeechFailureReason =
+  | 'unsupported'
+  | 'not-allowed'
+  | 'audio-capture'
+  | 'no-speech'
+  | 'network'
+  | 'aborted'
+  | 'no-result'
+  | 'timeout';
+
+export function describeSpeechFailure(reason: SpeechFailureReason): string {
+  switch (reason) {
+    case 'unsupported':
+      return 'Trình duyệt này chưa hỗ trợ nhận diện giọng nói. Hãy dùng Chrome hoặc Edge để luyện phát âm.';
+    case 'not-allowed':
+      return 'Micro đang bị chặn. Cho phép trang dùng micro (biểu tượng ổ khóa cạnh địa chỉ web) rồi thử lại.';
+    case 'audio-capture':
+      return 'Không tìm thấy micro. Kiểm tra micro đã cắm và đang bật rồi thử lại.';
+    case 'network':
+      return 'Nhận diện giọng nói cần kết nối mạng. Kiểm tra mạng rồi thử lại.';
+    case 'no-speech':
+    case 'timeout':
+      return 'Chưa nghe thấy bạn đọc. Bấm "Đọc thử" rồi đọc rõ từ, gần micro hơn một chút.';
+    case 'aborted':
+      return 'Đã dừng thu âm.';
+    default:
+      return 'Chưa nhận được kết quả. Hãy thử đọc lại.';
+  }
+}
+
+function toFailureReason(code: unknown): SpeechFailureReason {
+  const c = String(code || '');
+  if (c === 'not-allowed' || c === 'service-not-allowed') return 'not-allowed';
+  if (c === 'audio-capture' || c === 'no-speech' || c === 'network' || c === 'aborted') return c;
+  return 'no-result';
+}
+
 export function startChineseSpeechRecognition(
   onResult: (result: { transcript: string; alternatives?: string[] }) => void,
-  onErrorOrEnd: () => void
+  onErrorOrEnd: (reason?: SpeechFailureReason) => void
 ): () => void {
   if (typeof window === 'undefined') {
-    onErrorOrEnd();
+    onErrorOrEnd('unsupported');
     return () => {};
   }
 
@@ -360,7 +461,7 @@ export function startChineseSpeechRecognition(
   const SpeechRecognitionAPI =
     (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
   if (!SpeechRecognitionAPI) {
-    onErrorOrEnd();
+    onErrorOrEnd('unsupported');
     return () => {};
   }
 
@@ -386,17 +487,17 @@ export function startChineseSpeechRecognition(
       onResult({ transcript, alternatives });
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: any) => {
       if (!settled) {
         settled = true;
-        onErrorOrEnd();
+        onErrorOrEnd(toFailureReason(event?.error));
       }
     };
 
     recognition.onend = () => {
       if (!settled) {
         settled = true;
-        onErrorOrEnd();
+        onErrorOrEnd('no-result');
       }
     };
 
@@ -409,29 +510,30 @@ export function startChineseSpeechRecognition(
       }
     };
   } catch {
-    onErrorOrEnd();
+    onErrorOrEnd('unsupported');
     return () => {};
   }
 }
 
+/**
+ * Listen once and grade the learner's pronunciation. If nothing was heard
+ * (mic blocked, no speech, unsupported browser, timeout) `onUnavailable` is
+ * called instead — the target text is never graded as if it had been spoken.
+ */
 export function practiceChinesePronunciationWithMic(options: {
   targetHanzi: string;
   targetPinyin?: string;
   timeoutMs?: number;
   onResult: (evaluation: PronunciationEvaluationResult) => void;
+  onUnavailable?: (reason: SpeechFailureReason) => void;
 }): () => void {
-  const { targetHanzi, targetPinyin = '', timeoutMs = 1900, onResult } = options;
+  const { targetHanzi, targetPinyin = '', timeoutMs = 9000, onResult, onUnavailable } = options;
   let finished = false;
 
-  const finishWithEvaluation = (spokenText: string) => {
+  const finishUnavailable = (reason: SpeechFailureReason) => {
     if (finished) return;
     finished = true;
-    const evaluation = evaluateChinesePronunciation(spokenText, targetHanzi, targetPinyin);
-    playGentleChime(
-      evaluation.tier === 'excellent' ? 783.99 : evaluation.tier === 'good' ? 659.25 : 440,
-      0.2
-    );
-    onResult(evaluation);
+    onUnavailable?.(reason);
   };
 
   const stopRec = startChineseSpeechRecognition(
@@ -439,7 +541,7 @@ export function practiceChinesePronunciationWithMic(options: {
       if (finished) return;
       const candidates = [transcript, ...alternatives].filter(Boolean);
       if (candidates.length === 0) {
-        finishWithEvaluation(targetHanzi);
+        finishUnavailable('no-speech');
         return;
       }
       let bestEval = evaluateChinesePronunciation(candidates[0], targetHanzi, targetPinyin);
@@ -449,6 +551,7 @@ export function practiceChinesePronunciationWithMic(options: {
           bestEval = candidateEval;
         }
       }
+      if (finished) return;
       finished = true;
       playGentleChime(
         bestEval.tier === 'excellent' ? 783.99 : bestEval.tier === 'good' ? 659.25 : 440,
@@ -456,11 +559,8 @@ export function practiceChinesePronunciationWithMic(options: {
       );
       onResult(bestEval);
     },
-    () => {
-      // Fallback when browser mic is unavailable/blocked in preview iframe so user can still experience pronunciation grading
-      if (!finished) {
-        finishWithEvaluation(targetHanzi);
-      }
+    (reason) => {
+      finishUnavailable(reason || 'no-result');
     }
   );
 
@@ -469,7 +569,7 @@ export function practiceChinesePronunciationWithMic(options: {
       ? window.setTimeout(() => {
           if (!finished) {
             stopRec();
-            finishWithEvaluation(targetHanzi);
+            finishUnavailable('timeout');
           }
         }, timeoutMs)
       : null;

@@ -22,11 +22,11 @@ export default defineConfig(() => {
         ],
         manifest: {
           name: 'HANU HSK — Học tiếng Trung chuẩn HSK 3.0',
-          short_name: 'Bin-Bin HSK',
+          short_name: 'HANU HSK',
           description:
             'Nền tảng học tiếng Trung HSK 1–9, luyện viết chữ Hán ô Mễ Tự Cách, ôn tập Flashcard SRS ngoại tuyến và quản lý lớp học.',
-          theme_color: '#b83227',
-          background_color: '#faf7f2',
+          theme_color: '#F5F6F8',
+          background_color: '#F5F6F8',
           display: 'standalone',
           orientation: 'portrait',
           scope: '/',
@@ -65,12 +65,20 @@ export default defineConfig(() => {
           navigateFallbackDenylist: [/^\/api\//, /^\/hanzi-data\//],
           runtimeCaching: [
             {
-              // Never cache authenticated or private API endpoints in Service Worker CacheStorage
-              urlPattern: /^\/api\/(?!hanzi\/char\/).*/i,
+              // Never cache authenticated or private API endpoints in Service Worker CacheStorage.
+              // (Workbox tests a RegExp against the full URL, so match on pathname.)
+              urlPattern: ({ url }) =>
+                url.origin === self.location.origin &&
+                /^\/api\/(?!hanzi\/char\/)/i.test(url.pathname),
               handler: 'NetworkOnly',
             },
             {
-              urlPattern: /^\/(hanzi-data\/.*\.json|api\/hanzi\/char\/.*)$/i,
+              // Stroke data: same-origin route, or the jsDelivr copy used on static hosting
+              urlPattern: ({ url }) =>
+                (url.origin === self.location.origin &&
+                  /^\/(hanzi-data\/.+\.json|api\/hanzi\/char\/.+)$/i.test(url.pathname)) ||
+                (url.hostname === 'cdn.jsdelivr.net' &&
+                  url.pathname.startsWith('/npm/hanzi-writer-data@')),
               handler: 'CacheFirst',
               options: {
                 cacheName: 'hanzi-stroke-data-cache',
@@ -84,7 +92,8 @@ export default defineConfig(() => {
               },
             },
             {
-              urlPattern: /^\/illustrations\/.*\.svg$/i,
+              urlPattern: ({ url }) =>
+                url.origin === self.location.origin && /^\/illustrations\/.+\.svg$/i.test(url.pathname),
               handler: 'StaleWhileRevalidate',
               options: {
                 cacheName: 'vocab-illustrations-cache',
