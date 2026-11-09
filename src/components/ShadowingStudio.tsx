@@ -125,8 +125,15 @@ export const ShadowingStudio: React.FC<{ slides: VocabSlide[] }> = ({ slides }) 
 
   // Keep the active row visible in the sentence list.
   useEffect(() => {
-    const row = listRef.current?.querySelector<HTMLElement>(`[data-row="${safeIndex}"]`);
-    row?.scrollIntoView({ block: 'nearest' });
+    // Scroll only the list itself; scrollIntoView would also move the page on phones.
+    const list = listRef.current;
+    const row = list?.querySelector<HTMLElement>(`[data-row="${safeIndex}"]`);
+    if (!list || !row) return;
+    const top = row.offsetTop - list.offsetTop;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (top + row.offsetHeight > list.scrollTop + list.clientHeight) {
+      list.scrollTop = top + row.offsetHeight - list.clientHeight;
+    }
   }, [safeIndex, level]);
 
   const changeLevel = (next: HskLevel) => {
